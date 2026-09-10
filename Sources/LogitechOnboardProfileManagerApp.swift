@@ -12,6 +12,7 @@ struct ProfileChoice: Identifiable, Hashable {
     let id: Int
     let sector: String
     var enabled: Bool
+    var crcValid: Bool
 
     var title: String {
         "Profile \(id)\(enabled ? "" : " (disabled)")"
@@ -1053,8 +1054,19 @@ final class AppModel: ObservableObject {
                 let sector = capture(match, in: line, index: 2)
                 let enabledText = capture(match, in: line, index: 3)
                 currentProfile = id
-                choices.append(ProfileChoice(id: id, sector: sector, enabled: enabledText == "yes"))
+                choices.append(ProfileChoice(
+                    id: id,
+                    sector: sector,
+                    enabled: enabledText == "yes",
+                    crcValid: false
+                ))
                 rows[id] = []
+                continue
+            }
+            if let profile = currentProfile,
+               line.trimmingCharacters(in: .whitespaces) == "CRC: OK",
+               let index = choices.firstIndex(where: { $0.id == profile }) {
+                choices[index].crcValid = true
                 continue
             }
             guard let profile = currentProfile,
@@ -1295,30 +1307,59 @@ struct ContentView: View {
                 Text("Disable a profile to keep it out of the mouse’s profile cycle. At least one profile must remain enabled.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                ForEach(model.profiles) { profile in
-                    HStack(spacing: 10) {
-                        Text("Profile \(profile.id)")
-                            .frame(width: 72, alignment: .leading)
-                        Toggle("Enabled", isOn: Binding(
-                            get: { model.profileEnabled(profile.id) },
-                            set: { model.setProfileEnabled(profileID: profile.id, enabled: $0) }))
-                            .toggleStyle(.checkbox)
-                        if model.showAdvancedFields {
-                            Text(profile.sector)
+                HStack(spacing: 12) {
+                    Text("Enable Profile(s):")
+                        .font(.callout.weight(.medium))
+                    ForEach(model.profiles) { profile in
+                        profileEnableControl(profile)
+                    }
+                    Spacer()
+                }
+                if model.showAdvancedFields {
+                    HStack(spacing: 12) {
+                        Text("Sectors:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(model.profiles) { profile in
+                            Text("Profile \(profile.id): \(profile.sector)")
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
-                        if profile.id == model.profileNumber {
-                            Text("Selected")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
                     }
                 }
             }
             .padding(4)
         }
+    }
+
+    private func profileEnableControl(_ profile: ProfileChoice) -> some View {
+        let profileID = profile.id
+        let label = String(profileID)
+        let crcLabel = profile.crcValid ? "CRC OK" : "CRC invalid"
+        let crcColor: Color = profile.crcValid ? .secondary : .red
+        let helpText = "Profile \(label) is \(profile.crcValid ? "CRC valid" : "CRC invalid")"
+        let enabled = Binding<Bool>(
+            get: { model.profileEnabled(profileID) },
+            set: { model.setProfileEnabled(profileID: profileID, enabled: $0) }
+        )
+        return HStack(spacing: 4) {
+            Text(label)
+            Toggle("", isOn: enabled)
+                .labelsHidden()
+                .toggleStyle(.checkbox)
+            Text(crcLabel)
+                .font(.caption)
+                .foregroundStyle(crcColor)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            profileID == model.profileNumber
+                ? Color.accentColor.opacity(0.12)
+                : Color.clear,
+            in: RoundedRectangle(cornerRadius: 6)
+        )
+        .help(helpText)
     }
 
     private func keyboardChordEditor(_ index: Int) -> some View {

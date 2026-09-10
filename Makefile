@@ -6,6 +6,14 @@ GUI_SRC := Sources/LogitechOnboardProfileManagerApp.swift
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
 SWIFT_MODULE_CACHE := .build/module-cache
+# A stable signing identity lets macOS recognize rebuilt versions of the app
+# as the same app for Input Monitoring. Override this when several identities
+# are installed, for example:
+#   make SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)"
+SIGNING_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development:|Developer ID Application:/ {print $$2; exit}')
+ifeq ($(strip $(SIGNING_IDENTITY)),)
+SIGNING_IDENTITY := -
+endif
 
 CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -O2
 FRAMEWORKS := -framework IOKit -framework CoreFoundation
@@ -32,7 +40,7 @@ app: build gui
 	cp -f $(GUI_BIN) $(GUI_BUNDLE)/Contents/MacOS/LogitechOnboardProfileManager
 	cp -f bin/$(APP) $(GUI_BUNDLE)/Contents/Resources/$(APP)
 	cp -f App/Info.plist $(GUI_BUNDLE)/Contents/Info.plist
-	@codesign --force --deep --sign - $(GUI_BUNDLE) >/dev/null
+	@codesign --force --deep --sign "$(SIGNING_IDENTITY)" $(GUI_BUNDLE) >/dev/null
 
 test: $(APP)
 	./$(APP) self-test

@@ -14,8 +14,17 @@ Build and open the app:
 
 ```sh
 make
-open outputs/logitech-onboard-macos-arm64/LogitechOnboardProfileManager.app
+open outputs/LogitechOnboardProfileManager.app
 ```
+
+The build automatically uses an installed Apple Development or Developer ID signing identity when one is available. This keeps Input Monitoring permission across rebuilds. If the build reports an ad-hoc signature, install a development certificate through Xcode or pass the identity explicitly:
+
+```sh
+security find-identity -v -p codesigning
+make SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)"
+```
+
+Ad-hoc builds (`Signature=adhoc`) may need to be added to Input Monitoring again after the executable changes because macOS treats each version as a different code identity.
 
 The first time macOS blocks the mouse, open **System Settings**, go to **Privacy & Security**, open **Input Monitoring**, and enable **Logitech Onboard Profile Manager**. The app's no-device screen has a button that opens that settings page for you.
 
