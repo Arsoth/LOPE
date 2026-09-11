@@ -1,5 +1,34 @@
 static volatile sig_atomic_t g_stop_watch = 0;
 
+static bool hid_debug_enabled(void) {
+    static int enabled = -1;
+    if (enabled < 0) {
+        const char *value = getenv("LOGITECH_ONBOARD_DEBUG");
+        enabled = value != NULL && value[0] != '\0' && strcmp(value, "0") != 0;
+    }
+    return enabled != 0;
+}
+
+static void hid_debug_log(const char *format, ...) {
+    if (!hid_debug_enabled()) {
+        return;
+    }
+    va_list arguments;
+    va_start(arguments, format);
+    vfprintf(stderr, format, arguments);
+    va_end(arguments);
+
+    FILE *file = fopen("/tmp/logitech-onboard-hid-debug.log", "a");
+    if (file == NULL) {
+        return;
+    }
+    va_start(arguments, format);
+    vfprintf(file, format, arguments);
+    va_end(arguments);
+    fputc('\n', file);
+    fclose(file);
+}
+
 static void on_sigint(int signal_number) {
     (void)signal_number;
     g_stop_watch = 1;
@@ -186,6 +215,10 @@ static int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
     channel->run_loop = CFRunLoopGetCurrent();
     pthread_mutex_init(&channel->lock, NULL);
     IOReturn result = IOHIDDeviceOpen(device, kIOHIDOptionsTypeNone);
+    hid_debug_log("hid-debug open product=0x%04X location=0x%llX result=0x%08X",
+                  number_property(device, CFSTR(kIOHIDProductIDKey)),
+                  (unsigned long long)location_property(device),
+                  result);
     if (result != kIOReturnSuccess) {
         if (result == kIOReturnNotPermitted) {
             fprintf(stderr, "warning: macOS denied HID access to the Logitech interface; grant Input Monitoring to the terminal/app running this utility (0x%08X)\n", result);
@@ -313,6 +346,9 @@ static Reply channel_request(HidChannel *channel,
                                            use_long ? REPORT_LONG : REPORT_SHORT,
                                            frame,
                                            (CFIndex)frame_length);
+    hid_debug_log("hid-debug tx report=0x%02X device=0x%02X request=0x%04X length=%zu result=0x%08X",
+                  use_long ? REPORT_LONG : REPORT_SHORT, device_number, request_id,
+                  frame_length, result);
     if (result != kIOReturnSuccess) {
         reply.status = REPLY_IO_ERROR;
         return reply;
@@ -438,7 +474,7 @@ static Reply device_call_with_report(Device *device,
                            request_id,
                            params,
                            params_length,
-                           prefer_long,
+                           prefer_long || device->prefer_long_reports,
                            timeout_seconds);
 }
 
@@ -473,7 +509,6 @@ static Reply raw_request(Device *device,
                            request_id,
                            params,
                            params_length,
-                           prefer_long,
+                           prefer_long || device->prefer_long_reports,
                            timeout_seconds);
 }
-

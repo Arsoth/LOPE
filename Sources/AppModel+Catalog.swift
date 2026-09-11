@@ -51,6 +51,7 @@ extension AppModel {
 
     var presets: [OutputPreset] {
         [
+            OutputPreset(id: "FFFFFFFF", label: "Disabled", raw: "FFFFFFFF"),
             OutputPreset(id: "80010001", label: "Left click", raw: "80010001"),
             OutputPreset(id: "80010002", label: "Right click", raw: "80010002"),
             OutputPreset(id: "80010004", label: "Middle click", raw: "80010004"),
@@ -68,7 +69,6 @@ extension AppModel {
             OutputPreset(id: "90070000", label: "DPI shift", raw: "90070000"),
             OutputPreset(id: "900A0000", label: "Cycle profile", raw: "900A0000"),
             OutputPreset(id: "900B0000", label: "G-Shift", raw: "900B0000"),
-            OutputPreset(id: "FFFFFFFF", label: "Disabled", raw: "FFFFFFFF")
         ]
     }
 }

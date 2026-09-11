@@ -4,33 +4,163 @@ static int ping_interface(HidInterface *iface,
                           double *protocol,
                           uint8_t *resolved_device_number) {
     uint8_t params[3] = {0, 0, 0x5A};
-    Reply reply = channel_request(&iface->channel,
-                                  device_number,
-                                  (uint16_t)(0x0010 | SW_ID),
-                                  params,
-                                  sizeof(params),
-                                  false,
-                                  timeout);
-    if (reply.status == REPLY_OK && reply.length >= 3 && reply.bytes[2] == 0x5A) {
-        *protocol = (double)reply.bytes[0] + (double)reply.bytes[1] / 10.0;
-        if (resolved_device_number != NULL) {
-            *resolved_device_number = device_number == 0xFF &&
-                                      reply.device_number >= 1 && reply.device_number <= 6
-                ? reply.device_number
-                : device_number;
+    // A receiver advertises long reports, but routed slot probes follow the
+    // short HID++ 1.0 path.  Try short first for receiver slots and retain a
+    // long fallback for devices that require it.
+    bool receiver = iface != NULL && is_receiver_product(iface->product_id);
+    bool modes[2] = {
+        receiver ? false : iface->prefer_long_reports,
+        receiver ? iface->prefer_long_reports : false
+    };
+    size_t mode_count = modes[0] == modes[1] ? 1 : 2;
+    for (size_t mode = 0; mode < mode_count; mode++) {
+        Reply reply = channel_request(&iface->channel,
+                                      device_number,
+                                      (uint16_t)(0x0010 | SW_ID),
+                                      params,
+                                      sizeof(params),
+                                      modes[mode],
+                                      timeout);
+        if (hid_debug_enabled()) {
+            char line[512];
+            int written = snprintf(line, sizeof(line),
+                                   "hid-debug ping product=0x%04X location=0x%llX slot=0x%02X mode=%s status=%s error=0x%02X length=%zu reply-device=0x%02X",
+                                   iface->product_id,
+                                   (unsigned long long)iface->location_id,
+                                   device_number,
+                                   modes[mode] ? "long" : "short",
+                                   reply_status_name(reply.status),
+                                   reply.error_code,
+                                   reply.length,
+                                   reply.device_number);
+            if (reply.length > 0) {
+                if (written < (int)sizeof(line)) {
+                    written += snprintf(line + written, sizeof(line) - (size_t)written, " bytes=");
+                }
+                for (size_t i = 0; i < reply.length && i < 8 && written < (int)sizeof(line); i++) {
+                    written += snprintf(line + written, sizeof(line) - (size_t)written, "%02X", reply.bytes[i]);
+                }
+            }
+            hid_debug_log("%s", line);
         }
-        return 1;
-    }
-    // A HID++ 1.0 receiver answers the 2.0-style ping with invalid-sub-id.
-    // It is useful to list that receiver, but it cannot edit a 0x8100 profile.
-    if (reply.status == REPLY_HIDPP10_ERROR && reply.error_code == 0x01) {
-        *protocol = 1.0;
-        if (resolved_device_number != NULL) {
-            *resolved_device_number = device_number;
+        if (reply.status == REPLY_OK && reply.length >= 3 && reply.bytes[2] == 0x5A) {
+            *protocol = (double)reply.bytes[0] + (double)reply.bytes[1] / 10.0;
+            if (resolved_device_number != NULL) {
+                *resolved_device_number = device_number == 0xFF &&
+                                          reply.device_number >= 1 && reply.device_number <= 6
+                    ? reply.device_number
+                    : device_number;
+            }
+            return 1;
         }
-        return 1;
+        // A HID++ 1.0 receiver answers the 2.0-style ping with
+        // invalid-sub-id. It is useful to list that receiver, but it cannot
+        // edit a 0x8100 profile.
+        if (reply.status == REPLY_HIDPP10_ERROR && reply.error_code == 0x01) {
+            *protocol = 1.0;
+            if (resolved_device_number != NULL) {
+                *resolved_device_number = device_number;
+            }
+            return 1;
+        }
+        // A failed long-report probe can still be a valid short-only device.
+        // Do not issue a second request for protocol errors such as an empty
+        // receiver slot; those are definitive.
+        if (reply.status != REPLY_TIMEOUT && reply.status != REPLY_IO_ERROR) {
+            break;
+        }
     }
     return 0;
+}
+
+static Reply receiver_register_read(HidInterface *iface,
+                                    uint16_t register_id,
+                                    bool has_subregister,
+                                    uint8_t subregister) {
+    uint8_t params[1] = {subregister};
+    return channel_request(&iface->channel,
+                           0xFF,
+                           (uint16_t)(0x8100 | (register_id & 0x02FF)),
+                           has_subregister ? params : NULL,
+                           has_subregister ? sizeof(params) : 0,
+                           false,
+                           1.0);
+}
+
+static void log_receiver_register_reply(const HidInterface *iface,
+                                         uint16_t register_id,
+                                         uint8_t subregister,
+                                         Reply reply) {
+    if (!hid_debug_enabled()) {
+        return;
+    }
+    char line[512];
+    int written = snprintf(line, sizeof(line),
+                           "hid-debug receiver-register product=0x%04X location=0x%llX register=0x%04X sub=0x%02X status=%s error=0x%02X length=%zu bytes=",
+                           iface->product_id,
+                           (unsigned long long)iface->location_id,
+                           register_id,
+                           subregister,
+                           reply_status_name(reply.status),
+                           reply.error_code,
+                           reply.length);
+    for (size_t i = 0; i < reply.length && i < 16 && written < (int)sizeof(line); i++) {
+        written += snprintf(line + written, sizeof(line) - (size_t)written, "%02X", reply.bytes[i]);
+    }
+    hid_debug_log("%s", line);
+}
+
+static bool receiver_pairing_reply_is_present(Reply reply) {
+    // The pairing-information record contains the WPID at bytes 3..4 and
+    // the device kind at byte 7. Empty slots return a HID++ 1.0 error.
+    return reply.status == REPLY_OK && reply.length >= 8;
+}
+
+static void receiver_device_name(Device *device, uint8_t slot) {
+    Reply reply = receiver_register_read(device->iface,
+                                         REGISTER_RECEIVER_INFO,
+                                         true,
+                                         (uint8_t)(RECEIVER_INFO_DEVICE_NAME + slot - 1));
+    if (reply.status != REPLY_OK || reply.length < 2) {
+        return;
+    }
+    size_t length = reply.bytes[1];
+    if (length > reply.length - 2) {
+        length = reply.length - 2;
+    }
+    if (length >= sizeof(device->name)) {
+        length = sizeof(device->name) - 1;
+    }
+    memcpy(device->name, reply.bytes + 2, length);
+    device->name[length] = '\0';
+    while (length > 0 && (device->name[length - 1] == '\0' ||
+                          device->name[length - 1] == '\n' ||
+                          device->name[length - 1] == '\r')) {
+        device->name[--length] = '\0';
+    }
+}
+
+static bool add_receiver_slot_device(Device *devices,
+                                     size_t *count,
+                                     HidInterface *iface,
+                                     uint8_t slot,
+                                     Reply pairing_reply) {
+    if (!receiver_pairing_reply_is_present(pairing_reply)) {
+        return false;
+    }
+    size_t before = *count;
+    // Pairing information is the authoritative presence signal. A routed
+    // ping can legitimately return RESOURCE_ERROR while the receiver still
+    // has a paired device, so do not require ping success to list it.
+    add_device(devices, count, iface, slot, slot, 2.0);
+    if (*count == before) {
+        return false;
+    }
+    Device *device = &devices[*count - 1];
+    if (device->name[0] == '\0') {
+        receiver_device_name(device, slot);
+    }
+    return true;
 }
 
 static int discover_features(Device *device) {
@@ -156,6 +286,21 @@ static int compare_hid_interfaces(const void *left_pointer, const void *right_po
 
 static int hid_context_create(HidContext *context) {
     memset(context, 0, sizeof(*context));
+    // IOHIDDeviceOpen uses the HID-specific Input Monitoring permission.
+    // The GUI previously requested only the CoreGraphics event-tap variant,
+    // which can leave receiver interfaces denied even when the app appears
+    // enabled in System Settings.
+    IOHIDAccessType hid_access_before = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent);
+    IOHIDAccessType hid_access_after = hid_access_before;
+    bool hid_access_requested = false;
+    if (hid_access_before != kIOHIDAccessTypeGranted) {
+        hid_access_requested = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent);
+        hid_access_after = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent);
+    }
+    if (hid_debug_enabled()) {
+        hid_debug_log("hid-debug access before=%d requested=%d after=%d",
+                      hid_access_before, hid_access_requested, hid_access_after);
+    }
     context->manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     if (context->manager == NULL) {
         fprintf(stderr, "could not create macOS HID manager\n");
@@ -197,8 +342,17 @@ static int hid_context_create(HidContext *context) {
             // Some Logitech mice combine keyboard/mouse collections and
             // HID++ collections in one interface; the primary usage is not
             // always the vendor page. Inspect all parsed elements as well.
-            bool vendor = page == HIDPP_USAGE_PAGE || device_has_hidpp_reports(device) ||
-                          is_known_hidpp_product(product_id);
+            bool hidpp_reports = device_has_hidpp_reports(device);
+            // A receiver exposes separate mouse, keyboard, and vendor HID
+            // interfaces with the same product ID. Do not let the known
+            // receiver PID fallback turn the first two into HID++ channels;
+            // the descriptor/usage-page check identifies the real vendor
+            // interface. The fallback remains necessary for direct wireless
+            // and Bluetooth devices whose HID++ descriptor is hidden by macOS.
+            bool known_device_fallback = is_known_hidpp_product(product_id) &&
+                                         !is_receiver_product(product_id);
+            bool vendor = page == HIDPP_USAGE_PAGE || hidpp_reports ||
+                          known_device_fallback;
             bool mouse = page == MOUSE_USAGE_PAGE && usage == MOUSE_USAGE;
             if (!vendor && !mouse) {
                 continue;
@@ -213,8 +367,19 @@ static int hid_context_create(HidContext *context) {
             item->registry_id = registry_id_property(device);
             item->is_vendor = vendor;
             item->is_mouse = mouse;
+            item->prefer_long_reports = hidpp_reports || is_known_hidpp_product(product_id);
             string_property(device, CFSTR(kIOHIDProductKey), item->product, sizeof(item->product));
             string_property(device, CFSTR(kIOHIDTransportKey), item->transport, sizeof(item->transport));
+            hid_debug_log("hid-debug interface product=0x%04X location=0x%llX registry=0x%llX page=0x%04X usage=0x%04X vendor=%d mouse=%d hidpp=%d product-name=%s",
+                          item->product_id,
+                          (unsigned long long)item->location_id,
+                          (unsigned long long)item->registry_id,
+                          item->usage_page,
+                          item->usage,
+                          item->is_vendor,
+                          item->is_mouse,
+                          hidpp_reports,
+                          item->product);
         }
         free(devices);
 
@@ -255,6 +420,7 @@ static int add_device(Device *devices,
     device->device_number = device_number;
     device->request_device_number = request_device_number;
     device->protocol = protocol;
+    device->prefer_long_reports = iface->prefer_long_reports;
     if (protocol >= 2.0) {
         discover_features(device);
         device_name(device);
@@ -272,6 +438,32 @@ static bool is_receiver_interface(const HidInterface *iface) {
             text_contains_case_insensitive(iface->product, "receiver") ||
             text_contains_case_insensitive(iface->product, "unifying") ||
             text_contains_case_insensitive(iface->product, "bolt"));
+}
+
+static uint8_t receiver_slot_limit(const HidInterface *iface) {
+    if (iface == NULL || !is_receiver_interface(iface)) {
+        return 0;
+    }
+    // Lightspeed receivers expose one paired slot. Unifying and Bolt
+    // receivers expose up to six. Unknown C5xx receivers retain the broad
+    // limit so a new receiver is not silently omitted.
+    switch (iface->product_id) {
+        case 0xC539:
+        case 0xC53A:
+        case 0xC53D:
+        case 0xC53F:
+        case 0xC541:
+        case 0xC545:
+        case 0xC547:
+        case 0xC54D:
+            return 1;
+        case 0xC52B:
+        case 0xC532:
+        case 0xC548:
+            return 6;
+        default:
+            return 6;
+    }
 }
 
 static bool is_receiver_endpoint(const Device *device);
@@ -336,7 +528,16 @@ static int discover_devices(HidContext *context, int requested_slot, Device *dev
             continue;
         }
         if (is_receiver_interface(iface)) {
-            for (uint8_t slot = 1; slot <= 6; slot++) {
+            Reply connection_reply = receiver_register_read(iface, 0x0002, false, 0);
+            log_receiver_register_reply(iface, 0x0002, 0, connection_reply);
+            Reply receiver_info_reply = receiver_register_read(iface, 0x02B5, true, 0x03);
+            log_receiver_register_reply(iface, 0x02B5, 0x03, receiver_info_reply);
+            for (uint8_t slot = 1; slot <= receiver_slot_limit(iface); slot++) {
+                Reply pairing_reply = receiver_register_read(iface, 0x02B5, true,
+                                                              (uint8_t)(0x20 + slot - 1));
+                log_receiver_register_reply(iface, 0x02B5,
+                                            (uint8_t)(0x20 + slot - 1),
+                                            pairing_reply);
                 double protocol = 0;
                 uint8_t resolved_device_number = slot;
                 if (ping_interface(iface, slot, 1.0, &protocol, &resolved_device_number)) {
@@ -490,4 +691,3 @@ static const char *device_connection(const Device *device) {
     }
     return "Wired";
 }
-

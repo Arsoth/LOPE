@@ -4,6 +4,7 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import IOKit.hidsystem
 
 @MainActor
 extension AppModel {
@@ -21,7 +22,7 @@ extension AppModel {
         // Input Monitoring. Request access on the normal refresh path too,
         // since a wired G502 can otherwise make the app look healthy while
         // the other mice are silently denied.
-        CGRequestListenEventAccess()
+        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
 
         guard let engine else {
             busy = false

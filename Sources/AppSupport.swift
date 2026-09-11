@@ -31,6 +31,9 @@ enum EngineRunner {
         process.executableURL = executable
         process.arguments = arguments
         process.currentDirectoryURL = currentDirectory
+        var environment = ProcessInfo.processInfo.environment
+        environment["LOGITECH_ONBOARD_DEBUG"] = "1"
+        process.environment = environment
         process.standardOutput = pipe
         process.standardError = pipe
         try process.run()

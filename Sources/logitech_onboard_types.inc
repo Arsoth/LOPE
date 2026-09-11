@@ -10,6 +10,7 @@
 #include <IOKit/hid/IOHIDKeys.h>
 #include <IOKit/hid/IOHIDManager.h>
 #include <IOKit/hid/IOHIDLib.h>
+#include <IOKit/hidsystem/IOHIDLib.h>
 #include <IOKit/IOKitLib.h>
 #include <ctype.h>
 #include <errno.h>
@@ -17,6 +18,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -48,6 +50,13 @@
 #define FEATURE_DEVICE_NAME 0x0005
 #define FEATURE_ADJUSTABLE_DPI 0x2201
 #define FEATURE_ONBOARD_PROFILES 0x8100
+
+// HID++ 1.0 receiver registers used to enumerate paired devices.
+#define REGISTER_RECEIVER_CONNECTION 0x0002
+#define REGISTER_RECEIVER_INFO 0x02B5
+#define RECEIVER_INFO_INFORMATION 0x03
+#define RECEIVER_INFO_PAIRING 0x20
+#define RECEIVER_INFO_DEVICE_NAME 0x40
 
 #define ONBOARD_GET_INFO 0x00
 #define ONBOARD_READ_SECTOR 0x50
@@ -87,6 +96,10 @@ typedef struct {
     char transport[128];
     bool is_vendor;
     bool is_mouse;
+    // Receiver-backed HID++ devices may require the long report even when
+    // the request payload would fit in a short report. This is detected from
+    // the interface descriptor (or a known Logitech HID++ product ID).
+    bool prefer_long_reports;
     HidChannel channel;
     bool channel_open;
 } HidInterface;
@@ -114,6 +127,7 @@ typedef struct {
     uint8_t device_number;
     uint8_t request_device_number;
     double protocol;
+    bool prefer_long_reports;
     Feature features[MAX_FEATURES];
     size_t feature_count;
     char name[256];
@@ -202,4 +216,3 @@ typedef struct {
     uint8_t profile_format;
     uint8_t *data;
 } BackupPackage;
-
