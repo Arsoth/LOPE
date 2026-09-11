@@ -344,9 +344,41 @@ final class AppModel: ObservableObject {
     }
 
     func selectDevice(_ index: Int) {
-        guard devices.contains(where: { $0.id == index }), selectedDeviceIndex != index else { return }
+        guard let selected = devices.first(where: { $0.id == index }), selectedDeviceIndex != index else { return }
         selectedDeviceIndex = index
-        refresh()
+        refreshTask?.cancel()
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let preferredProfileNumber = profileNumber
+        let currentDirectory = backupDirectory
+
+        busy = true
+        currentDeviceName = selected.name
+        deviceSummary = selected.title
+        status = "Reading \(selected.name)…"
+
+        guard let engine else {
+            busy = false
+            status = EngineError.unavailable.localizedDescription
+            return
+        }
+
+        let currentDevices = devices
+        refreshTask = Task { [weak self] in
+            let snapshot = await Task.detached(priority: .userInitiated) {
+                Self.makeProfileSnapshot(
+                    executable: engine,
+                    currentDirectory: currentDirectory,
+                    devices: currentDevices,
+                    selectedDeviceIndex: selected.id,
+                    preferredProfileNumber: preferredProfileNumber
+                )
+            }.value
+
+            guard !Task.isCancelled, let self,
+                  self.refreshGeneration == generation else { return }
+            self.applyRefreshSnapshot(snapshot)
+        }
     }
 
     private func applyRefreshSnapshot(_ snapshot: RefreshSnapshot) {
@@ -436,25 +468,40 @@ final class AppModel: ObservableObject {
                 )
             }
 
-            let profileText: String
-            do {
-                profileText = try EngineRunner.run(
-                    executable: executable,
-                    arguments: ["--device", String(selected.id), "profiles"],
-                    currentDirectory: currentDirectory
-                )
-            } catch {
-                return RefreshSnapshot(
-                    devices: discovered,
-                    selectedDeviceIndex: selected.id,
-                    profileText: nil,
-                    profileError: errorMessage(for: error),
-                    dpiText: nil,
-                    dpiError: nil,
-                    selectedProfileNumber: nil,
-                    errorMessage: nil
-                )
-            }
+            return makeProfileSnapshot(
+                executable: executable,
+                currentDirectory: currentDirectory,
+                devices: discovered,
+                selectedDeviceIndex: selected.id,
+                preferredProfileNumber: preferredProfileNumber
+            )
+        } catch {
+            return RefreshSnapshot(
+                devices: [],
+                selectedDeviceIndex: nil,
+                profileText: nil,
+                profileError: nil,
+                dpiText: nil,
+                dpiError: nil,
+                selectedProfileNumber: nil,
+                errorMessage: errorMessage(for: error)
+            )
+        }
+    }
+
+    private nonisolated static func makeProfileSnapshot(
+        executable: URL,
+        currentDirectory: URL,
+        devices: [DeviceChoice],
+        selectedDeviceIndex: Int,
+        preferredProfileNumber: Int
+    ) -> RefreshSnapshot {
+        do {
+            let profileText = try EngineRunner.run(
+                executable: executable,
+                arguments: ["--device", String(selectedDeviceIndex), "profiles"],
+                currentDirectory: currentDirectory
+            )
 
             let availableProfileNumbers = profileNumbers(in: profileText)
             let selectedProfileNumber = availableProfileNumbers.contains(preferredProfileNumber)
@@ -467,7 +514,7 @@ final class AppModel: ObservableObject {
                     dpiText = try EngineRunner.run(
                         executable: executable,
                         arguments: [
-                            "--device", String(selected.id),
+                            "--device", String(selectedDeviceIndex),
                             "--profile", String(selectedProfileNumber),
                             "dpi"
                         ],
@@ -478,8 +525,8 @@ final class AppModel: ObservableObject {
                 }
             }
             return RefreshSnapshot(
-                devices: discovered,
-                selectedDeviceIndex: selected.id,
+                devices: devices,
+                selectedDeviceIndex: selectedDeviceIndex,
                 profileText: profileText,
                 profileError: nil,
                 dpiText: dpiText,
@@ -489,14 +536,14 @@ final class AppModel: ObservableObject {
             )
         } catch {
             return RefreshSnapshot(
-                devices: [],
-                selectedDeviceIndex: nil,
+                devices: devices,
+                selectedDeviceIndex: selectedDeviceIndex,
                 profileText: nil,
-                profileError: nil,
+                profileError: errorMessage(for: error),
                 dpiText: nil,
                 dpiError: nil,
                 selectedProfileNumber: nil,
-                errorMessage: errorMessage(for: error)
+                errorMessage: nil
             )
         }
     }

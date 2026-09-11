@@ -304,6 +304,22 @@ static bool is_wireless_device_product(uint32_t product_id) {
            product_id == 0x4101 || product_id == 0x4102;
 }
 
+static bool is_receiver_product(uint32_t product_id) {
+    return product_id >= 0xC500 && product_id <= 0xC5FF;
+}
+
+static bool is_bluetooth_device_product(uint32_t product_id) {
+    // Bluetooth HID++ model IDs are in the B0xx/B3xx ranges (for example,
+    // the MX Master 3S uses B034).
+    return (product_id >= 0xB000 && product_id <= 0xB3FF);
+}
+
+static bool is_known_hidpp_product(uint32_t product_id) {
+    return is_wireless_device_product(product_id) ||
+           is_receiver_product(product_id) ||
+           is_bluetooth_device_product(product_id);
+}
+
 static void channel_report_callback(void *context,
                                     IOReturn result,
                                     void *sender,
@@ -815,7 +831,8 @@ static int hid_context_create(HidContext *context) {
             // Some Logitech mice combine keyboard/mouse collections and
             // HID++ collections in one interface; the primary usage is not
             // always the vendor page. Inspect all parsed elements as well.
-            bool vendor = page == HIDPP_USAGE_PAGE || device_has_hidpp_reports(device);
+            bool vendor = page == HIDPP_USAGE_PAGE || device_has_hidpp_reports(device) ||
+                          is_known_hidpp_product(product_id);
             bool mouse = page == MOUSE_USAGE_PAGE && usage == MOUSE_USAGE;
             if (!vendor && !mouse) {
                 continue;
@@ -877,7 +894,7 @@ static bool is_receiver_interface(const HidInterface *iface) {
     // Logitech USB receiver product IDs occupy the C5xx range. Direct USB
     // mice use a different product-ID range and should not be probed as if
     // they had receiver slots.
-    return iface != NULL && iface->product_id >= 0xC500 && iface->product_id <= 0xC5FF;
+    return iface != NULL && is_receiver_product(iface->product_id);
 }
 
 static bool is_receiver_endpoint(const Device *device);
@@ -898,14 +915,16 @@ static int discover_devices(HidContext *context, int requested_slot, Device *dev
             }
             continue;
         }
-        for (uint8_t slot = 1; slot <= 6; slot++) {
-            double protocol = 0;
-            if (ping_interface(iface, slot, 0.35, &protocol)) {
-                add_device(devices, count, iface, slot, protocol);
+        if (is_receiver_interface(iface)) {
+            for (uint8_t slot = 1; slot <= 6; slot++) {
+                double protocol = 0;
+                if (ping_interface(iface, slot, 1.0, &protocol)) {
+                    add_device(devices, count, iface, slot, protocol);
+                }
             }
         }
         double protocol = 0;
-        if (ping_interface(iface, 0xFF, 0.9, &protocol)) {
+        if (ping_interface(iface, 0xFF, 1.0, &protocol)) {
             add_device(devices, count, iface, 0xFF, protocol);
         }
     }
@@ -979,10 +998,12 @@ static bool is_mouse_device(const Device *device) {
 }
 
 static const char *device_connection(const Device *device) {
-    if (device->device_number != 0xFF || is_wireless_device_product(device->iface->product_id)) {
+    if (device->device_number != 0xFF || is_receiver_product(device->iface->product_id) ||
+        is_wireless_device_product(device->iface->product_id)) {
         return "Receiver";
     }
-    if (text_contains_case_insensitive(device->iface->transport, "bluetooth")) {
+    if (text_contains_case_insensitive(device->iface->transport, "bluetooth") ||
+        is_bluetooth_device_product(device->iface->product_id)) {
         return "Bluetooth";
     }
     return "Wired";
