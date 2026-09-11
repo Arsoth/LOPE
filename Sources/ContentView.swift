@@ -7,6 +7,7 @@ struct ContentView: View {
     @StateObject private var model = AppModel()
     @State private var confirmRestore = false
     @State private var restoreURL: URL?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -40,6 +41,11 @@ struct ContentView: View {
         .frame(minWidth: 960, minHeight: 520)
         .onChange(of: model.profileNumber) { _ in
             model.reloadSelectedProfile()
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                model.updateInputMonitoringAuthorization()
+            }
         }
         .alert("Restore this backup?", isPresented: $confirmRestore) {
             Button("Cancel", role: .cancel) { restoreURL = nil }
@@ -102,9 +108,8 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 560)
-            HStack {
+            if !model.inputMonitoringAuthorized {
                 Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
-                Button("Refresh", action: model.refresh)
             }
             Spacer()
         }

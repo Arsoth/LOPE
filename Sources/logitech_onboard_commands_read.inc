@@ -147,8 +147,6 @@ static int run_profiles(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
-    size_t first = 0;
-    size_t last = header_count;
     int requested_profile = options->profile;
     if (options->include_dpi && requested_profile > 0 &&
         (size_t)requested_profile > header_count) {
@@ -156,23 +154,6 @@ static int run_profiles(const Options *options) {
         // devices. If that slot does not exist on the new mouse, use its
         // first enabled slot and report the actual selection below.
         requested_profile = 0;
-    }
-    if (requested_profile > 0) {
-        if ((size_t)requested_profile > header_count) {
-            fprintf(stderr, "profile %d is out of range 1..%zu\n", options->profile, header_count);
-            hid_context_release(&context);
-            return 1;
-        }
-        first = (size_t)requested_profile - 1;
-        last = first + 1;
-    } else if (options->include_dpi) {
-        for (size_t i = 0; i < header_count; i++) {
-            if (headers[i].enabled != 0) {
-                first = i;
-                break;
-            }
-        }
-        last = first + 1;
     }
     printf("Onboard profiles for %s:\n", device_label(device));
     if (options->headers_only && !options->include_dpi) {
@@ -183,17 +164,61 @@ static int run_profiles(const Options *options) {
         hid_context_release(&context);
         return 0;
     }
-    for (size_t i = first; i < last; i++) {
-        Profile profile;
-        int loaded = options->summary_only
-            ? load_profile_summary_with_headers(device, &info, headers, header_count, (int)i + 1, &profile)
-            : load_profile_with_headers(device, &info, headers, header_count, (int)i + 1, &profile);
-        if (loaded) {
-            if (options->include_dpi) {
-                printf("Selected profile: %zu\n", profile.selected_header + 1);
+
+    if (options->include_dpi) {
+        // The GUI needs the complete profile list, but only the selected
+        // profile's records and onboard DPI stages. Emit lightweight headers
+        // for every slot before the detailed selected-profile summary so the
+        // caller can populate its picker without reading every full sector.
+        for (size_t i = 0; i < header_count; i++) {
+            printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
+                   i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
+        }
+
+        size_t selected = 0;
+        if (requested_profile > 0) {
+            selected = (size_t)requested_profile - 1;
+        } else {
+            for (size_t i = 0; i < header_count; i++) {
+                if (headers[i].enabled != 0) {
+                    selected = i;
+                    break;
+                }
             }
+        }
+
+        Profile profile;
+        if (options->summary_only
+                ? load_profile_summary_with_headers(device, &info, headers, header_count,
+                                                     (int)selected + 1, &profile)
+                : load_profile_with_headers(device, &info, headers, header_count,
+                                             (int)selected + 1, &profile)) {
+            printf("Selected profile: %zu\n", selected + 1);
             print_profile_summary(&profile, true);
             free(profile.data);
+        }
+    } else {
+        size_t first = 0;
+        size_t last = header_count;
+        if (requested_profile > 0) {
+            if ((size_t)requested_profile > header_count) {
+                fprintf(stderr, "profile %d is out of range 1..%zu\n", options->profile, header_count);
+                hid_context_release(&context);
+                return 1;
+            }
+            first = (size_t)requested_profile - 1;
+            last = first + 1;
+        }
+
+        for (size_t i = first; i < last; i++) {
+            Profile profile;
+            int loaded = options->summary_only
+                ? load_profile_summary_with_headers(device, &info, headers, header_count, (int)i + 1, &profile)
+                : load_profile_with_headers(device, &info, headers, header_count, (int)i + 1, &profile);
+            if (loaded) {
+                print_profile_summary(&profile, true);
+                free(profile.data);
+            }
         }
     }
     if (options->include_dpi) {

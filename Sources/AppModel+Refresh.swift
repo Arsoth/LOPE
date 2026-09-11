@@ -18,11 +18,13 @@ extension AppModel {
 
         busy = true
         status = "Reading the mouse…"
+        updateInputMonitoringAuthorization()
         // Receiver and Bluetooth HID++ interfaces are protected by macOS
         // Input Monitoring. Request access on the normal refresh path too,
         // since a wired G502 can otherwise make the app look healthy while
         // the other mice are silently denied.
         IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        updateInputMonitoringAuthorization()
 
         guard let engine else {
             busy = false
@@ -259,6 +261,7 @@ extension AppModel {
 
     func openInputMonitoringSettings() {
         CGRequestListenEventAccess()
+        updateInputMonitoringAuthorization()
         let candidates = [
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
             "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ListenEvent"
@@ -270,6 +273,10 @@ extension AppModel {
             }
         }
         status = "Open System Settings > Privacy & Security > Input Monitoring, enable this app, then choose Refresh."
+    }
+
+    func updateInputMonitoringAuthorization() {
+        inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     }
 
     func reloadSelectedProfile() {

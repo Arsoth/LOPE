@@ -150,7 +150,6 @@ extension AppModel {
             case 1: return "Primary click"
             case 2: return "Secondary click"
             case 3: return "Middle click"
-            case 4: return "Back / thumb"
             default: return "Button \(number)"
             }
         }

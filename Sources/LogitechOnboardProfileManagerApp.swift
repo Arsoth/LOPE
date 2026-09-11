@@ -4,6 +4,7 @@
 import AppKit
 import Combine
 import Foundation
+import IOKit.hidsystem
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -20,6 +21,7 @@ final class AppModel: ObservableObject {
     @Published var shiftStage = 1
     @Published var dpiDetails = "DPI capabilities have not been read."
     @Published var busy = false
+    @Published var inputMonitoringAuthorized = false
     @Published var backups: [BackupEntry] = []
     @Published var backupDirectoryPath = ""
     @Published var showAdvancedFields = false
@@ -62,6 +64,7 @@ final class AppModel: ObservableObject {
         backupDirectoryPath = selectedDirectory.path
         let advancedFieldsKey = "\(AppConstants.defaultsPrefix).showAdvancedFields"
         showAdvancedFields = defaults.bool(forKey: advancedFieldsKey)
+        inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
         refreshBackups()
         Task { @MainActor in
