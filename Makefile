@@ -1,8 +1,11 @@
 APP := logitech-onboard
 SRC := Sources/logitech_onboard.m
+# The C implementation is intentionally one translation unit, assembled from
+# focused .inc modules so static helper linkage and original call ordering stay intact.
+C_MODULES := $(wildcard Sources/logitech_onboard_*.inc)
 GUI_APP := LogitechOnboardProfileManager.app
 GUI_BIN := bin/LogitechOnboardProfileManager
-GUI_SRC := Sources/LogitechOnboardProfileManagerApp.swift
+GUI_SRC := $(wildcard Sources/*.swift)
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
 SWIFT_MODULE_CACHE := .build/module-cache
@@ -24,7 +27,7 @@ all: app
 
 build: $(APP)
 
-$(APP): $(SRC)
+$(APP): $(SRC) $(C_MODULES)
 	@mkdir -p bin
 	clang $(CFLAGS) $(FRAMEWORKS) $(SRC) -o bin/$(APP)
 	@ln -sf bin/$(APP) $(APP)
