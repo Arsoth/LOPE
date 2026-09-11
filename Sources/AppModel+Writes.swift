@@ -141,10 +141,8 @@ extension AppModel {
     }
 
     private func saveOperationID() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
-        let suffix = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
-        return "save-\(formatter.string(from: Date()))-\(suffix)"
+        let suffix = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
+        return "\(selectedMouseFileIdentifier())-\(backupTimestamp())-\(suffix)"
     }
 
     private func batchRecoveryBackups(from message: String) -> [URL] {
@@ -224,24 +222,6 @@ extension AppModel {
         UserDefaults.standard.set(show, forKey: "\(AppConstants.defaultsPrefix).showAdvancedFields")
     }
 
-    func refreshBackups() {
-        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: backupDirectory,
-            includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles]
-        )) ?? []
-        backups = urls
-            .filter { [AppConstants.backupExtension, "bin", "json"].contains($0.pathExtension.lowercased()) }
-            .compactMap { url in
-                guard let values = try? url.resourceValues(forKeys: keys),
-                      let modifiedAt = values.contentModificationDate,
-                      let fileSize = values.fileSize else { return nil }
-                return BackupEntry(url: url, modifiedAt: modifiedAt, size: Int64(fileSize))
-            }
-            .sorted { $0.modifiedAt > $1.modifiedAt }
-    }
-
     func chooseJSONBackup() -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -255,7 +235,8 @@ extension AppModel {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
         panel.allowedContentTypes = [UTType.json]
-        panel.nameFieldStringValue = "profile\(profileNumber).json"
+        panel.directoryURL = backupDirectory
+        panel.nameFieldStringValue = editableJSONExportName()
         panel.message = "Export the selected profile as an editable JSON file."
         return panel.runModal() == .OK ? panel.url : nil
     }

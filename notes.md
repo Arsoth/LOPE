@@ -62,53 +62,53 @@ before the first write; no JSON sidecar is required for this safety guarantee.
 
 ## P1 — backup and profile UX
 
-### [ ] 3. Make backups mouse-specific and filter them to the active mouse
+### [x] 3. Make backups mouse-specific and filter them to the active mouse
 
 **Feasibility: High for model-level filtering; medium for old/imported files.**
-`DeviceChoice` already has a display name, product ID, and device key. Binary
-backup headers currently preserve vendor/product/device-number metadata, while
-editable JSON contains the device name and product ID. `BackupEntry` currently
-just lists every `.bin`, custom backup extension, and `.json` in the directory.
+`DeviceChoice` already has a display name and product ID. Binary backup headers
+preserve vendor/product metadata, while editable JSON contains the device name
+and product ID. The backup index combines those metadata sources with the
+sanitized mouse/family name in new filenames; it intentionally does not track
+an individual physical mouse.
 
 **Implementation tasks:**
 
-- [ ] Add a sanitized mouse identifier to new binary backup names, preferably
+- [x] Add a sanitized mouse identifier to new binary backup names, preferably
       using the display name, for example `G502-X-20260911-021500.bin`.
-- [ ] Keep names filesystem-safe and bounded; avoid relying on the display name
-      as the only identity when two devices share a model name.
-- [ ] Add backup metadata parsing/indexing so the list can compare a backup to
+- [x] Keep names filesystem-safe and bounded; treat same-model mice as one
+      compatible backup family rather than assigning each physical mouse a
+      unique filename identity.
+- [x] Add backup metadata parsing/indexing so the list can compare a backup to
       the selected device. Use embedded binary metadata where available and JSON
       metadata for import files; define a visible “unknown device” state for legacy
       files that cannot be matched safely.
-- [ ] Filter the Backups tab to the selected mouse by default and offer an
+- [x] Filter the Backups tab to the selected mouse by default and offer an
       explicit “show all mice” option for recovery/import workflows.
-- [ ] Refresh the filtered list when the selected device changes.
-- [ ] Add tests for two mice, same-model mice, malformed metadata, and legacy
+- [x] Refresh the filtered list when the selected device changes.
+- [x] Add tests for two mice, same-model mice, malformed metadata, and legacy
       filenames.
 
 **Done when:** new backups identify their target mouse, changing the active
 mouse changes the visible list, and an unmatched backup is never presented as
 belonging to the active mouse without an explicit warning.
 
-### [ ] 4. Stop generating JSON backup sidecars; use JSON only for import/export
+### [x] 4. Stop generating JSON backup sidecars; use JSON only for import/export
 
-**Feasibility: High.** `AppModel+Writes.swift` currently calls
-`makeEditableBackup()` and writes a `.json` beside every binary backup. JSON
-import/export is already implemented separately, so this is primarily a
-lifecycle and UI cleanup.
+**Feasibility: High.** JSON is now written only by the explicit export
+workflow; mouse writes and manual binary dumps do not create JSON sidecars.
 
 **Implementation tasks:**
 
-- [ ] Remove sidecar JSON creation from button, DPI, profile-state, batch, and
+- [x] Remove sidecar JSON creation from button, DPI, profile-state, batch, and
       manual binary-backup paths.
-- [ ] Keep `Import JSON…` and `Export JSON…` as explicit profile workflows.
-- [ ] Change the export default name from `profileN.json` to a sanitized
+- [x] Keep `Import JSON…` and `Export JSON…` as explicit profile workflows.
+- [x] Change the export default name from `profileN.json` to a sanitized
       `mouse-date-time.json` name, using a stable timestamp format and avoiding
       collisions where practical.
-- [ ] Decide how existing sidecar JSON files appear: retain them as importable
+- [x] Decide how existing sidecar JSON files appear: retain them as importable
       files with an “Editable JSON” label, but do not call them backups or create
       new ones.
-- [ ] Update the Backups help text and list filtering so exact binary backups
+- [x] Update the Backups help text and list filtering so exact binary backups
       and editable JSON imports are not conflated.
 
 **Done when:** a mouse write creates only the exact binary backup(s), while an

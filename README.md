@@ -66,16 +66,28 @@ The profile list shows which onboard profiles are enabled. Disabling one removes
 
 ### Backups
 
-The Backups tab shows the files in the current backup folder.
+The Backups tab shows backups for the selected mouse by default. Turn on
+**Show backups for all mice** when recovering or importing a file from another
+mouse. Files that cannot be matched safely are labeled **Unknown device** and
+are never presented as belonging to the selected mouse.
 
 There are two kinds of files:
 
 - **Exact binary** backups are automatic safety copies. Restore one when you want to put the mouse back exactly as it was.
 - **Editable JSON** files are readable profile descriptions. Load one into the editor, review the changes, and press Save to mouse when you are ready.
 
-Each **Save to mouse** operation creates a binary backup before any write. A binary backup preserves bytes the app does not understand, so it remains the most reliable emergency restore. JSON is the convenient format for reading and editing button assignments and DPI values.
+Each **Save to mouse** operation creates a binary backup before any write. New
+binary names include a sanitized mouse/family name, while the binary header
+retains product metadata for matching older files. Compatible same-model mice
+share the same backup family; LOPE does not encode a physical mouse identity
+in the filename. A binary backup preserves bytes the app does not understand,
+so it remains the most reliable emergency restore. JSON is the convenient
+format for reading and editing button assignments and DPI values.
 
-You can also use **Export JSON** to save the current editor contents, or **Import JSON** to load a file someone edited. Importing JSON does not write to the mouse by itself.
+You can also use **Export JSON** to save the current editor contents, or
+**Import JSON** to load a file someone edited. Export defaults to a sanitized
+`mouse-YYYYMMDD-HHmmss.json` name and includes the mouse name and product
+metadata. Importing JSON does not write to the mouse by itself.
 
 The JSON includes the raw four-byte record as well as its friendly name. Standard outputs can be changed by editing `output`. Custom or unfamiliar outputs can be changed by editing `raw`, for example:
 

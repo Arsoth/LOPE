@@ -198,6 +198,7 @@ extension AppModel {
         // profile and report that actual slot back to the UI.
         currentDeviceName = selected.name
         deviceSummary = selected.title
+        refreshBackups()
         startRefresh(preferredDeviceIndex: index, preferredProfileNumber: 0)
     }
 
@@ -235,6 +236,7 @@ extension AppModel {
         currentDeviceName = selected.name
         deviceSummary = selected.title
         rememberSelectedDevice(selected)
+        refreshBackups()
 
         guard let profileText = snapshot.profileText else {
             resetEditorState()
@@ -401,6 +403,7 @@ extension AppModel {
             self.currentDeviceName = selected.name
             self.deviceSummary = selected.title
             self.rememberSelectedDevice(selected)
+            self.refreshBackups()
         }
     }
 

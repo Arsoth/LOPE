@@ -41,13 +41,41 @@ struct KeyboardKeyChoice: Identifiable, Hashable {
 }
 
 struct BackupEntry: Identifiable {
+    enum DeviceMatch: Equatable {
+        case selected
+        case other
+        case unknown
+
+        var label: String {
+            switch self {
+            case .selected: return "Selected mouse"
+            case .other: return "Different mouse"
+            case .unknown: return "Unknown device"
+            }
+        }
+    }
+
     let url: URL
     let modifiedAt: Date
     let size: Int64
+    let deviceMatch: DeviceMatch
+    let deviceName: String?
 
     var id: String { url.path }
     var name: String { url.lastPathComponent }
     var isJSON: Bool { url.pathExtension.lowercased() == "json" }
+    var fileTypeLabel: String { isJSON ? "Editable JSON" : "Exact binary" }
+
+    var deviceStatusLabel: String {
+        switch deviceMatch {
+        case .selected:
+            return deviceName.map { "Selected mouse: \($0)" } ?? deviceMatch.label
+        case .other:
+            return deviceName.map { "Different mouse: \($0)" } ?? deviceMatch.label
+        case .unknown:
+            return "Unknown device — review before using"
+        }
+    }
 }
 
 struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
