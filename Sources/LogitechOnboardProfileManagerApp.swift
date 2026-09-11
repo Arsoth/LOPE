@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
     @Published var shiftStage = 1
     @Published var dpiDetails = "DPI capabilities have not been read."
     @Published var busy = false
+    @Published var loadingProfile = false
     @Published var inputMonitoringAuthorized = false
     @Published var backups: [BackupEntry] = []
     @Published var backupDirectoryPath = ""

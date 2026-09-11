@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 //
-// lomps: a deliberately small, read-first Logitech HID++ utility for
+// lope: a deliberately small, read-first Logitech HID++ utility for
 // macOS. Protocol constants and layout knowledge are based on public Solaar,
 // libratbag, lowtech, and omm.py research; see docs/PROTOCOL.md.
 

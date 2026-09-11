@@ -8,6 +8,8 @@ import IOKit.hidsystem
 
 private let deviceReadAttempts = 3
 private let deviceReadRetryDelay: TimeInterval = 0.2
+private let profileReadAttempts = 5
+private let profileReadRetryDelay: TimeInterval = 0.25
 
 @MainActor
 extension AppModel {
@@ -20,6 +22,7 @@ extension AppModel {
         let currentDirectory = backupDirectory
 
         busy = true
+        loadingProfile = true
         status = "Reading the mouse…"
         updateInputMonitoringAuthorization()
         // Receiver and Bluetooth HID++ interfaces are protected by macOS
@@ -31,10 +34,12 @@ extension AppModel {
 
         guard let engine else {
             busy = false
+            loadingProfile = false
             status = EngineError.unavailable.localizedDescription
             return
         }
 
+        prepareLoadingEditor(profileNumber: profileNumber)
         refreshTask = Task { [weak self] in
             let snapshot = await Task.detached(priority: .userInitiated) {
                 Self.makeRefreshSnapshot(
@@ -65,16 +70,19 @@ extension AppModel {
         let currentDirectory = backupDirectory
 
         busy = true
+        loadingProfile = true
         currentDeviceName = selected.name
         deviceSummary = selected.title
         status = "Reading \(selected.name)…"
 
         guard let engine else {
             busy = false
+            loadingProfile = false
             status = EngineError.unavailable.localizedDescription
             return
         }
 
+        prepareLoadingEditor(profileNumber: 1)
         let currentDevices = devices
         refreshTask = Task { [weak self] in
             let snapshot = await Task.detached(priority: .userInitiated) {
@@ -97,6 +105,7 @@ extension AppModel {
     func applyRefreshSnapshot(_ snapshot: RefreshSnapshot) {
         defer {
             busy = false
+            loadingProfile = false
             refreshTask = nil
         }
 
@@ -171,6 +180,22 @@ extension AppModel {
         baselineProfileEnabled.removeAll()
         keyInputDrafts.removeAll()
         resetDPIState()
+    }
+
+    private func prepareLoadingEditor(profileNumber placeholderProfileNumber: Int) {
+        let placeholderNumber = max(placeholderProfileNumber, 1)
+        profiles = [ProfileChoice(
+            id: placeholderNumber,
+            sector: "Loading…",
+            enabled: true,
+            crcValid: nil
+        )]
+        profileNumber = placeholderNumber
+        baselineProfileEnabled = [placeholderNumber: true]
+        keyInputDrafts.removeAll()
+        buttons = loadingButtonRows()
+        resetDPIState()
+        dpiDetails = "Loading DPI capabilities from the mouse…"
     }
 
     private func resetDPIState() {
@@ -308,7 +333,7 @@ extension AppModel {
     ) throws -> String {
         var lastError: Error?
 
-        for attempt in 0..<deviceReadAttempts {
+        for attempt in 0..<profileReadAttempts {
             do {
                 let output = try EngineRunner.run(
                     executable: executable,
@@ -327,8 +352,11 @@ extension AppModel {
                 lastError = error
             }
 
-            if attempt < deviceReadAttempts - 1 {
-                Thread.sleep(forTimeInterval: deviceReadRetryDelay)
+            if attempt < profileReadAttempts - 1 {
+                // Each attempt launches a fresh HID context, but only for the
+                // selected device key. This gives macOS time to finish the
+                // interface handoff without re-enumerating every mouse.
+                Thread.sleep(forTimeInterval: profileReadRetryDelay)
             }
         }
 

@@ -14,11 +14,14 @@ struct ContentView: View {
             header
             Divider()
             TabView {
-                Group {
-                    if model.profiles.isEmpty {
+                ZStack {
+                    if model.profiles.isEmpty && !model.loadingProfile {
                         emptyState
                     } else {
                         buttonsPane
+                    }
+                    if model.loadingProfile {
+                        loadingProfileOverlay
                     }
                 }
                 .tabItem { Label("Buttons", systemImage: "cursorarrow.click") }
@@ -61,12 +64,8 @@ struct ContentView: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(AppConstants.shortName)
+                Text(AppConstants.displayName)
                     .font(.title2.weight(.semibold))
-                Text(model.deviceSummary)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             Spacer()
             if !model.devices.isEmpty {
@@ -87,12 +86,34 @@ struct ContentView: View {
                     }
                 }
                 .frame(width: 180)
+                .disabled(model.busy)
             }
             Button("Refresh", action: model.refresh)
                 .keyboardShortcut("r", modifiers: [.command])
                 .disabled(model.busy)
             if model.busy { ProgressView().controlSize(.small) }
         }
+    }
+
+    private var loadingProfileOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.28)
+            VStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("Loading profiles from mouse…")
+                    .font(.headline)
+                Text(model.currentDeviceName.isEmpty ? "Reading onboard assignments and DPI data" : "Reading \(model.currentDeviceName)")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 22)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .shadow(radius: 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
     }
 
     private var emptyState: some View {
@@ -130,12 +151,6 @@ struct ContentView: View {
             }
             Text("Modify profiles, button outputs and DPI together, then save once. The original data is backed up automatically.")
                 .font(.callout)
-                .foregroundStyle(.secondary)
-            Text("Choose a standard output or use Custom for a keyboard chord. Raw HID++ fields are available in Settings.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Physical mapping: \(model.currentMouseProfile.name) · \(model.currentMouseProfile.profileIO.capability)")
-                .font(.caption)
                 .foregroundStyle(.secondary)
             if !model.currentMouseProfile.profileIO.canSave {
                 Text("This device is cataloged for read-only inspection until its profile-specific save format is validated.")

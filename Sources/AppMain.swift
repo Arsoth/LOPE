@@ -4,7 +4,7 @@
 import SwiftUI
 
 @main
-struct LOMPSApp: App {
+struct LOPEApp: App {
     var body: some Scene {
         WindowGroup(AppConstants.displayName) {
             ContentView()

@@ -2,6 +2,46 @@
 // Copyright (C) 2026
 
 extension AppModel {
+    func loadingButtonRows() -> [ButtonRow] {
+        currentMouseProfile.buttons.map { button in
+            let raw = stockRawAssignment(for: button)
+            let choice = presets.contains { normalize($0.raw) == raw } ? raw : "custom"
+            return ButtonRow(
+                id: button.number,
+                label: button.label,
+                currentRaw: raw,
+                draftRaw: raw,
+                draftChoice: choice
+            )
+        }
+    }
+
+    private func stockRawAssignment(for button: MouseProfileDescriptor.Button) -> String {
+        let description = ([button.control] + button.aliases).joined(separator: " ").lowercased()
+        if description.contains("g-shift") { return "900B0000" }
+        if description.contains("dpi shift") || description.contains("sniper") { return "90070000" }
+        if description.contains("dpi up") { return "90030000" }
+        if description.contains("dpi down") { return "90040000" }
+        if description.contains("dpi button") { return "90050000" }
+        if description.contains("profile") || description.contains("mode switch") { return "900A0000" }
+        if description.contains("tilt left") || description.contains("scroll left") { return "90010000" }
+        if description.contains("tilt right") || description.contains("scroll right") { return "90020000" }
+        if description.contains("primary") { return "80010001" }
+        if description.contains("secondary") { return "80010002" }
+        if description.contains("middle") { return "80010004" }
+        if description.contains("back") || description.contains("side rear") { return "80010008" }
+        if description.contains("forward") || description.contains("side front") { return "80010010" }
+
+        switch button.number {
+        case 1: return "80010001"
+        case 2: return "80010002"
+        case 3: return "80010004"
+        case 4: return "80010008"
+        case 5: return "80010010"
+        default: return "FFFFFFFF"
+        }
+    }
+
     var modifierChoices: [ModifierChoice] {
         [
             ModifierChoice(id: 0x01, label: "Ctrl"),
