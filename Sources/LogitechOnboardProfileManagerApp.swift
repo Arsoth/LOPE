@@ -97,7 +97,7 @@ final class AppModel: ObservableObject {
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
         refreshBackups()
         Task { @MainActor in
-            refresh()
+            initialRefresh()
         }
     }
 

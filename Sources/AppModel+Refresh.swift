@@ -20,6 +20,79 @@ extension AppModel {
         )
     }
 
+    func initialRefresh() {
+        guard let cachedDevice = loadLastSelectedDevice() else {
+            refresh()
+            return
+        }
+        startInitialRefresh(cachedDevice: cachedDevice)
+    }
+
+    private func startInitialRefresh(cachedDevice: DeviceChoice) {
+        refreshTask?.cancel()
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let currentDirectory = backupDirectory
+        let preferredProfileNumber = profileNumber
+
+        busy = true
+        loadingProfile = true
+        currentDeviceName = cachedDevice.name
+        deviceSummary = cachedDevice.title
+        status = "Reading \(cachedDevice.name)…"
+        if !inputMonitoringAuthorized {
+            IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+            updateInputMonitoringAuthorization()
+        }
+
+        guard let engine else {
+            busy = false
+            loadingProfile = false
+            status = EngineError.unavailable.localizedDescription
+            return
+        }
+
+        // Keep the cached device visible while the targeted read is in flight.
+        // The full device list is refreshed after this read succeeds.
+        devices = [cachedDevice]
+        selectedDeviceIndex = cachedDevice.id
+        prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
+
+        refreshTask = Task { [weak self] in
+            let snapshot = await Task.detached(priority: .userInitiated) {
+                Self.makeProfileSnapshot(
+                    executable: engine,
+                    currentDirectory: currentDirectory,
+                    devices: [cachedDevice],
+                    selectedDeviceKey: cachedDevice.deviceKey,
+                    selectedDeviceIndex: cachedDevice.id,
+                    preferredProfileNumber: preferredProfileNumber
+                )
+            }.value
+
+            guard !Task.isCancelled, let self,
+                  self.refreshGeneration == generation else { return }
+
+            // A stale cached key should not prevent the normal discovery path
+            // from finding a newly connected mouse.
+            guard snapshot.profileText != nil else {
+                self.startRefresh(
+                    preferredDeviceIndex: cachedDevice.id,
+                    preferredProfileNumber: preferredProfileNumber
+                )
+                return
+            }
+
+            self.applyRefreshSnapshot(snapshot)
+            self.startBackgroundDeviceEnumeration(
+                executable: engine,
+                currentDirectory: currentDirectory,
+                cachedDevice: cachedDevice,
+                generation: generation
+            )
+        }
+    }
+
     private func startRefresh(
         preferredDeviceIndex: Int,
         preferredProfileNumber: Int
@@ -59,7 +132,8 @@ extension AppModel {
                 Self.makeDeviceEnumerationSnapshot(
                     executable: engine,
                     currentDirectory: currentDirectory,
-                    preferredDeviceIndex: preferredDeviceIndex
+                    preferredDeviceIndex: preferredDeviceIndex,
+                    preferredDeviceKey: nil
                 )
             }.value
 
@@ -90,6 +164,7 @@ extension AppModel {
             self.selectedDeviceIndex = selected.id
             self.currentDeviceName = selected.name
             self.deviceSummary = selected.title
+            self.rememberSelectedDevice(selected)
             self.prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
             self.status = "Found \(selected.name). Reading onboard profile…"
 
@@ -114,6 +189,7 @@ extension AppModel {
     func selectDevice(_ index: Int) {
         guard let selected = devices.first(where: { $0.id == index }), selectedDeviceIndex != index else { return }
         selectedDeviceIndex = index
+        rememberSelectedDevice(selected)
         // Profile numbers are device-local. Reusing the previous mouse's
         // selection can target a disabled/partially provisioned slot on the
         // newly selected mouse, so let the engine choose its first enabled
@@ -156,6 +232,7 @@ extension AppModel {
         selectedDeviceIndex = selected.id
         currentDeviceName = selected.name
         deviceSummary = selected.title
+        rememberSelectedDevice(selected)
 
         guard let profileText = snapshot.profileText else {
             resetEditorState()
@@ -241,7 +318,8 @@ extension AppModel {
     private nonisolated static func makeDeviceEnumerationSnapshot(
         executable: URL,
         currentDirectory: URL,
-        preferredDeviceIndex: Int
+        preferredDeviceIndex: Int,
+        preferredDeviceKey: String?
     ) -> DeviceEnumerationSnapshot {
         do {
             let list = try runDeviceListWithRetry(
@@ -250,7 +328,9 @@ extension AppModel {
             )
             let discovered = parseDeviceChoices(list)
             let accessWarning = list.contains("macOS denied HID access")
-            let selectedIndex = (discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first)?.id
+            let selectedIndex = (preferredDeviceKey.flatMap { key in
+                discovered.first(where: { $0.deviceKey == key })
+            } ?? discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first)?.id
             return DeviceEnumerationSnapshot(
                 devices: discovered,
                 selectedDeviceIndex: selectedIndex,
@@ -265,6 +345,73 @@ extension AppModel {
                 errorMessage: errorMessage(for: error)
             )
         }
+    }
+
+    private func startBackgroundDeviceEnumeration(
+        executable: URL,
+        currentDirectory: URL,
+        cachedDevice: DeviceChoice,
+        generation: Int
+    ) {
+        refreshTask = Task { [weak self] in
+            let enumeration = await Task.detached(priority: .utility) {
+                Self.makeDeviceEnumerationSnapshot(
+                    executable: executable,
+                    currentDirectory: currentDirectory,
+                    preferredDeviceIndex: cachedDevice.id,
+                    preferredDeviceKey: cachedDevice.deviceKey
+                )
+            }.value
+
+            guard !Task.isCancelled, let self,
+                  self.refreshGeneration == generation else { return }
+
+            self.refreshTask = nil
+            if let errorMessage = enumeration.errorMessage {
+                self.status = "Loaded \(cachedDevice.name). The device list could not be refreshed: \(errorMessage)"
+                return
+            }
+
+            guard let selected = enumeration.devices.first(where: { $0.deviceKey == cachedDevice.deviceKey }) else {
+                guard let fallback = enumeration.devices.first else {
+                    self.devices = []
+                    self.selectedDeviceIndex = 0
+                    self.currentDeviceName = ""
+                    self.deviceSummary = "No editable Logitech mouse found"
+                    self.resetEditorState()
+                    self.status = enumeration.accessWarning
+                        ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then choose Refresh."
+                        : "No Logitech mouse was found. USB receiver entries are hidden."
+                    return
+                }
+
+                // The cached mouse disappeared while the list was refreshed.
+                // Hand the newly selected device through the normal full read
+                // so the editor never shows one mouse's profile for another.
+                self.devices = enumeration.devices
+                self.selectedDeviceIndex = fallback.id
+                self.startRefresh(preferredDeviceIndex: fallback.id, preferredProfileNumber: 0)
+                return
+            }
+
+            self.devices = enumeration.devices
+            self.selectedDeviceIndex = selected.id
+            self.currentDeviceName = selected.name
+            self.deviceSummary = selected.title
+            self.rememberSelectedDevice(selected)
+        }
+    }
+
+    private func loadLastSelectedDevice() -> DeviceChoice? {
+        let key = "\(AppConstants.defaultsPrefix).\(AppConstants.lastSelectedDeviceKey)"
+        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(DeviceChoice.self, from: data)
+    }
+
+    private func rememberSelectedDevice(_ device: DeviceChoice) {
+        let key = "\(AppConstants.defaultsPrefix).\(AppConstants.lastSelectedDeviceKey)"
+        guard let data = try? JSONEncoder().encode(device) else { return }
+        UserDefaults.standard.set(data, forKey: key)
     }
 
     private nonisolated static func makeProfileSnapshot(

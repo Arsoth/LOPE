@@ -116,6 +116,16 @@ static bool receiver_pairing_reply_is_present(Reply reply) {
     return reply.status == REPLY_OK && reply.length >= 8;
 }
 
+static bool receiver_pairing_reply_is_definitive_empty(Reply reply) {
+    // Known receiver firmware reports an empty pairing record as a protocol
+    // error. A successful but undersized record is also not a paired-device
+    // record. Timeouts and I/O errors remain eligible for the compatibility
+    // ping below because the receiver may simply be waking up.
+    return reply.status == REPLY_HIDPP10_ERROR ||
+           reply.status == REPLY_HIDPP20_ERROR ||
+           (reply.status == REPLY_OK && reply.length < 8);
+}
+
 static int add_device(Device *devices,
                       size_t *count,
                       HidInterface *iface,
@@ -556,6 +566,14 @@ static int discover_devices(HidContext *context,
                                              pairing_reply, inspect_features);
                     continue;
                 }
+                // C5xx receivers have a reliable pairing table. Do not issue
+                // a second, potentially one-second ping for a slot that the
+                // table has already identified as empty. Keep the ping for
+                // unknown/name-only receivers and transport failures.
+                if (is_receiver_product(iface->product_id) &&
+                    receiver_pairing_reply_is_definitive_empty(pairing_reply)) {
+                    continue;
+                }
                 double protocol = 0;
                 uint8_t resolved_device_number = slot;
                 if (ping_interface(iface, slot, 1.0, &protocol, &resolved_device_number)) {
@@ -563,6 +581,11 @@ static int discover_devices(HidContext *context,
                                protocol, inspect_features);
                 }
             }
+
+            // The receiver endpoint itself is not a mouse and is filtered
+            // from `list`; its broadcast ping only adds another avoidable HID
+            // request after all receiver slots have already been checked.
+            continue;
         }
         double protocol = 0;
         uint8_t resolved_device_number = 0xFF;

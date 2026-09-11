@@ -50,7 +50,7 @@ struct BackupEntry: Identifiable {
     var isJSON: Bool { url.pathExtension.lowercased() == "json" }
 }
 
-struct DeviceChoice: Identifiable, Hashable, Sendable {
+struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
     let id: Int
     let name: String
     let connection: String
