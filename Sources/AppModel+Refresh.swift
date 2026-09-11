@@ -6,6 +6,9 @@ import ApplicationServices
 import Foundation
 import IOKit.hidsystem
 
+private let deviceReadAttempts = 3
+private let deviceReadRetryDelay: TimeInterval = 0.2
+
 @MainActor
 extension AppModel {
     func refresh() {
@@ -123,7 +126,11 @@ extension AppModel {
         guard let profileText = snapshot.profileText else {
             resetEditorState()
             dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
-            status = "Connected to \(selected.name), but no compatible onboard profile was found."
+            if let profileError = snapshot.profileError, !profileError.isEmpty {
+                status = "Could not read an onboard profile from \(selected.name). \(profileError) Try Refresh."
+            } else {
+                status = "Connected to \(selected.name), but no compatible onboard profile was found."
+            }
             return
         }
 
@@ -181,9 +188,8 @@ extension AppModel {
         preferredProfileNumber: Int
     ) -> RefreshSnapshot {
         do {
-            let list = try EngineRunner.run(
+            let list = try runDeviceListWithRetry(
                 executable: executable,
-                arguments: ["list"],
                 currentDirectory: currentDirectory
             )
             let discovered = parseDeviceChoices(list)
@@ -227,7 +233,7 @@ extension AppModel {
             // The engine keeps one HID context for this combined read. The
             // previous implementation launched separate processes for headers,
             // profile data, and DPI, repeating feature discovery each time.
-            let profileText = try EngineRunner.run(
+            let profileText = try runProfileReadWithRetry(
                 executable: executable,
                 arguments: [
                     "--device-key", selectedDeviceKey,
@@ -253,6 +259,69 @@ extension AppModel {
                 accessWarning: accessWarning
             )
         }
+    }
+
+    private nonisolated static func runDeviceListWithRetry(
+        executable: URL,
+        currentDirectory: URL
+    ) throws -> String {
+        var lastError: Error?
+
+        for attempt in 0..<deviceReadAttempts {
+            do {
+                let output = try EngineRunner.run(
+                    executable: executable,
+                    arguments: ["list"],
+                    currentDirectory: currentDirectory
+                )
+                if !parseDeviceChoices(output).isEmpty || attempt == deviceReadAttempts - 1 {
+                    return output
+                }
+                lastError = EngineError.failed("The Logitech device list was empty.")
+            } catch {
+                lastError = error
+            }
+
+            if attempt < deviceReadAttempts - 1 {
+                Thread.sleep(forTimeInterval: deviceReadRetryDelay)
+            }
+        }
+
+        throw lastError ?? EngineError.failed("The Logitech device list could not be read.")
+    }
+
+    private nonisolated static func runProfileReadWithRetry(
+        executable: URL,
+        arguments: [String],
+        currentDirectory: URL
+    ) throws -> String {
+        var lastError: Error?
+
+        for attempt in 0..<deviceReadAttempts {
+            do {
+                let output = try EngineRunner.run(
+                    executable: executable,
+                    arguments: arguments,
+                    currentDirectory: currentDirectory
+                )
+                // run_profiles historically returned success after emitting
+                // headers when the selected sector read timed out. Require
+                // this marker so a transient G603 wake-up failure is retried
+                // instead of being presented as a mouse with no profile.
+                if selectedProfileNumber(in: output) != nil {
+                    return output
+                }
+                lastError = EngineError.failed("The selected onboard profile was not returned.")
+            } catch {
+                lastError = error
+            }
+
+            if attempt < deviceReadAttempts - 1 {
+                Thread.sleep(forTimeInterval: deviceReadRetryDelay)
+            }
+        }
+
+        throw lastError ?? EngineError.failed("The selected onboard profile could not be read.")
     }
 
     private nonisolated static func errorMessage(for error: Error) -> String {
