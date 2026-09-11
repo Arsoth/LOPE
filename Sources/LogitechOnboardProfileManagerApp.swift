@@ -13,6 +13,11 @@ final class AppModel: ObservableObject {
     @Published var devices: [DeviceChoice] = []
     @Published var selectedDeviceIndex = 0
     @Published var profiles: [ProfileChoice] = []
+    // The effective capacity is distinct from the number of readable profile
+    // headers. Older engine output falls back to profiles.count and records
+    // that the device did not actually report a capacity.
+    @Published var onboardProfileCapacity: Int?
+    @Published var onboardProfileCapacityWasReported = false
     @Published var profileNumber = 1
     @Published var buttons: [ButtonRow] = []
     @Published var dpiStages = ["", "", "", "", ""]
@@ -72,6 +77,33 @@ final class AppModel: ObservableObject {
         // present runtime-numbered fallback controls until a dedicated JSON
         // descriptor has been added to the catalog.
         return !isMXSeriesMouse || hasSpecificMouseProfile
+    }
+
+    var onboardProfileSummary: String {
+        guard !loadingProfile else { return "Onboard profiles" }
+        let readableCount = profiles.count
+        guard readableCount > 0 else { return "Onboard profiles" }
+
+        guard let capacity = onboardProfileCapacity else {
+            return readableCount == 1
+                ? "Profile 1 (capacity not reported)"
+                : "Onboard profiles (\(readableCount) readable; capacity not reported)"
+        }
+
+        guard capacity >= readableCount else {
+            return "Onboard profiles (\(readableCount) readable; reported capacity inconsistent)"
+        }
+
+        if !onboardProfileCapacityWasReported {
+            return readableCount == 1
+                ? "Profile 1 (1 readable; capacity not reported)"
+                : "Onboard profiles (\(readableCount) readable; capacity not reported)"
+        }
+
+        if readableCount == 1 && capacity == 1 {
+            return "Profile 1 of 1"
+        }
+        return "Onboard profiles (\(readableCount) of \(capacity) supported)"
     }
 
     var engine: URL? {

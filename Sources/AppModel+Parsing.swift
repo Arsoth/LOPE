@@ -116,6 +116,10 @@ extension AppModel {
         return nil
     }
 
+    nonisolated static func onboardProfileCapacity(in text: String) -> Int? {
+        ProfileOutputParser.onboardProfileCapacity(in: text)
+    }
+
     func parseProfiles(_ text: String) -> (choices: [ProfileChoice], rowsByProfile: [Int: [ButtonRow]]) {
         let profilePattern = try! NSRegularExpression(pattern: #"^Profile\s+(\d+)\s+\(sector\s+(0x[0-9A-Fa-f]+),\s+enabled=(yes|no)\)"#)
         let buttonPattern = try! NSRegularExpression(pattern: #"^\s*button\s+(\d+):\s*(.*?)\s*\[([0-9A-Fa-f ]+)\]"#)

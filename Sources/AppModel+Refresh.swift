@@ -57,6 +57,7 @@ extension AppModel {
         devices = [cachedDevice]
         selectedDeviceIndex = cachedDevice.id
         prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
+        let profileReadProgress = profileReadProgressHandler(generation: generation)
 
         refreshTask = Task { [weak self] in
             let snapshot = await Task.detached(priority: .userInitiated) {
@@ -66,7 +67,8 @@ extension AppModel {
                     devices: [cachedDevice],
                     selectedDeviceKey: cachedDevice.deviceKey,
                     selectedDeviceIndex: cachedDevice.id,
-                    preferredProfileNumber: preferredProfileNumber
+                    preferredProfileNumber: preferredProfileNumber,
+                    onLine: profileReadProgress
                 )
             }.value
 
@@ -167,6 +169,7 @@ extension AppModel {
             self.rememberSelectedDevice(selected)
             self.prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
             self.status = "Found \(selected.name). Reading onboard profile…"
+            let profileReadProgress = self.profileReadProgressHandler(generation: generation)
 
             let snapshot = await Task.detached(priority: .userInitiated) {
                 Self.makeProfileSnapshot(
@@ -176,6 +179,7 @@ extension AppModel {
                     selectedDeviceKey: selected.deviceKey,
                     selectedDeviceIndex: selected.id,
                     preferredProfileNumber: preferredProfileNumber,
+                    onLine: profileReadProgress,
                     accessWarning: enumeration.accessWarning
                 )
             }.value
@@ -223,6 +227,7 @@ extension AppModel {
             selectedDeviceIndex = 0
             currentDeviceName = ""
             deviceSummary = "No editable Logitech mouse found"
+            onboardProfileCapacity = nil
             profiles = []
             buttons = []
             resetEditorState()
@@ -251,6 +256,9 @@ extension AppModel {
 
         let parsed = parseProfiles(profileText)
         profiles = parsed.choices
+        let reportedCapacity = Self.onboardProfileCapacity(in: profileText)
+        onboardProfileCapacity = reportedCapacity ?? parsed.choices.count
+        onboardProfileCapacityWasReported = reportedCapacity != nil
         baselineProfileEnabled = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.enabled) })
         keyInputDrafts.removeAll()
         resetDPIState()
@@ -259,12 +267,11 @@ extension AppModel {
             status = "The mouse was found, but no onboard profiles were readable."
             return
         }
-        if let loadedProfile = snapshot.selectedProfileNumber,
-           profiles.contains(where: { $0.id == loadedProfile }) {
-            profileNumber = loadedProfile
-        } else if !profiles.contains(where: { $0.id == profileNumber }) {
-            profileNumber = profiles[0].id
-        }
+        profileNumber = ProfileSelection.resolvedProfileNumber(
+            selectedProfileNumber: snapshot.selectedProfileNumber,
+            availableProfileIDs: profiles.map(\.id),
+            preferredProfileNumber: profileNumber
+        ) ?? profiles[0].id
         buttons = parsed.rowsByProfile[profileNumber] ?? []
         dpiDetails = ""
         parseDPI(profileText)
@@ -276,7 +283,22 @@ extension AppModel {
             : "Read-only inspection complete. Changes are previewed before writing."
     }
 
+    private func profileReadProgressHandler(generation: Int) -> @Sendable (String) -> Void {
+        { [weak self] line in
+            guard let capacity = Self.onboardProfileCapacity(in: line) else { return }
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.refreshGeneration == generation,
+                      self.loadingProfile else { return }
+                self.onboardProfileCapacity = capacity
+                self.onboardProfileCapacityWasReported = true
+            }
+        }
+    }
+
     private func resetEditorState() {
+        onboardProfileCapacity = nil
+        onboardProfileCapacityWasReported = false
         profiles = []
         buttons = []
         baselineProfileEnabled.removeAll()
@@ -286,6 +308,8 @@ extension AppModel {
 
     private func prepareLoadingEditor(profileNumber placeholderProfileNumber: Int) {
         let placeholderNumber = max(placeholderProfileNumber, 1)
+        onboardProfileCapacity = nil
+        onboardProfileCapacityWasReported = false
         profiles = [ProfileChoice(
             id: placeholderNumber,
             sector: "Loading…",
@@ -426,6 +450,7 @@ extension AppModel {
         selectedDeviceKey: String,
         selectedDeviceIndex: Int,
         preferredProfileNumber: Int,
+        onLine: @escaping @Sendable (String) -> Void = { _ in },
         accessWarning: Bool = false
     ) -> RefreshSnapshot {
         do {
@@ -447,7 +472,8 @@ extension AppModel {
             let profileText = try runProfileReadWithRetry(
                 executable: executable,
                 arguments: arguments,
-                currentDirectory: currentDirectory
+                currentDirectory: currentDirectory,
+                onLine: onLine
             )
             let selectedProfileNumber = Self.selectedProfileNumber(in: profileText)
             return RefreshSnapshot(
@@ -498,16 +524,18 @@ extension AppModel {
     private nonisolated static func runProfileReadWithRetry(
         executable: URL,
         arguments: [String],
-        currentDirectory: URL
+        currentDirectory: URL,
+        onLine: @escaping @Sendable (String) -> Void
     ) throws -> String {
         var lastError: Error?
 
         for attempt in 0..<profileReadAttempts {
             do {
-                let output = try EngineRunner.run(
+                let output = try EngineRunner.runWithLineProgress(
                     executable: executable,
                     arguments: arguments,
-                    currentDirectory: currentDirectory
+                    currentDirectory: currentDirectory,
+                    onLine: onLine
                 )
                 // run_profiles historically returned success after emitting
                 // headers when the selected sector read timed out. Require

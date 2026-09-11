@@ -60,6 +60,56 @@ enum EngineRunner {
         }
         return output
     }
+
+    static func runWithLineProgress(
+        executable: URL,
+        arguments: [String],
+        currentDirectory: URL,
+        onLine: @escaping @Sendable (String) -> Void
+    ) throws -> String {
+        invocationLock.lock()
+        defer { invocationLock.unlock() }
+
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.currentDirectoryURL = currentDirectory
+        var environment = ProcessInfo.processInfo.environment
+        environment["LOGITECH_ONBOARD_DEBUG"] = "0"
+        process.environment = environment
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+
+        var outputData = Data()
+        var pendingLineData = Data()
+        let handle = pipe.fileHandleForReading
+        while true {
+            let data = handle.availableData
+            if data.isEmpty { break }
+            outputData.append(data)
+            pendingLineData.append(data)
+            while let newline = pendingLineData.firstIndex(of: 0x0A) {
+                let lineData = pendingLineData[..<newline]
+                if let line = String(data: lineData, encoding: .utf8) {
+                    onLine(line)
+                }
+                pendingLineData.removeSubrange(...newline)
+            }
+        }
+        if !pendingLineData.isEmpty,
+           let line = String(data: pendingLineData, encoding: .utf8) {
+            onLine(line)
+        }
+
+        process.waitUntilExit()
+        let output = String(data: outputData, encoding: .utf8) ?? ""
+        guard process.terminationStatus == 0 else {
+            throw EngineError.failed(output.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return output
+    }
 }
 
 struct RefreshSnapshot: Sendable {

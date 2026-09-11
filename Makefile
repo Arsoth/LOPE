@@ -10,6 +10,7 @@ PROFILE_FILES := $(wildcard Profiles/*.json)
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
 SWIFT_MODULE_CACHE := .build/module-cache
+SWIFT_PROFILE_PARSER_TEST := .build/profile-output-parser-self-test
 # A stable signing identity lets macOS recognize rebuilt versions of the app
 # as the same app for Input Monitoring. Override this when several identities
 # are installed, for example:
@@ -47,8 +48,13 @@ app: build gui
 	cp -f App/Info.plist $(GUI_BUNDLE)/Contents/Info.plist
 	@codesign --force --deep --sign "$(SIGNING_IDENTITY)" $(GUI_BUNDLE) >/dev/null
 
-test: $(APP)
+test: $(APP) $(SWIFT_PROFILE_PARSER_TEST)
 	./$(APP) self-test
+	./$(SWIFT_PROFILE_PARSER_TEST)
+
+$(SWIFT_PROFILE_PARSER_TEST): Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift
+	@mkdir -p .build
+	swiftc -O -target $(GUI_TARGET) Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
 
 clean:
-	rm -f $(APP) bin/$(APP) $(GUI_BIN)
+	rm -f $(APP) bin/$(APP) $(GUI_BIN) $(SWIFT_PROFILE_PARSER_TEST)

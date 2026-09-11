@@ -95,7 +95,7 @@ struct ContentView: View {
                 .frame(width: 310)
                 .disabled(model.devices.isEmpty)
             }
-            if !model.profiles.isEmpty {
+            if model.profiles.count > 1 {
                 Picker("Profile", selection: $model.profileNumber) {
                     ForEach(model.profiles) { profile in
                         Text(profile.title).tag(profile.id)
@@ -326,18 +326,24 @@ struct ContentView: View {
     }
 
     private var profilesEditor: some View {
-        GroupBox("Onboard profiles") {
+        GroupBox(model.onboardProfileSummary) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Disable a profile to keep it out of the mouse’s profile cycle. At least one profile must remain enabled.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 12) {
-                    Text("Enable Profile(s):")
-                        .font(.callout.weight(.medium))
-                    ForEach(model.profiles) { profile in
-                        profileEnableControl(profile)
+                if model.profiles.count > 1 {
+                    Text("Disable a profile to keep it out of the mouse’s profile cycle. At least one profile must remain enabled.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Text("Enable Profile(s):")
+                            .font(.callout.weight(.medium))
+                        ForEach(model.profiles) { profile in
+                            profileEnableControl(profile)
+                        }
+                        Spacer()
                     }
-                    Spacer()
+                } else {
+                    Text("This mouse has one readable onboard profile; profile cycling and disabling are unavailable.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 if model.showAdvancedFields {
                     HStack(spacing: 12) {

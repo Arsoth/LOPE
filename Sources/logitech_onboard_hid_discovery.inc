@@ -562,8 +562,13 @@ static int discover_devices(HidContext *context,
                     // the pairing table already confirmed it.
                     if (pairing_present || protocol >= 2.0) {
                         size_t before = *count;
+                        // A paired receiver slot is a HID++ 2.0 peripheral
+                        // even when its routed compatibility ping is answered
+                        // by the receiver with a HID++ 1.0 error. Preserve the
+                        // pairing-table fact so feature discovery still runs.
+                        double device_protocol = pairing_present ? 2.0 : protocol;
                         add_device(devices, count, iface, resolved_device_number, slot,
-                                   protocol, inspect_features);
+                                   device_protocol, inspect_features);
                         if (*count > before && devices[*count - 1].name[0] == '\0') {
                             receiver_device_name(&devices[*count - 1], slot);
                         }
@@ -636,10 +641,17 @@ static int discover_device_by_key(HidContext *context,
             bool pairing_present = receiver_pairing_reply_is_present(pairing_reply);
             if (ping_interface(iface, device_number, 1.0,
                                &protocol, &resolved_device_number)) {
-                if (pairing_present || protocol >= 2.0) {
+                if (pairing_present || protocol >= 2.0 || is_receiver_interface(iface)) {
                     size_t before = *count;
+                    // This key came from a paired receiver slot. A successful
+                    // slot probe can still be answered as HID++ 1.0 by the
+                    // receiver, so keep the paired peripheral's 2.0 model
+                    // when preparing its feature table.
+                    double device_protocol = pairing_present || is_receiver_interface(iface)
+                        ? 2.0
+                        : protocol;
                     add_device(devices, count, iface, resolved_device_number,
-                               device_number, protocol, true);
+                               device_number, device_protocol, true);
                     if (*count > before && devices[*count - 1].name[0] == '\0') {
                         receiver_device_name(&devices[*count - 1], device_number);
                     }

@@ -116,32 +116,32 @@ explicit JSON export creates a file named for the mouse and date/time.
 
 ## P1 — profile and button discovery
 
-### [ ] 5. Expose onboard profile capacity in the loaded UI
+### [x] 5. Expose onboard profile capacity in the loaded UI
 
 **Feasibility: High.** The native engine already reads `ProfileInfo.profile_count`
-from HID++ feature `0x8100`, and prints profile/header information. The Swift
-model parses the actual profile headers into `profiles`, but does not retain the
-reported capacity separately. Capacity and currently discovered headers should
-be represented as different values.
+from HID++ feature `0x8100`; it now emits that value as a stable
+`Profile capacity: N` line. The Swift model stores the effective capacity and
+tracks whether it was reported or derived from readable headers.
 
 **Implementation tasks:**
 
-- [ ] Emit a stable machine-readable line such as `Profile capacity: N` in the
+- [x] Emit a stable machine-readable line such as `Profile capacity: N` in the
       engine output used by the GUI, or add a dedicated metadata command/result.
-- [ ] Parse and store `onboardProfileCapacity` in `AppModel`; fall back to the
+- [x] Parse and store `onboardProfileCapacity` in `AppModel`; fall back to the
       number of readable headers if older engine output does not include it.
-- [ ] Show it during/after load, for example `Onboard profiles (2 of 5
-supported)` or `Profile 1 of 1`, and make the distinction between capacity and
+- [x] Show it during/after load, for example `Onboard profiles (2 of 5
+      supported)` or `Profile 1 of 1`, and make the distinction between capacity and
       readable slots clear.
-- [ ] Keep the UI honest for devices that report unavailable or inconsistent
+- [x] Keep the UI honest for devices that report unavailable or inconsistent
       profile metadata.
-- [ ] Add parser tests for capacity, missing capacity, and malformed values.
+- [x] Add parser tests for capacity, missing capacity, malformed values, and
+      CRLF output.
 
 **Done when:** the user can see the mouse’s reported onboard profile capacity
 as soon as profile loading completes, without mistaking it for the number of
 currently readable/available profile headers.
 
-### [ ] 6. Hide redundant profile selectors for one-profile mice
+### [x] 6. Hide redundant profile selectors for one-profile mice
 
 **Feasibility: High and low risk.** The app already knows the number of
 discovered profile headers. The top-level profile `Picker` in `ContentView`
@@ -150,13 +150,13 @@ load profile 1 normally.
 
 **Implementation tasks:**
 
-- [ ] Hide the top header profile picker when only one profile is available.
-- [ ] Hide or simplify profile-cycle/enable controls when there is only one
+- [x] Hide the top header profile picker when only one profile is available.
+- [x] Hide or simplify profile-cycle/enable controls when there is only one
       profile, while preserving the invariant that the sole profile cannot be
       disabled.
-- [ ] Use the capacity label from item 5 where it gives useful context without
+- [x] Use the capacity label from item 5 where it gives useful context without
       reintroducing a selector.
-- [ ] Test switching from a multi-profile mouse to a one-profile mouse and back
+- [x] Test switching from a multi-profile mouse to a one-profile mouse and back
       without leaving a stale profile number or stale edits.
 
 **Done when:** one-profile devices have no redundant profile selector, and

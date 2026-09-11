@@ -140,6 +140,14 @@ static int run_profiles(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
+    printf("Onboard profiles for %s:\n", device_label(device));
+    // Keep the device-reported capacity separate from the number of profile
+    // headers that were readable. The GUI uses this stable marker to explain
+    // partially provisioned or unusual onboard-profile layouts.
+    // Emit it before the header walk so the UI can show capacity while the
+    // remaining profile reads are still in progress.
+    printf("Profile capacity: %u\n", info.profile_count);
+    fflush(stdout);
     ProfileHeader headers[MAX_HEADERS];
     size_t header_count = 0;
     if (!read_profile_headers(device, &info, headers, &header_count)) {
@@ -155,7 +163,6 @@ static int run_profiles(const Options *options) {
         // first enabled slot and report the actual selection below.
         requested_profile = 0;
     }
-    printf("Onboard profiles for %s:\n", device_label(device));
     if (options->headers_only && !options->include_dpi) {
         for (size_t i = 0; i < header_count; i++) {
             printf("Profile %zu (sector 0x%04X, enabled=%s)\n",

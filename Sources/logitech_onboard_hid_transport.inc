@@ -440,10 +440,13 @@ static bool is_receiver_routed_device(const Device *device) {
 static bool should_retry_short_report(Reply reply) {
     // A few Lightspeed mouse firmware revisions accept the receiver's
     // long-report probe but only answer a routed feature request on the
-    // short HID++ path. Resource errors are also seen while the radio route
-    // is waking up, so give the alternate framing one chance.
+    // short HID++ path. The receiver can report this as a timeout, I/O error,
+    // or either HID++ error family while the radio route is waking up, so give
+    // the alternate framing one chance for every non-success response.
     return reply.status == REPLY_TIMEOUT ||
-           (reply.status == REPLY_HIDPP10_ERROR && reply.error_code == 0x09);
+           reply.status == REPLY_IO_ERROR ||
+           reply.status == REPLY_HIDPP10_ERROR ||
+           reply.status == REPLY_HIDPP20_ERROR;
 }
 
 static const char *reply_status_name(ReplyStatus status) {
