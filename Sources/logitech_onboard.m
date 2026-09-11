@@ -107,7 +107,12 @@ typedef struct {
 
 typedef struct {
     HidInterface *iface;
+    // device_number is the address returned by discovery and is useful for
+    // identifying receiver slots. request_device_number is the address that
+    // must be used for subsequent HID++ calls; a direct wireless endpoint can
+    // report a slot alias while still requiring 0xFF for commands.
     uint8_t device_number;
+    uint8_t request_device_number;
     double protocol;
     Feature features[MAX_FEATURES];
     size_t feature_count;
@@ -126,6 +131,7 @@ typedef enum {
 typedef struct {
     ReplyStatus status;
     uint8_t error_code;
+    uint8_t device_number;
     uint8_t bytes[MAX_REPORT_BYTES];
     size_t length;
 } Reply;
@@ -155,6 +161,7 @@ typedef struct {
     uint8_t *data;
     size_t data_length;
     bool crc_ok;
+    bool crc_checked;
     size_t button_offset;
     size_t valid_specs;
     size_t known_specs;
@@ -172,8 +179,12 @@ typedef struct {
     const char *target;
     const char *backup_path;
     int device_index;
+    const char *device_key;
     int slot;
     int profile;
+    bool headers_only;
+    bool summary_only;
+    bool sensor_only;
     int button;
     int dpi_default;
     int dpi_shift;
@@ -318,6 +329,25 @@ static bool is_known_hidpp_product(uint32_t product_id) {
     return is_wireless_device_product(product_id) ||
            is_receiver_product(product_id) ||
            is_bluetooth_device_product(product_id);
+}
+
+static bool text_contains_case_insensitive(const char *text, const char *needle) {
+    if (text == NULL || needle == NULL || *needle == '\0') {
+        return false;
+    }
+    for (const char *start = text; *start != '\0'; start++) {
+        const char *text_cursor = start;
+        const char *needle_cursor = needle;
+        while (*text_cursor != '\0' && *needle_cursor != '\0' &&
+               tolower((unsigned char)*text_cursor) == tolower((unsigned char)*needle_cursor)) {
+            text_cursor++;
+            needle_cursor++;
+        }
+        if (*needle_cursor == '\0') {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void channel_report_callback(void *context,
@@ -520,10 +550,17 @@ static Reply channel_request(HidChannel *channel,
         const uint8_t *wire = node->bytes + offset;
         size_t wire_length = node->length - offset;
         uint8_t returned_device = wire[0];
-        if (returned_device != device_number && returned_device != (uint8_t)(device_number ^ 0xFF)) {
+        bool wireless_direct_alias =
+            device_number == 0xFF &&
+            request_id == (uint16_t)(0x0010 | SW_ID) &&
+            returned_device >= 1 && returned_device <= 6;
+        if (returned_device != device_number &&
+            returned_device != (uint8_t)(device_number ^ 0xFF) &&
+            !wireless_direct_alias) {
             free(node);
             continue;
         }
+        reply.device_number = returned_device;
         const uint8_t *body = wire + 1;
         size_t body_length = wire_length - 1;
         if (body_length >= 4 && node->report_id == REPORT_SHORT && body[0] == 0x8F &&
@@ -602,7 +639,7 @@ static Reply device_call_with_report(Device *device,
     }
     uint16_t request_id = (uint16_t)(((uint16_t)feature_index << 8) | (function & 0xF0) | SW_ID);
     return channel_request(&device->iface->channel,
-                           device->device_number,
+                           device->request_device_number,
                            request_id,
                            params,
                            params_length,
@@ -637,7 +674,7 @@ static Reply raw_request(Device *device,
                          bool prefer_long,
                          double timeout_seconds) {
     return channel_request(&device->iface->channel,
-                           device->device_number,
+                           device->request_device_number,
                            request_id,
                            params,
                            params_length,
@@ -645,7 +682,11 @@ static Reply raw_request(Device *device,
                            timeout_seconds);
 }
 
-static int ping_interface(HidInterface *iface, uint8_t device_number, double timeout, double *protocol) {
+static int ping_interface(HidInterface *iface,
+                          uint8_t device_number,
+                          double timeout,
+                          double *protocol,
+                          uint8_t *resolved_device_number) {
     uint8_t params[3] = {0, 0, 0x5A};
     Reply reply = channel_request(&iface->channel,
                                   device_number,
@@ -656,12 +697,21 @@ static int ping_interface(HidInterface *iface, uint8_t device_number, double tim
                                   timeout);
     if (reply.status == REPLY_OK && reply.length >= 3 && reply.bytes[2] == 0x5A) {
         *protocol = (double)reply.bytes[0] + (double)reply.bytes[1] / 10.0;
+        if (resolved_device_number != NULL) {
+            *resolved_device_number = device_number == 0xFF &&
+                                      reply.device_number >= 1 && reply.device_number <= 6
+                ? reply.device_number
+                : device_number;
+        }
         return 1;
     }
     // A HID++ 1.0 receiver answers the 2.0-style ping with invalid-sub-id.
     // It is useful to list that receiver, but it cannot edit a 0x8100 profile.
     if (reply.status == REPLY_HIDPP10_ERROR && reply.error_code == 0x01) {
         *protocol = 1.0;
+        if (resolved_device_number != NULL) {
+            *resolved_device_number = device_number;
+        }
         return 1;
     }
     return 0;
@@ -874,7 +924,12 @@ static int open_vendor_channels(HidContext *context) {
     return 1;
 }
 
-static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8_t device_number, double protocol) {
+static int add_device(Device *devices,
+                      size_t *count,
+                      HidInterface *iface,
+                      uint8_t device_number,
+                      uint8_t request_device_number,
+                      double protocol) {
     if (*count >= MAX_DEVICES) {
         return 0;
     }
@@ -882,6 +937,7 @@ static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8
     memset(device, 0, sizeof(*device));
     device->iface = iface;
     device->device_number = device_number;
+    device->request_device_number = request_device_number;
     device->protocol = protocol;
     if (protocol >= 2.0) {
         discover_features(device);
@@ -893,42 +949,150 @@ static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8
 static bool is_receiver_interface(const HidInterface *iface) {
     // Logitech USB receiver product IDs occupy the C5xx range. Direct USB
     // mice use a different product-ID range and should not be probed as if
-    // they had receiver slots.
-    return iface != NULL && is_receiver_product(iface->product_id);
+    // they had receiver slots. A few macOS HID interfaces report product ID
+    // zero, so retain the product-name fallback for those receivers.
+    return iface != NULL &&
+           (is_receiver_product(iface->product_id) ||
+            text_contains_case_insensitive(iface->product, "receiver") ||
+            text_contains_case_insensitive(iface->product, "unifying") ||
+            text_contains_case_insensitive(iface->product, "bolt"));
 }
 
 static bool is_receiver_endpoint(const Device *device);
 static bool is_mouse_device(const Device *device);
+static bool is_duplicate_direct_mouse_endpoint(const Device *candidate,
+                                               const Device *devices,
+                                               size_t count);
+
+static void format_device_key(const Device *device, char *out, size_t out_size) {
+    snprintf(out, out_size, "%" PRIx64 "-%" PRIx64 "-%02X",
+             device->iface->location_id, device->iface->registry_id,
+             device->request_device_number);
+}
+
+static bool parse_device_key(const char *text,
+                             uint64_t *location_id,
+                             uint64_t *registry_id,
+                             uint8_t *device_number) {
+    unsigned long long parsed_location = 0;
+    unsigned long long parsed_registry = 0;
+    unsigned int parsed_device = 0;
+    char trailing = '\0';
+    if (text == NULL ||
+        sscanf(text, "%llx-%llx-%x%c",
+               &parsed_location, &parsed_registry, &parsed_device, &trailing) != 3 ||
+        parsed_device > UINT8_MAX) {
+        return false;
+    }
+    *location_id = (uint64_t)parsed_location;
+    *registry_id = (uint64_t)parsed_registry;
+    *device_number = (uint8_t)parsed_device;
+    return true;
+}
 
 static int discover_devices(HidContext *context, int requested_slot, Device *devices, size_t *count) {
     *count = 0;
     open_vendor_channels(context);
     for (size_t i = 0; i < context->count; i++) {
         HidInterface *iface = &context->items[i];
-        if (!iface->is_vendor || !iface->channel_open) {
+        if (!iface->is_vendor) {
+            continue;
+        }
+        // A standard mouse collection is enough to identify a direct mouse
+        // even when macOS blocks its separate HID++ vendor channel. Keep it
+        // in the device picker so the UI can accurately report that profiles
+        // are unavailable, rather than silently dropping the mouse.
+        if (!iface->channel_open) {
+            if (iface->is_mouse && !is_receiver_interface(iface)) {
+                add_device(devices, count, iface, 0xFF, 0xFF, 0.0);
+            }
             continue;
         }
         if (requested_slot >= 0) {
             double protocol = 0;
-            if (ping_interface(iface, (uint8_t)requested_slot, requested_slot == 0xFF ? 1.0 : 0.35, &protocol)) {
-                add_device(devices, count, iface, (uint8_t)requested_slot, protocol);
+            uint8_t resolved_device_number = (uint8_t)requested_slot;
+            if (ping_interface(iface, (uint8_t)requested_slot,
+                               1.0,
+                               &protocol, &resolved_device_number)) {
+                add_device(devices, count, iface, resolved_device_number,
+                           (uint8_t)requested_slot, protocol);
             }
             continue;
         }
         if (is_receiver_interface(iface)) {
             for (uint8_t slot = 1; slot <= 6; slot++) {
                 double protocol = 0;
-                if (ping_interface(iface, slot, 1.0, &protocol)) {
-                    add_device(devices, count, iface, slot, protocol);
+                uint8_t resolved_device_number = slot;
+                if (ping_interface(iface, slot, 1.0, &protocol, &resolved_device_number)) {
+                    add_device(devices, count, iface, resolved_device_number, slot, protocol);
                 }
             }
         }
         double protocol = 0;
-        if (ping_interface(iface, 0xFF, 1.0, &protocol)) {
-            add_device(devices, count, iface, 0xFF, protocol);
+        uint8_t resolved_device_number = 0xFF;
+        if (ping_interface(iface, 0xFF, 1.0, &protocol, &resolved_device_number)) {
+            // A receiver can echo a paired slot in response to the broadcast
+            // ping. Keep that endpoint marked as FF so the receiver itself is
+            // still filtered from the mouse list; slot discovery above owns
+            // the paired mouse entry.
+            uint8_t reported_device_number = is_receiver_interface(iface)
+                ? 0xFF
+                : resolved_device_number;
+            add_device(devices, count, iface, reported_device_number, 0xFF, protocol);
+        } else if (iface->is_mouse && !is_receiver_interface(iface)) {
+            // Bluetooth and some direct wireless mice expose a normal mouse
+            // collection even when HID++ ping is unavailable. They remain
+            // selectable, but profile operations will correctly fail later.
+            add_device(devices, count, iface, 0xFF, 0xFF, 0.0);
         }
     }
     return 1;
+}
+
+static int discover_device_by_key(HidContext *context,
+                                  const char *key,
+                                  Device *devices,
+                                  size_t *count) {
+    *count = 0;
+    uint64_t location_id = 0;
+    uint64_t registry_id = 0;
+    uint8_t device_number = 0;
+    if (!parse_device_key(key, &location_id, &registry_id, &device_number)) {
+        fprintf(stderr, "invalid device key '%s'\n", key == NULL ? "" : key);
+        return 0;
+    }
+    open_vendor_channels(context);
+    for (size_t i = 0; i < context->count; i++) {
+        HidInterface *iface = &context->items[i];
+        if (!iface->is_vendor || !iface->channel_open ||
+            iface->location_id != location_id ||
+            iface->registry_id != registry_id) {
+            continue;
+        }
+        double protocol = 0;
+        uint8_t resolved_device_number = device_number;
+        if (ping_interface(iface, device_number, 1.0, &protocol, &resolved_device_number)) {
+            add_device(devices, count, iface, resolved_device_number, device_number, protocol);
+        } else if (device_number != 0xFF && !is_receiver_interface(iface) &&
+                   ping_interface(iface, 0xFF, 1.0, &protocol, &resolved_device_number)) {
+            // The direct wireless HID endpoint may report its paired receiver
+            // slot in response to an FF ping, while requiring FF as the
+            // destination for all later feature calls.
+            add_device(devices, count, iface, resolved_device_number, 0xFF, protocol);
+        }
+        return 1;
+    }
+    return 1;
+}
+
+static int discover_devices_for_options(HidContext *context,
+                                         const Options *options,
+                                         Device *devices,
+                                         size_t *count) {
+    if (options->device_key != NULL) {
+        return discover_device_by_key(context, options->device_key, devices, count);
+    }
+    return discover_devices(context, options->slot, devices, count);
 }
 
 static const char *device_label(const Device *device) {
@@ -939,25 +1103,6 @@ static const char *device_label(const Device *device) {
         return device->iface->product;
     }
     return "Logitech HID++ device";
-}
-
-static bool text_contains_case_insensitive(const char *text, const char *needle) {
-    if (text == NULL || needle == NULL || *needle == '\0') {
-        return false;
-    }
-    for (const char *start = text; *start != '\0'; start++) {
-        const char *text_cursor = start;
-        const char *needle_cursor = needle;
-        while (*text_cursor != '\0' && *needle_cursor != '\0' &&
-               tolower((unsigned char)*text_cursor) == tolower((unsigned char)*needle_cursor)) {
-            text_cursor++;
-            needle_cursor++;
-        }
-        if (*needle_cursor == '\0') {
-            return true;
-        }
-    }
-    return false;
 }
 
 static bool is_receiver_endpoint(const Device *device) {
@@ -995,6 +1140,27 @@ static bool is_mouse_device(const Device *device) {
     // mouse-specific feature list; the name checks above still suppress
     // ordinary paired keyboards.
     return true;
+}
+
+static bool is_duplicate_direct_mouse_endpoint(const Device *candidate,
+                                               const Device *devices,
+                                               size_t count) {
+    if (candidate == NULL || devices == NULL ||
+        is_receiver_interface(candidate->iface) ||
+        !is_wireless_device_product(candidate->iface->product_id)) {
+        return false;
+    }
+    for (size_t i = 0; i < count; i++) {
+        const Device *other = &devices[i];
+        if (other == candidate || other->device_number == 0xFF ||
+            !is_receiver_interface(other->iface)) {
+            continue;
+        }
+        if (strcmp(device_label(candidate), device_label(other)) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static const char *device_connection(const Device *device) {
@@ -1142,9 +1308,10 @@ static int write_sector(Device *device, uint16_t sector, const uint8_t *bytes, s
 static int read_profile_control(Device *device,
                                 const ProfileInfo *info,
                                 uint16_t *control_sector_out,
-                                uint8_t *control) {
+                                uint8_t *control,
+                                size_t control_length) {
     uint16_t header_sector = 0;
-    if (!read_sector(device, 0, info->sector_size, control)) {
+    if (!read_sector(device, 0, control_length, control)) {
         return 0;
     }
     bool all_zero = true;
@@ -1155,7 +1322,7 @@ static int read_profile_control(Device *device,
     }
     if (all_zero || all_ff) {
         header_sector = 1;
-        if (!read_sector(device, header_sector, info->sector_size, control)) {
+        if (!read_sector(device, header_sector, control_length, control)) {
             return 0;
         }
     }
@@ -1166,11 +1333,15 @@ static int read_profile_control(Device *device,
 }
 
 static int parse_profile_headers(const ProfileInfo *info,
-                                 const uint8_t *control,
-                                 ProfileHeader *headers,
-                                 size_t *header_count) {
+                                const uint8_t *control,
+                                size_t control_length,
+                                ProfileHeader *headers,
+                                size_t *header_count) {
     *header_count = 0;
-    size_t limit = info->sector_size - 2;
+    size_t limit = control_length;
+    if (control_length >= info->sector_size && limit >= 2) {
+        limit -= 2;
+    }
     for (size_t offset = 0; offset + 3 < limit && *header_count < MAX_HEADERS; offset += 4) {
         if (control[offset] == 0xFF && control[offset + 1] == 0xFF) {
             break;
@@ -1190,12 +1361,17 @@ static int read_profile_headers(Device *device,
                                 const ProfileInfo *info,
                                 ProfileHeader *headers,
                                 size_t *header_count) {
-    uint8_t *control = (uint8_t *)malloc(info->sector_size);
+    size_t control_length = info->sector_size;
+    size_t maximum_header_bytes = MAX_HEADERS * 4 + 4;
+    if (control_length > maximum_header_bytes) {
+        control_length = maximum_header_bytes;
+    }
+    uint8_t *control = (uint8_t *)malloc(control_length);
     if (control == NULL) {
         return 0;
     }
-    bool ok = read_profile_control(device, info, NULL, control) &&
-              parse_profile_headers(info, control, headers, header_count);
+    bool ok = read_profile_control(device, info, NULL, control, control_length) &&
+              parse_profile_headers(info, control, control_length, headers, header_count);
     free(control);
     return ok;
 }
@@ -1471,6 +1647,67 @@ static int load_profile_with_headers(Device *device,
         return 0;
     }
     profile->crc_ok = sector_crc_ok(profile->data, profile->data_length);
+    profile->crc_checked = true;
+    detect_button_layout(profile);
+    detect_dpi_layout(profile);
+    return 1;
+}
+
+static int load_profile_summary_with_headers(Device *device,
+                                             const ProfileInfo *info,
+                                             const ProfileHeader *headers,
+                                             size_t header_count,
+                                             int requested_profile,
+                                             Profile *profile) {
+    memset(profile, 0, sizeof(*profile));
+    profile->info = *info;
+    profile->header_count = header_count;
+    if (header_count > MAX_HEADERS) {
+        return 0;
+    }
+    memcpy(profile->headers, headers, header_count * sizeof(*headers));
+    size_t selected = 0;
+    if (requested_profile > 0) {
+        if ((size_t)requested_profile > header_count) {
+            fprintf(stderr, "profile %d is out of range 1..%zu\n", requested_profile, header_count);
+            return 0;
+        }
+        selected = (size_t)requested_profile - 1;
+    } else {
+        bool found_enabled = false;
+        for (size_t i = 0; i < header_count; i++) {
+            if (headers[i].enabled != 0) {
+                selected = i;
+                found_enabled = true;
+                break;
+            }
+        }
+        if (!found_enabled) {
+            selected = 0;
+        }
+    }
+    profile->selected_header = selected;
+
+    // The GUI only needs the format prefix, DPI stages, and button records on
+    // its first pass. Avoid reading the rest of a large sector; a full sector
+    // read remains available to explicit reload/write paths where CRC is
+    // required.
+    size_t summary_length = 48 + (size_t)info->button_count * 4 + 2;
+    if (summary_length > info->sector_size) {
+        summary_length = info->sector_size;
+    }
+    profile->data_length = summary_length;
+    profile->data = (uint8_t *)malloc(profile->data_length);
+    if (profile->data == NULL) {
+        return 0;
+    }
+    if (!read_sector(device, headers[selected].sector, profile->data_length, profile->data)) {
+        free(profile->data);
+        profile->data = NULL;
+        return 0;
+    }
+    profile->crc_ok = false;
+    profile->crc_checked = false;
     detect_button_layout(profile);
     detect_dpi_layout(profile);
     return 1;
@@ -1632,7 +1869,8 @@ static void print_profile_summary(const Profile *profile, bool show_buttons) {
            profile->info.button_count,
            profile->info.sector_count,
            profile->info.sector_size);
-    printf("  CRC: %s\n", profile->crc_ok ? "OK" : "INVALID");
+    printf("  CRC: %s\n",
+           !profile->crc_checked ? "NOT_READ" : (profile->crc_ok ? "OK" : "INVALID"));
     if (profile->dpi_layout_supported) {
         printf("  DPI stages: ");
         for (size_t i = 0; i < profile->dpi_count; i++) {
@@ -1712,9 +1950,11 @@ static void print_feature_list(const Device *device) {
 }
 
 static void print_device_line(const Device *device, size_t index) {
-    printf("[%zu] %s  %s  (HID++ %.1f, product 0x%04X)\n",
+    char key[64];
+    format_device_key(device, key, sizeof(key));
+    printf("[%zu] %s  %s  (HID++ %.1f, product 0x%04X, key %s)\n",
            index, device_connection(device), device_label(device),
-           device->protocol, device->iface->product_id);
+           device->protocol, device->iface->product_id, key);
 }
 
 static int write_all(int fd, const uint8_t *bytes, size_t length) {
@@ -1767,7 +2007,7 @@ static int package_write(const char *path,
     header[8] = 1;
     put_be16(header + 10, (uint16_t)device->iface->vendor_id);
     put_be16(header + 12, (uint16_t)device->iface->product_id);
-    header[14] = device->device_number;
+    header[14] = device->request_device_number;
     header[15] = profile->info.profile_format;
     put_be16(header + 16, profile->headers[profile->selected_header].sector);
     put_be16(header + 18, (uint16_t)profile->data_length);
@@ -1901,7 +2141,8 @@ static int run_list(void) {
     printf("Logitech HID++ vendor interfaces: %zu\n", vendor_interfaces);
     size_t mouse_count = 0;
     for (size_t i = 0; i < count; i++) {
-        if (!is_mouse_device(&devices[i])) {
+        if (!is_mouse_device(&devices[i]) ||
+            is_duplicate_direct_mouse_endpoint(&devices[i], devices, count)) {
             continue;
         }
         print_device_line(&devices[i], i);
@@ -1917,6 +2158,18 @@ static int run_list(void) {
 static int select_device(Device *devices, size_t count, const Options *options, Device **selected) {
     if (count == 0) {
         fprintf(stderr, "no reachable Logitech HID++ device found\n");
+        return 0;
+    }
+    if (options->device_key != NULL) {
+        for (size_t i = 0; i < count; i++) {
+            char key[64];
+            format_device_key(&devices[i], key, sizeof(key));
+            if (strcmp(options->device_key, key) == 0) {
+                *selected = &devices[i];
+                return 1;
+            }
+        }
+        fprintf(stderr, "device key '%s' was not found among reachable devices\n", options->device_key);
         return 0;
     }
     if (options->device_index >= 0) {
@@ -1944,7 +2197,7 @@ static int run_info(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -1997,7 +2250,7 @@ static int run_profiles(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -2027,9 +2280,20 @@ static int run_profiles(const Options *options) {
         last = first + 1;
     }
     printf("Onboard profiles for %s:\n", device_label(device));
+    if (options->headers_only) {
+        for (size_t i = 0; i < header_count; i++) {
+            printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
+                   i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
+        }
+        hid_context_release(&context);
+        return 0;
+    }
     for (size_t i = first; i < last; i++) {
         Profile profile;
-        if (load_profile_with_headers(device, &info, headers, header_count, (int)i + 1, &profile)) {
+        int loaded = options->summary_only
+            ? load_profile_summary_with_headers(device, &info, headers, header_count, (int)i + 1, &profile)
+            : load_profile_with_headers(device, &info, headers, header_count, (int)i + 1, &profile);
+        if (loaded) {
             print_profile_summary(&profile, true);
             free(profile.data);
         }
@@ -2067,7 +2331,7 @@ static int run_dpi(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -2086,6 +2350,11 @@ static int run_dpi(const Options *options) {
     printf("DPI sensors: %u\n", sensor_count);
     print_supported_dpi(values, value_count);
     printf("Current sensor 1 DPI: %u\n", current);
+
+    if (options->sensor_only) {
+        hid_context_release(&context);
+        return 0;
+    }
 
     Profile profile;
     if (load_selected_profile(device, options->profile, &profile)) {
@@ -2170,7 +2439,7 @@ static int run_set_dpi(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -2325,7 +2594,7 @@ static int run_set_profile_state(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t device_count = 0;
-    discover_devices(&context, options->slot, devices, &device_count);
+    discover_devices_for_options(&context, options, devices, &device_count);
     Device *device = NULL;
     if (!select_device(devices, device_count, options, &device)) {
         hid_context_release(&context);
@@ -2346,9 +2615,9 @@ static int run_set_profile_state(const Options *options) {
     uint16_t control_sector = 0;
     ProfileHeader headers[MAX_HEADERS];
     size_t header_count = 0;
-    if (!read_profile_control(device, &info, &control_sector, control) ||
+    if (!read_profile_control(device, &info, &control_sector, control, info.sector_size) ||
         !sector_crc_ok(control, info.sector_size) ||
-        !parse_profile_headers(&info, control, headers, &header_count)) {
+        !parse_profile_headers(&info, control, info.sector_size, headers, &header_count)) {
         fprintf(stderr, "refusing to edit profile state: the control sector or profile headers were not validated\n");
         free(control);
         hid_context_release(&context);
@@ -2472,7 +2741,7 @@ static int run_dump(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -2663,7 +2932,7 @@ static int run_bind(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -2810,7 +3079,7 @@ static int run_restore(const Options *options) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, options->slot, devices, &count);
+    discover_devices_for_options(&context, options, devices, &count);
     Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
@@ -2844,7 +3113,7 @@ static int run_restore(const Options *options) {
         return 1;
     }
     uint16_t control_sector = 0;
-    if (!read_profile_control(device, &info, &control_sector, control)) {
+    if (!read_profile_control(device, &info, &control_sector, control, info.sector_size)) {
         free(control);
         hid_context_release(&context);
         package_release(&package);
@@ -2855,7 +3124,7 @@ static int run_restore(const Options *options) {
     size_t selected = 0;
     bool found = package.sector == control_sector;
     if (!found) {
-        if (!parse_profile_headers(&info, control, headers, &header_count)) {
+        if (!parse_profile_headers(&info, control, info.sector_size, headers, &header_count)) {
             free(control);
             hid_context_release(&context);
             package_release(&package);
@@ -3080,6 +3349,7 @@ static void print_usage(const char *program) {
     printf("  --device N                           logical device index from list\n");
     printf("  --slot N|ff                          receiver slot 1..6 or direct 0xff\n");
     printf("  --profile N                          1-based profile number\n");
+    printf("  --summary-only                       read only the selected profile prefix\n");
     printf("  --button N                           explicit profile button number for bind\n");
     printf("  --default N                          onboard default DPI stage, 1..5\n");
     printf("  --shift N                            onboard DPI-shift stage, 1..5\n");
@@ -3131,7 +3401,19 @@ static int parse_options(int argc, char **argv, Options *options) {
             options->yes = true;
             continue;
         }
-        if (strcmp(arg, "--device") == 0 || strcmp(arg, "--slot") == 0 ||
+        if (strcmp(arg, "--headers-only") == 0) {
+            options->headers_only = true;
+            continue;
+        }
+        if (strcmp(arg, "--summary-only") == 0) {
+            options->summary_only = true;
+            continue;
+        }
+        if (strcmp(arg, "--sensor-only") == 0) {
+            options->sensor_only = true;
+            continue;
+        }
+        if (strcmp(arg, "--device") == 0 || strcmp(arg, "--device-key") == 0 || strcmp(arg, "--slot") == 0 ||
             strcmp(arg, "--profile") == 0 || strcmp(arg, "--button") == 0 ||
             strcmp(arg, "--backup") == 0 || strcmp(arg, "--default") == 0 ||
             strcmp(arg, "--shift") == 0) {
@@ -3145,6 +3427,8 @@ static int parse_options(int argc, char **argv, Options *options) {
                     fprintf(stderr, "invalid --device value '%s'\n", value);
                     return 0;
                 }
+            } else if (strcmp(arg, "--device-key") == 0) {
+                options->device_key = value;
             } else if (strcmp(arg, "--slot") == 0) {
                 if (!parse_slot(value, &options->slot)) {
                     fprintf(stderr, "invalid --slot value '%s'\n", value);
@@ -3191,8 +3475,12 @@ static int parse_options(int argc, char **argv, Options *options) {
     if (options->command == NULL) {
         options->command = "list";
     }
-    if (options->device_index >= 0 && options->slot >= 0) {
-        fprintf(stderr, "use either --device or --slot, not both\n");
+    if (options->device_index >= 0 && options->device_key != NULL) {
+        fprintf(stderr, "use either --device or --device-key, not both\n");
+        return 0;
+    }
+    if ((options->device_index >= 0 || options->device_key != NULL) && options->slot >= 0) {
+        fprintf(stderr, "use a device selector or --slot, not both\n");
         return 0;
     }
     if (strcmp(options->command, "dump") == 0 || strcmp(options->command, "restore") == 0) {
@@ -3339,6 +3627,7 @@ static int run_self_test(void) {
     memset(&dummy_device, 0, sizeof(dummy_device));
     dummy_device.iface = &dummy_interface;
     dummy_device.device_number = 0xFF;
+    dummy_device.request_device_number = 0xFF;
     profile.headers[0].sector = 0x0123;
     profile.selected_header = 0;
     profile.info.profile_format = 5;

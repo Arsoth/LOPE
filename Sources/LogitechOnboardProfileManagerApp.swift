@@ -10,9 +10,11 @@ import UniformTypeIdentifiers
 
 struct ProfileChoice: Identifiable, Hashable {
     let id: Int
-    let sector: String
+    var sector: String
     var enabled: Bool
-    var crcValid: Bool
+    // Header-only discovery intentionally does not read the full profile
+    // sector, so CRC status can be unknown until that profile is loaded.
+    var crcValid: Bool?
 
     var title: String {
         "Profile \(id)\(enabled ? "" : " (disabled)")"
@@ -58,6 +60,7 @@ struct DeviceChoice: Identifiable, Hashable, Sendable {
     let name: String
     let connection: String
     let productID: String
+    let deviceKey: String
 
     var title: String {
         "\(name) — \(connection)"
@@ -154,6 +157,7 @@ private struct RefreshSnapshot: Sendable {
     let dpiError: String?
     let selectedProfileNumber: Int?
     let errorMessage: String?
+    let accessWarning: Bool
 }
 
 @MainActor
@@ -320,6 +324,11 @@ final class AppModel: ObservableObject {
 
         busy = true
         status = "Reading the mouse…"
+        // Receiver and Bluetooth HID++ interfaces are protected by macOS
+        // Input Monitoring. Request access on the normal refresh path too,
+        // since a wired G502 can otherwise make the app look healthy while
+        // the other mice are silently denied.
+        CGRequestListenEventAccess()
 
         guard let engine else {
             busy = false
@@ -370,6 +379,7 @@ final class AppModel: ObservableObject {
                     executable: engine,
                     currentDirectory: currentDirectory,
                     devices: currentDevices,
+                    selectedDeviceKey: selected.deviceKey,
                     selectedDeviceIndex: selected.id,
                     preferredProfileNumber: preferredProfileNumber
                 )
@@ -402,7 +412,9 @@ final class AppModel: ObservableObject {
             deviceSummary = "No editable Logitech mouse found"
             profiles = []
             buttons = []
-            status = "No Logitech mouse was found. USB receiver entries are hidden."
+            status = snapshot.accessWarning
+                ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then Refresh."
+                : "No Logitech mouse was found. USB receiver entries are hidden."
             return
         }
 
@@ -435,11 +447,13 @@ final class AppModel: ObservableObject {
         buttons = parsed.rowsByProfile[profileNumber] ?? []
         dpiDetails = ""
         if let dpiText = snapshot.dpiText {
-            parseDPI(dpiText)
+            parseDPI([profileText, dpiText].joined(separator: "\n"))
         } else {
             dpiDetails = snapshot.dpiError ?? "DPI capabilities could not be read."
         }
-        status = "Read-only inspection complete. Changes are previewed before writing."
+        status = snapshot.accessWarning
+            ? "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh."
+            : "Read-only inspection complete. Changes are previewed before writing."
     }
 
     private nonisolated static func makeRefreshSnapshot(
@@ -455,6 +469,7 @@ final class AppModel: ObservableObject {
                 currentDirectory: currentDirectory
             )
             let discovered = parseDeviceChoices(list)
+            let accessWarning = list.contains("macOS denied HID access")
             guard let selected = discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first else {
                 return RefreshSnapshot(
                     devices: [],
@@ -464,7 +479,8 @@ final class AppModel: ObservableObject {
                     dpiText: nil,
                     dpiError: nil,
                     selectedProfileNumber: nil,
-                    errorMessage: nil
+                    errorMessage: nil,
+                    accessWarning: accessWarning
                 )
             }
 
@@ -472,8 +488,10 @@ final class AppModel: ObservableObject {
                 executable: executable,
                 currentDirectory: currentDirectory,
                 devices: discovered,
+                selectedDeviceKey: selected.deviceKey,
                 selectedDeviceIndex: selected.id,
-                preferredProfileNumber: preferredProfileNumber
+                preferredProfileNumber: preferredProfileNumber,
+                accessWarning: accessWarning
             )
         } catch {
             return RefreshSnapshot(
@@ -484,7 +502,8 @@ final class AppModel: ObservableObject {
                 dpiText: nil,
                 dpiError: nil,
                 selectedProfileNumber: nil,
-                errorMessage: errorMessage(for: error)
+                errorMessage: errorMessage(for: error),
+                accessWarning: false
             )
         }
     }
@@ -493,29 +512,49 @@ final class AppModel: ObservableObject {
         executable: URL,
         currentDirectory: URL,
         devices: [DeviceChoice],
+        selectedDeviceKey: String,
         selectedDeviceIndex: Int,
-        preferredProfileNumber: Int
+        preferredProfileNumber: Int,
+        accessWarning: Bool = false
     ) -> RefreshSnapshot {
         do {
-            let profileText = try EngineRunner.run(
+            let headerText = try EngineRunner.run(
                 executable: executable,
-                arguments: ["--device", String(selectedDeviceIndex), "profiles"],
+                arguments: ["--device-key", selectedDeviceKey, "--headers-only", "profiles"],
                 currentDirectory: currentDirectory
             )
 
-            let availableProfileNumbers = profileNumbers(in: profileText)
+            let availableProfileNumbers = profileNumbers(in: headerText)
             let selectedProfileNumber = availableProfileNumbers.contains(preferredProfileNumber)
                 ? preferredProfileNumber
                 : availableProfileNumbers.first
+            let selectedProfileText: String
+            if let selectedProfileNumber {
+                selectedProfileText = try EngineRunner.run(
+                    executable: executable,
+                    arguments: [
+                        "--device-key", selectedDeviceKey,
+                        "--summary-only",
+                        "--profile", String(selectedProfileNumber),
+                        "profiles"
+                    ],
+                    currentDirectory: currentDirectory
+                )
+            } else {
+                selectedProfileText = ""
+            }
+            let profileText = [headerText, selectedProfileText]
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
             var dpiText: String?
             var dpiError: String?
-            if let selectedProfileNumber {
+            if selectedProfileNumber != nil {
                 do {
                     dpiText = try EngineRunner.run(
                         executable: executable,
                         arguments: [
-                            "--device", String(selectedDeviceIndex),
-                            "--profile", String(selectedProfileNumber),
+                            "--device-key", selectedDeviceKey,
+                            "--sensor-only",
                             "dpi"
                         ],
                         currentDirectory: currentDirectory
@@ -532,7 +571,8 @@ final class AppModel: ObservableObject {
                 dpiText: dpiText,
                 dpiError: dpiError,
                 selectedProfileNumber: selectedProfileNumber,
-                errorMessage: nil
+                errorMessage: nil,
+                accessWarning: accessWarning
             )
         } catch {
             return RefreshSnapshot(
@@ -543,7 +583,8 @@ final class AppModel: ObservableObject {
                 dpiText: nil,
                 dpiError: nil,
                 selectedProfileNumber: nil,
-                errorMessage: nil
+                errorMessage: nil,
+                accessWarning: accessWarning
             )
         }
     }
@@ -576,14 +617,14 @@ final class AppModel: ObservableObject {
 
     private func reloadSelectedProfileContents() {
         do {
-            let profileText = try runEngine(["profiles"])
+            let profileText = try runEngine([
+                "--summary-only",
+                "--profile", String(profileNumber),
+                "profiles"
+            ])
             let parsed = parseProfiles(profileText)
-            if !parsed.choices.isEmpty {
-                profiles = parsed.choices
-                baselineProfileEnabled = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.enabled) })
-            }
             buttons = parsed.rowsByProfile[profileNumber] ?? parsed.rowsByProfile.values.first ?? []
-            loadDPI()
+            loadDPI(profileText: profileText)
             status = "Reloaded profile \(profileNumber)."
         } catch {
             status = error.localizedDescription
@@ -1192,11 +1233,11 @@ final class AppModel: ObservableObject {
         presets.first(where: { normalize($0.raw) == normalize(raw) })?.label ?? "Custom raw output"
     }
 
-    private func loadDPI() {
+    private func loadDPI(profileText: String? = nil) {
         dpiDetails = ""
         do {
-            let dpiText = try runEngine(["--profile", String(profileNumber), "dpi"])
-            parseDPI(dpiText)
+            let dpiText = try runEngine(["--sensor-only", "dpi"])
+            parseDPI([profileText ?? "", dpiText].joined(separator: "\n"))
         } catch {
             dpiDetails = error.localizedDescription
         }
@@ -1211,9 +1252,14 @@ final class AppModel: ObservableObject {
         let process = Process()
         let pipe = Pipe()
         process.executableURL = engine
-        process.arguments = selectingDevice && !devices.isEmpty
-            ? ["--device", String(selectedDeviceIndex)] + arguments
-            : arguments
+        if selectingDevice, let selected = devices.first(where: { $0.id == selectedDeviceIndex }) {
+            let selector = selected.deviceKey.isEmpty
+                ? ["--device", String(selectedDeviceIndex)]
+                : ["--device-key", selected.deviceKey]
+            process.arguments = selector + arguments
+        } else {
+            process.arguments = arguments
+        }
         process.currentDirectoryURL = backupDirectory
         process.standardOutput = pipe
         process.standardError = pipe
@@ -1238,7 +1284,7 @@ final class AppModel: ObservableObject {
     }
 
     private nonisolated static func parseDeviceChoices(_ text: String) -> [DeviceChoice] {
-        let pattern = try! NSRegularExpression(pattern: #"^\[(\d+)\]\s+(.+?)\s+\(HID\+\+\s+[0-9.]+,\s+product\s+(0x[0-9A-Fa-f]+)\)$"#)
+        let pattern = try! NSRegularExpression(pattern: #"^\[(\d+)\]\s+(.+?)\s+\(HID\+\+\s+[0-9.]+,\s+product\s+(0x[0-9A-Fa-f]+),\s+key\s+([0-9A-Fa-f-]+)\)$"#)
         var result: [DeviceChoice] = []
         for line in text.split(separator: "\n").map(String.init) {
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
@@ -1254,7 +1300,8 @@ final class AppModel: ObservableObject {
                 id: id,
                 name: name,
                 connection: connection,
-                productID: capture(match, in: line, index: 3)
+                productID: capture(match, in: line, index: 3),
+                deviceKey: capture(match, in: line, index: 4)
             ))
         }
         return result.sorted { $0.id < $1.id }
@@ -1285,20 +1332,33 @@ final class AppModel: ObservableObject {
                 let sector = capture(match, in: line, index: 2)
                 let enabledText = capture(match, in: line, index: 3)
                 currentProfile = id
-                choices.append(ProfileChoice(
-                    id: id,
-                    sector: sector,
-                    enabled: enabledText == "yes",
-                    crcValid: false
-                ))
+                if let existing = choices.firstIndex(where: { $0.id == id }) {
+                    choices[existing].sector = sector
+                    choices[existing].enabled = enabledText == "yes"
+                    choices[existing].crcValid = nil
+                } else {
+                    choices.append(ProfileChoice(
+                        id: id,
+                        sector: sector,
+                        enabled: enabledText == "yes",
+                        crcValid: nil
+                    ))
+                }
                 rows[id] = []
                 continue
             }
             if let profile = currentProfile,
-               line.trimmingCharacters(in: .whitespaces) == "CRC: OK",
                let index = choices.firstIndex(where: { $0.id == profile }) {
-                choices[index].crcValid = true
-                continue
+                switch line.trimmingCharacters(in: .whitespaces) {
+                case "CRC: OK":
+                    choices[index].crcValid = true
+                    continue
+                case "CRC: INVALID":
+                    choices[index].crcValid = false
+                    continue
+                default:
+                    break
+                }
             }
             guard let profile = currentProfile,
                   let match = buttonPattern.firstMatch(in: line, range: full),
@@ -1569,9 +1629,23 @@ struct ContentView: View {
     private func profileEnableControl(_ profile: ProfileChoice) -> some View {
         let profileID = profile.id
         let label = String(profileID)
-        let crcLabel = profile.crcValid ? "" : "Profile invalid"
-        let crcColor: Color = profile.crcValid ? .secondary : .red
-        let helpText = "Profile \(label) is \(profile.crcValid ? "CRC valid" : "CRC invalid")"
+        let crcLabel: String
+        let crcColor: Color
+        let helpText: String
+        switch profile.crcValid {
+        case true:
+            crcLabel = ""
+            crcColor = .secondary
+            helpText = "Profile \(label) CRC valid"
+        case false:
+            crcLabel = "Profile invalid"
+            crcColor = .red
+            helpText = "Profile \(label) CRC invalid"
+        case nil:
+            crcLabel = ""
+            crcColor = .secondary
+            helpText = "Profile \(label) CRC not read"
+        }
         let enabled = Binding<Bool>(
             get: { model.profileEnabled(profileID) },
             set: { model.setProfileEnabled(profileID: profileID, enabled: $0) }
