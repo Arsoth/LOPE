@@ -38,7 +38,7 @@ gui: $(GUI_BIN)
 
 $(GUI_BIN): $(GUI_SRC) $(PROFILE_FILES)
 	@mkdir -p bin $(SWIFT_MODULE_CACHE)
-	swiftc -O -parse-as-library -target $(GUI_TARGET) -module-cache-path $(SWIFT_MODULE_CACHE) -framework SwiftUI -framework AppKit $(GUI_SRC) -o $(GUI_BIN)
+	swiftc -O -parse-as-library -target $(GUI_TARGET) -module-cache-path $(SWIFT_MODULE_CACHE) -framework SwiftUI -framework AppKit -framework IOKit $(GUI_SRC) -o $(GUI_BIN)
 
 app: build gui
 	@mkdir -p $(GUI_BUNDLE)/Contents/MacOS $(GUI_BUNDLE)/Contents/Resources/MouseProfiles

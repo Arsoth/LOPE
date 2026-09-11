@@ -44,6 +44,10 @@ The Buttons tab puts profiles, button assignments, and DPI settings together.
 
 Changes stay in the editor until you press Save to mouse. That button creates a backup automatically before writing anything.
 
+Button-press highlighting is currently disabled. A future expansion may add a
+reliable Logitech HID event path after standard and vendor-specific controls
+can be mapped without guessing.
+
 The app uses the physical control name, not the current assignment. Physical mappings live in one JSON descriptor per G-series mouse family under [Profiles/](Profiles/). This keeps unusual layouts—such as the two G502 generations, G600's G-Shift layer, G604's two-row thumb grid, and ambidextrous G903/PRO mice—separate and makes future devices additive.
 
 Unknown mice use neutral names such as Primary click, Back, and Button 6 when their physical layout is not in the list of profiles. The output beside the name always shows what that profile will do.

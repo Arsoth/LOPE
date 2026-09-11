@@ -44,6 +44,18 @@ struct ContentView: View {
                     .textSelection(.enabled)
                 Spacer()
             }
+
+            // Future expansion: restore the button-press highlighting control
+            // here, below the footer/status line, after a reliable Logitech
+            // button-event path is available. AppKit only exposed buttons 1–3
+            // in testing, and the HID monitor did not provide dependable
+            // mappings for the remaining controls.
+            // HStack(spacing: 8) {
+            //     Spacer()
+            //     Button("Highlight presses") {
+            //         // Future button-event monitor action.
+            //     }
+            // }
         }
         .padding(20)
         .frame(minWidth: 960, minHeight: 520)
@@ -235,25 +247,6 @@ struct ContentView: View {
             }
             .id(model.selectedDeviceIndex)
 
-            HStack(spacing: 8) {
-                Spacer()
-                if !model.inputMonitoringAuthorized {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                        .help("Input Monitoring permission is required to detect mouse presses while LOPE is in the background.")
-                }
-                Toggle(isOn: Binding(
-                    get: { model.highlightButtonPresses },
-                    set: { model.setHighlightButtonPresses($0) })) {
-                    Label(
-                        model.highlightButtonPresses ? "Highlighting on" : "Highlight presses",
-                        systemImage: "sparkles"
-                    )
-                }
-                .toggleStyle(.button)
-                .controlSize(.small)
-                .help("When enabled, the matching button row glows for about a second after you press that mouse button.")
-            }
         }
         .padding(.top, 4)
     }
@@ -261,7 +254,6 @@ struct ContentView: View {
     private func buttonRow(_ buttonID: Int) -> some View {
         Group {
             if let button = model.buttons.first(where: { $0.id == buttonID }) {
-                let isHighlighted = model.highlightedButtonID == button.id
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Text("Button \(button.id)")
@@ -305,22 +297,21 @@ struct ContentView: View {
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isHighlighted ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.045))
+                        .fill(Color.white.opacity(0.045))
                 )
                 .overlay(alignment: .leading) {
                     Capsule(style: .continuous)
-                        .fill(isHighlighted ? Color.accentColor : Color.clear)
+                        .fill(Color.clear)
                         .frame(width: 3)
                         .padding(.vertical, 7)
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(
-                            isHighlighted ? Color.accentColor.opacity(0.7) : Color.white.opacity(0.055),
-                            lineWidth: isHighlighted ? 1 : 0.5
+                            Color.white.opacity(0.055),
+                            lineWidth: 0.5
                         )
                 }
-                .animation(.easeOut(duration: 0.25), value: isHighlighted)
             }
         }
     }

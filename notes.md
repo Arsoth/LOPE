@@ -166,11 +166,10 @@ multi-profile devices retain the current picker and profile-state controls.
 
 ### [ ] 7. Detect and highlight all standard mouse buttons when possible
 
-**Feasibility: Medium.** `AppModel+ButtonHighlight.swift` currently listens for
-`.leftMouseDown`, `.rightMouseDown`, and `.otherMouseDown`, then maps
-`event.buttonNumber + 1` to a profile button. `.otherMouseDown` may already
-cover additional standard buttons, so the first task is to measure the actual
-events rather than assume the current three-button behavior is the whole limit.
+**Status: Deferred.** AppKit testing on G502 X and G604 exposed only buttons
+1–3, and the attempted HID report monitor did not provide a dependable
+button-to-profile-row mapping. The experimental implementation was removed;
+the UI location is preserved as a commented future expansion below the footer.
 Some Logitech controls (DPI, profile, G-Shift, and vendor-specific buttons) may
 not generate ordinary macOS mouse-button events at all. A lower-level HID event
 path would require more permission handling and may still not reveal the
@@ -178,20 +177,15 @@ firmware’s logical profile-record number.
 
 **Implementation tasks:**
 
-- [ ] Add a temporary/diagnostic event log for event type, `buttonNumber`, and
-      device context; test primary, secondary, middle, side, extra, tilt, and
-      vendor-mapped controls across representative mice.
-- [ ] Expand the standard-button mapping if AppKit already reports the event;
-      keep highlighting limited to buttons that can be mapped unambiguously to the
-      loaded profile rows.
-- [ ] If AppKit cannot observe a required button, evaluate a CGEvent/HID-level
-      monitor behind the existing Input Monitoring permission flow. Do not make
-      this a prerequisite for editing, and do not claim coverage that the OS or
-      firmware does not provide.
-- [ ] Add a visible “not observable”/“mapping not confirmed” state rather than
-      highlighting the wrong row.
-- [ ] Remove the diagnostic logging before release and add regression coverage
-      for buttons 1–8 and unsupported vendor controls.
+- [x] Capture the AppKit limitation on representative G502 X/G604 hardware.
+- [x] Evaluate the existing HID-level watch path and the experimental app
+      monitor; neither produced a sufficiently reliable profile-row mapping for
+      this UI.
+- [x] Remove the experimental monitor and comment out the UI with a future-
+      expansion note rather than shipping misleading highlighting.
+- [ ] Revisit only when a reliable standard/vendor event-to-profile mapping is
+      available, with regression coverage for buttons 1–8 and unsupported
+      controls.
 
 **Done when:** every standard button that macOS exposes is mapped and
 highlighted correctly; unsupported or ambiguous controls are reported clearly
@@ -236,13 +230,12 @@ glance.
 1. Batch/preflight writes and exact backups (items 1–2).
 2. Remove JSON sidecars and improve backup naming/filtering (items 3–4).
 3. Add profile capacity metadata and one-profile UI behavior (items 5–6).
-4. Instrument and expand button highlighting (item 7).
+4. Revisit button highlighting only when a reliable event-to-profile mapping is available (item 7).
 5. Build the DPI bar after the typed DPI capability model exists (item 8).
 
 ## Relevant current files
 
 - `Sources/AppModel+Writes.swift` — save, backup, import, and export flows.
-- `Sources/AppModel+ButtonHighlight.swift` — mouse event monitoring.
 - `Sources/ContentView.swift` — profile selector, backup UI, and DPI editor.
 - `Sources/LogitechOnboardProfileManagerApp.swift` — published state and
   change detection.
@@ -256,7 +249,6 @@ unprocessed notes:
 - readme file and docs need overhauls again. Readme should be usability and at most how to build the app, docs should be everything else.
 - custom keyboard output is still weird. should we just combine function and special keys into one long dropdown? And put the modifiers before the keys so it's more logical what it is.
 - how many keys can be stored in a keyboard output anyway? what's the max length per mouse, that should be added to profile data. And shown as an X of Y or X/Y etc label at the end or similar of the textbox.
-- the highlight presses button should be below the footer line
 - for the 603, specify the sleep time / that you need ot keep mouse active then click refresh instead of saying there's no onboard profile
 - don't show fallback UI for MX mice, the bottom warning shouldn't be there either
 - put disabled, custom, then the rest of the keys
