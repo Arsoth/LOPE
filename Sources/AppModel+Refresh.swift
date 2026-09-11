@@ -14,11 +14,19 @@ private let profileReadRetryDelay: TimeInterval = 0.25
 @MainActor
 extension AppModel {
     func refresh() {
+        startRefresh(
+            preferredDeviceIndex: selectedDeviceIndex,
+            preferredProfileNumber: profileNumber
+        )
+    }
+
+    private func startRefresh(
+        preferredDeviceIndex: Int,
+        preferredProfileNumber: Int
+    ) {
         refreshTask?.cancel()
         refreshGeneration += 1
         let generation = refreshGeneration
-        let preferredDeviceIndex = selectedDeviceIndex
-        let preferredProfileNumber = profileNumber
         let currentDirectory = backupDirectory
 
         busy = true
@@ -39,7 +47,10 @@ extension AppModel {
             return
         }
 
-        prepareLoadingEditor(profileNumber: profileNumber)
+        // A zero profile asks the engine to choose the first enabled slot
+        // when a different device is selected. The editor still needs a
+        // valid picker tag while that asynchronous read is in progress.
+        prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
         refreshTask = Task { [weak self] in
             let snapshot = await Task.detached(priority: .userInitiated) {
                 Self.makeRefreshSnapshot(
@@ -59,47 +70,13 @@ extension AppModel {
     func selectDevice(_ index: Int) {
         guard let selected = devices.first(where: { $0.id == index }), selectedDeviceIndex != index else { return }
         selectedDeviceIndex = index
-        refreshTask?.cancel()
-        refreshGeneration += 1
-        let generation = refreshGeneration
         // Profile numbers are device-local. Reusing the previous mouse's
         // selection can target a disabled/partially provisioned slot on the
         // newly selected mouse, so let the engine choose its first enabled
         // profile and report that actual slot back to the UI.
-        let preferredProfileNumber = 0
-        let currentDirectory = backupDirectory
-
-        busy = true
-        loadingProfile = true
         currentDeviceName = selected.name
         deviceSummary = selected.title
-        status = "Reading \(selected.name)…"
-
-        guard let engine else {
-            busy = false
-            loadingProfile = false
-            status = EngineError.unavailable.localizedDescription
-            return
-        }
-
-        prepareLoadingEditor(profileNumber: 1)
-        let currentDevices = devices
-        refreshTask = Task { [weak self] in
-            let snapshot = await Task.detached(priority: .userInitiated) {
-                Self.makeProfileSnapshot(
-                    executable: engine,
-                    currentDirectory: currentDirectory,
-                    devices: currentDevices,
-                    selectedDeviceKey: selected.deviceKey,
-                    selectedDeviceIndex: selected.id,
-                    preferredProfileNumber: preferredProfileNumber
-                )
-            }.value
-
-            guard !Task.isCancelled, let self,
-                  self.refreshGeneration == generation else { return }
-            self.applyRefreshSnapshot(snapshot)
-        }
+        startRefresh(preferredDeviceIndex: index, preferredProfileNumber: 0)
     }
 
     func applyRefreshSnapshot(_ snapshot: RefreshSnapshot) {
@@ -269,15 +246,21 @@ extension AppModel {
             // The engine keeps one HID context for this combined read. The
             // previous implementation launched separate processes for headers,
             // profile data, and DPI, repeating feature discovery each time.
+            // A missing --profile lets the engine choose the first enabled
+            // slot. Passing --profile 0 is invalid because explicit profile
+            // numbers are one-based.
+            var arguments = [
+                "--device-key", selectedDeviceKey,
+                "--summary-only",
+                "--with-dpi"
+            ]
+            if preferredProfileNumber > 0 {
+                arguments += ["--profile", String(preferredProfileNumber)]
+            }
+            arguments.append("profiles")
             let profileText = try runProfileReadWithRetry(
                 executable: executable,
-                arguments: [
-                    "--device-key", selectedDeviceKey,
-                    "--summary-only",
-                    "--with-dpi",
-                    "--profile", String(preferredProfileNumber),
-                    "profiles"
-                ],
+                arguments: arguments,
                 currentDirectory: currentDirectory
             )
             let selectedProfileNumber = Self.selectedProfileNumber(in: profileText)
@@ -389,9 +372,10 @@ extension AppModel {
 
     func reloadSelectedProfile() {
         guard !busy, !profiles.isEmpty else { return }
-        busy = true
-        defer { busy = false }
-        reloadSelectedProfileContents()
+        // Profile changes use the same enumerating, retrying path as the
+        // Refresh button. The old one-shot read could return only the profile
+        // header after a transient HID++ timeout and leave the editor empty.
+        refresh()
     }
 
     func reloadSelectedProfileContents() {
