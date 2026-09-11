@@ -128,7 +128,7 @@ static int run_self_test(void) {
         return 1;
     }
     sector_put_crc(profile.data, profile.data_length);
-    char temp_path[] = "/tmp/logitech-onboard-selftest-XXXXXX";
+    char temp_path[] = "/tmp/lomps-selftest-XXXXXX";
     int temp_fd = mkstemp(temp_path);
     if (temp_fd < 0) {
         free(profile.data);

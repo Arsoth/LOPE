@@ -264,7 +264,7 @@ static int run_bind(const Options *options) {
     if (options->backup_path != NULL) {
         snprintf(backup_path, sizeof(backup_path), "%s", options->backup_path);
     } else {
-        default_backup_path(backup_path, sizeof(backup_path), "logitech-onboard-backup");
+        default_backup_path(backup_path, sizeof(backup_path), "lomps-backup");
     }
     printf("Backup: %s\n", backup_path);
     if (!options->yes) {
@@ -483,4 +483,3 @@ static int run_restore(const Options *options) {
     package_release(&package);
     return 0;
 }
-

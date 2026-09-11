@@ -61,7 +61,7 @@ struct ContentView: View {
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Logitech Onboard Profiles")
+                Text(AppConstants.shortName)
                     .font(.title2.weight(.semibold))
                 Text(model.deviceSummary)
                     .font(.callout)

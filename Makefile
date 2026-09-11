@@ -1,10 +1,10 @@
-APP := logitech-onboard
+APP := lomps
 SRC := Sources/logitech_onboard.m
 # The C implementation is intentionally one translation unit, assembled from
 # focused .inc modules so static helper linkage and original call ordering stay intact.
 C_MODULES := $(wildcard Sources/logitech_onboard_*.inc)
-GUI_APP := LogitechOnboardProfileManager.app
-GUI_BIN := bin/LogitechOnboardProfileManager
+GUI_APP := LOMPS.app
+GUI_BIN := bin/LOMPSGUI
 GUI_SRC := $(wildcard Sources/*.swift)
 PROFILE_FILES := $(wildcard Profiles/*.json)
 GUI_TARGET := arm64-apple-macos13.0
@@ -41,7 +41,7 @@ $(GUI_BIN): $(GUI_SRC) $(PROFILE_FILES)
 
 app: build gui
 	@mkdir -p $(GUI_BUNDLE)/Contents/MacOS $(GUI_BUNDLE)/Contents/Resources/MouseProfiles
-	cp -f $(GUI_BIN) $(GUI_BUNDLE)/Contents/MacOS/LogitechOnboardProfileManager
+	cp -f $(GUI_BIN) $(GUI_BUNDLE)/Contents/MacOS/LOMPS
 	cp -f bin/$(APP) $(GUI_BUNDLE)/Contents/Resources/$(APP)
 	cp -f $(PROFILE_FILES) $(GUI_BUNDLE)/Contents/Resources/MouseProfiles/
 	cp -f App/Info.plist $(GUI_BUNDLE)/Contents/Info.plist

@@ -1,6 +1,6 @@
-# Logitech Onboard Profile Manager
+# Logitech Onboard Memory Profile System (LOMPS)
 
-This is a small Mac app for changing what Logitech mouse buttons do when the mouse is using its own onboard memory.
+LOMPS is a small Mac app for changing what Logitech mouse buttons do when the mouse is using its own onboard memory.
 
 It is intended for Logitech gaming mice and other Logitech mice that expose editable onboard profiles through HID++. It has been developed around the G502 X and is designed to discover each mouse's capabilities instead of assuming every Logitech model has the same layout.
 
@@ -14,7 +14,7 @@ Build and open the app:
 
 ```sh
 make
-open outputs/LogitechOnboardProfileManager.app
+open outputs/LOMPS.app
 ```
 
 The build automatically uses an installed Apple Development or Developer ID signing identity when one is available. This keeps Input Monitoring permission across rebuilds. If the build reports an ad-hoc signature, install a development certificate through Xcode or pass the identity explicitly:
@@ -26,7 +26,7 @@ make SIGNING_IDENTITY="Apple Development: Your Name (TEAMID)"
 
 Ad-hoc builds (`Signature=adhoc`) may need to be added to Input Monitoring again after the executable changes because macOS treats each version as a different code identity.
 
-The first time macOS blocks the mouse, open **System Settings**, go to **Privacy & Security**, open **Input Monitoring**, and enable **Logitech Onboard Profile Manager**. The app's no-device screen has a button that opens that settings page for you.
+The first time macOS blocks the mouse, open **System Settings**, go to **Privacy & Security**, open **Input Monitoring**, and enable **LOMPS**. The app's no-device screen has a button that opens that settings page for you.
 
 Quit G HUB while making changes. Two programs trying to edit the mouse at the same time can undo each other's work.
 
@@ -104,7 +104,7 @@ The app validates the file before accepting it. Invalid button records, impossib
 New installations use this default backup folder:
 
 ```text
-~/Library/Application Support/LogitechOnboardProfileManager/Backups
+~/Library/Application Support/LOMPS/Backups
 ```
 
 Change it from Settings. Existing files are not moved when you choose a different folder.
@@ -137,22 +137,22 @@ The repository also builds a diagnostic command line tool:
 
 ```sh
 make build
-./logitech-onboard list
-./logitech-onboard info
-./logitech-onboard profiles
-./logitech-onboard self-test
+./lomps list
+./lomps info
+./lomps profiles
+./lomps self-test
 ```
 
 Write commands are preview-only unless `--yes` is supplied. The tool checks the device's reported profile format, validates the CRC, backs up the complete sector, writes in HID++ chunks, and reads the sector back before reporting success.
 
 ## Development notes
 
-The project source is in `Sources/`. `Sources/logitech_onboard.m` contains the macOS HID++ engine and `Sources/LogitechOnboardProfileManagerApp.swift` contains the SwiftUI app. Protocol notes and research links are in [docs/PROTOCOL.md](docs/PROTOCOL.md). License and third-party attribution details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The project source is in `Sources/`. `Sources/AppMain.swift` defines the LOMPS SwiftUI app, while `Sources/logitech_onboard.m` contains the macOS HID++ engine. Protocol notes and research links are in [docs/PROTOCOL.md](docs/PROTOCOL.md). License and third-party attribution details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Run the local checks with:
 
 ```sh
 make clean
 make
-./bin/logitech-onboard self-test
+./bin/lomps self-test
 ```

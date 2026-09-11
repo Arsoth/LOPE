@@ -1,6 +1,6 @@
 .build/
 bin/
 outputs/
-logitech-onboard
+lomps
 *.logiob
 *.bin

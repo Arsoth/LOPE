@@ -4,9 +4,9 @@
 import SwiftUI
 
 @main
-struct LogitechOnboardProfileManagerApp: App {
+struct LOMPSApp: App {
     var body: some Scene {
-        WindowGroup("Logitech Onboard Profile Manager") {
+        WindowGroup(AppConstants.displayName) {
             ContentView()
         }
     }

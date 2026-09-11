@@ -105,7 +105,7 @@ static int run_set_dpi(const Options *options) {
     if (options->backup_path != NULL) {
         snprintf(backup_path, sizeof(backup_path), "%s", options->backup_path);
     } else {
-        default_backup_path(backup_path, sizeof(backup_path), "logitech-onboard-dpi-backup");
+        default_backup_path(backup_path, sizeof(backup_path), "lomps-dpi-backup");
     }
     if (!package_write(backup_path, device, &profile, profile.data, true)) {
         free(profile.data);
@@ -246,7 +246,7 @@ static int run_set_profile_state(const Options *options) {
     if (options->backup_path != NULL) {
         snprintf(backup_path, sizeof(backup_path), "%s", options->backup_path);
     } else {
-        default_backup_path(backup_path, sizeof(backup_path), "logitech-onboard-profile-state-backup");
+        default_backup_path(backup_path, sizeof(backup_path), "lomps-profile-state-backup");
     }
     printf("Backup: %s\n", backup_path);
     if (!options->yes) {
@@ -315,4 +315,3 @@ static int run_set_profile_state(const Options *options) {
     hid_context_release(&context);
     return 0;
 }
-

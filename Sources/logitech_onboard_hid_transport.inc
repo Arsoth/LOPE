@@ -18,7 +18,7 @@ static void hid_debug_log(const char *format, ...) {
     vfprintf(stderr, format, arguments);
     va_end(arguments);
 
-    FILE *file = fopen("/tmp/logitech-onboard-hid-debug.log", "a");
+    FILE *file = fopen("/tmp/lomps-hid-debug.log", "a");
     if (file == NULL) {
         return;
     }

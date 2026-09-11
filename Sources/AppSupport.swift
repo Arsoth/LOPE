@@ -18,9 +18,11 @@ enum EngineError: LocalizedError {
 }
 
 enum AppConstants {
-    static let engineName = "logitech-onboard"
-    static let appSupportDirectory = "LogitechOnboardProfileManager"
-    static let defaultsPrefix = "LogitechOnboardProfileManager"
+    static let displayName = "Logitech Onboard Memory Profile System"
+    static let shortName = "LOMPS"
+    static let engineName = "lomps"
+    static let appSupportDirectory = "LOMPS"
+    static let defaultsPrefix = "LOMPS"
     static let backupExtension = "logiob"
 }
 
