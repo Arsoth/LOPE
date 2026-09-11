@@ -126,8 +126,8 @@ extension AppModel {
         guard let profileText = snapshot.profileText else {
             resetEditorState()
             dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
-            if let profileError = snapshot.profileError, !profileError.isEmpty {
-                status = "Could not read an onboard profile from \(selected.name). \(profileError) Try Refresh."
+            if snapshot.profileError != nil {
+                status = profileReadStatus(for: selected.name, accessWarning: snapshot.accessWarning)
             } else {
                 status = "Connected to \(selected.name), but no compatible onboard profile was found."
             }
@@ -179,6 +179,13 @@ extension AppModel {
         baselineDefaultStage = 1
         baselineShiftStage = 1
         dpiDetails = "DPI capabilities have not been read."
+    }
+
+    private func profileReadStatus(for deviceName: String, accessWarning: Bool) -> String {
+        if accessWarning {
+            return "macOS is blocking access to \(deviceName). Enable Input Monitoring, then choose Refresh."
+        }
+        return "Couldn’t read \(deviceName)’s onboard profile. Is the mouse turned on and awake? Wake it, then choose Refresh."
     }
 
     private nonisolated static func makeRefreshSnapshot(

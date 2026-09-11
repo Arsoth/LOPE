@@ -32,7 +32,10 @@ enum EngineRunner {
         process.arguments = arguments
         process.currentDirectoryURL = currentDirectory
         var environment = ProcessInfo.processInfo.environment
-        environment["LOGITECH_ONBOARD_DEBUG"] = "1"
+        // The engine's HID trace is useful from the CLI, but it is not a
+        // user-facing error message. Keep it disabled for GUI invocations so
+        // a failed read cannot turn into a wall of transport diagnostics.
+        environment["LOGITECH_ONBOARD_DEBUG"] = "0"
         process.environment = environment
         process.standardOutput = pipe
         process.standardError = pipe

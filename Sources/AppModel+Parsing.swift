@@ -38,7 +38,10 @@ extension AppModel {
         }
         process.currentDirectoryURL = backupDirectory
         var environment = ProcessInfo.processInfo.environment
-        environment["LOGITECH_ONBOARD_DEBUG"] = "1"
+        // Keep low-level HID tracing out of the status bar. It remains
+        // available when the command-line engine is run directly with
+        // LOGITECH_ONBOARD_DEBUG=1.
+        environment["LOGITECH_ONBOARD_DEBUG"] = "0"
         process.environment = environment
         process.standardOutput = pipe
         process.standardError = pipe
