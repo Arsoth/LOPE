@@ -10,6 +10,8 @@
 #include <IOKit/hid/IOHIDKeys.h>
 #include <IOKit/hid/IOHIDManager.h>
 #include <IOKit/hid/IOHIDLib.h>
+#include <IOKit/IOKitLib.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -80,6 +82,7 @@ typedef struct {
     uint32_t usage_page;
     uint32_t usage;
     uint64_t location_id;
+    uint64_t registry_id;
     char product[256];
     char transport[128];
     bool is_vendor;
@@ -220,6 +223,18 @@ static uint64_t location_property(IOHIDDeviceRef device) {
     return (uint64_t)(uint32_t)number;
 }
 
+static uint64_t registry_id_property(IOHIDDeviceRef device) {
+    io_service_t service = IOHIDDeviceGetService(device);
+    if (service == IO_OBJECT_NULL) {
+        return 0;
+    }
+    uint64_t registry_id = 0;
+    if (IORegistryEntryGetRegistryEntryID(service, &registry_id) != KERN_SUCCESS) {
+        return 0;
+    }
+    return registry_id;
+}
+
 static void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t out_size) {
     out[0] = '\0';
     CFTypeRef value = IOHIDDeviceGetProperty(device, key);
@@ -278,6 +293,15 @@ static bool device_has_hidpp_reports(IOHIDDeviceRef device) {
     }
     CFRelease(elements);
     return found;
+}
+
+static bool is_wireless_device_product(uint32_t product_id) {
+    // Logitech wireless HID++ product IDs are in the 0x4000 range. Some
+    // macOS HID stacks do not expose the vendor report descriptor for these
+    // interfaces, so the product ID is the reliable fallback (notably for
+    // the G604, PID 0x4085).
+    return (product_id >= 0x4002 && product_id <= 0x4097) ||
+           product_id == 0x4101 || product_id == 0x4102;
 }
 
 static void channel_report_callback(void *context,
@@ -723,6 +747,31 @@ static void hid_context_release(HidContext *context) {
     memset(context, 0, sizeof(*context));
 }
 
+static int compare_hid_interfaces(const void *left_pointer, const void *right_pointer) {
+    const HidInterface *left = (const HidInterface *)left_pointer;
+    const HidInterface *right = (const HidInterface *)right_pointer;
+    if (left->location_id != right->location_id) {
+        return left->location_id < right->location_id ? -1 : 1;
+    }
+    if (left->registry_id != right->registry_id) {
+        return left->registry_id < right->registry_id ? -1 : 1;
+    }
+    if (left->product_id != right->product_id) {
+        return left->product_id < right->product_id ? -1 : 1;
+    }
+    if (left->usage_page != right->usage_page) {
+        return left->usage_page < right->usage_page ? -1 : 1;
+    }
+    if (left->usage != right->usage) {
+        return left->usage < right->usage ? -1 : 1;
+    }
+    int product_result = strcmp(left->product, right->product);
+    if (product_result != 0) {
+        return product_result;
+    }
+    return strcmp(left->transport, right->transport);
+}
+
 static int hid_context_create(HidContext *context) {
     memset(context, 0, sizeof(*context));
     context->manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
@@ -762,6 +811,7 @@ static int hid_context_create(HidContext *context) {
             }
             uint32_t page = number_property(device, CFSTR(kIOHIDPrimaryUsagePageKey));
             uint32_t usage = number_property(device, CFSTR(kIOHIDPrimaryUsageKey));
+            uint32_t product_id = number_property(device, CFSTR(kIOHIDProductIDKey));
             // Some Logitech mice combine keyboard/mouse collections and
             // HID++ collections in one interface; the primary usage is not
             // always the vendor page. Inspect all parsed elements as well.
@@ -773,16 +823,23 @@ static int hid_context_create(HidContext *context) {
             HidInterface *item = &context->items[context->count++];
             item->device = device;
             item->vendor_id = vendor_id;
-            item->product_id = number_property(device, CFSTR(kIOHIDProductIDKey));
+            item->product_id = product_id;
             item->usage_page = page;
             item->usage = usage;
             item->location_id = location_property(device);
+            item->registry_id = registry_id_property(device);
             item->is_vendor = vendor;
             item->is_mouse = mouse;
             string_property(device, CFSTR(kIOHIDProductKey), item->product, sizeof(item->product));
             string_property(device, CFSTR(kIOHIDTransportKey), item->transport, sizeof(item->transport));
         }
         free(devices);
+
+        // IOHIDManagerCopyDevices returns a CFSet, whose iteration order is
+        // intentionally unspecified. Every CLI invocation must nevertheless
+        // agree on what `--device N` means, because the GUI lists devices in
+        // one process and reads the selected device in another.
+        qsort(context->items, context->count, sizeof(*context->items), compare_hid_interfaces);
     }
     return 1;
 }
@@ -815,6 +872,16 @@ static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8
     }
     return 1;
 }
+
+static bool is_receiver_interface(const HidInterface *iface) {
+    // Logitech USB receiver product IDs occupy the C5xx range. Direct USB
+    // mice use a different product-ID range and should not be probed as if
+    // they had receiver slots.
+    return iface != NULL && iface->product_id >= 0xC500 && iface->product_id <= 0xC5FF;
+}
+
+static bool is_receiver_endpoint(const Device *device);
+static bool is_mouse_device(const Device *device);
 
 static int discover_devices(HidContext *context, int requested_slot, Device *devices, size_t *count) {
     *count = 0;
@@ -853,6 +920,72 @@ static const char *device_label(const Device *device) {
         return device->iface->product;
     }
     return "Logitech HID++ device";
+}
+
+static bool text_contains_case_insensitive(const char *text, const char *needle) {
+    if (text == NULL || needle == NULL || *needle == '\0') {
+        return false;
+    }
+    for (const char *start = text; *start != '\0'; start++) {
+        const char *text_cursor = start;
+        const char *needle_cursor = needle;
+        while (*text_cursor != '\0' && *needle_cursor != '\0' &&
+               tolower((unsigned char)*text_cursor) == tolower((unsigned char)*needle_cursor)) {
+            text_cursor++;
+            needle_cursor++;
+        }
+        if (*needle_cursor == '\0') {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool is_receiver_endpoint(const Device *device) {
+    if (device == NULL || device->device_number != 0xFF) {
+        return false;
+    }
+    return is_receiver_interface(device->iface) ||
+           text_contains_case_insensitive(device_label(device), "receiver") ||
+           text_contains_case_insensitive(device->iface->product, "receiver") ||
+           text_contains_case_insensitive(device_label(device), "unifying") ||
+           text_contains_case_insensitive(device_label(device), "bolt");
+}
+
+static bool is_mouse_device(const Device *device) {
+    if (device == NULL || is_receiver_endpoint(device)) {
+        return false;
+    }
+    if (text_contains_case_insensitive(device_label(device), "keyboard") ||
+        text_contains_case_insensitive(device_label(device), "keypad") ||
+        text_contains_case_insensitive(device->iface->product, "keyboard") ||
+        text_contains_case_insensitive(device->iface->product, "keypad")) {
+        return false;
+    }
+    if (device->iface->is_mouse) {
+        return true;
+    }
+    // A paired mouse may not have a standard mouse HID interface of its own;
+    // these mouse-specific HID++ features still identify it as a mouse.
+    if (device_feature_index(device, FEATURE_ONBOARD_PROFILES, &(uint8_t){0}) ||
+        device_feature_index(device, FEATURE_ADJUSTABLE_DPI, &(uint8_t){0})) {
+        return true;
+    }
+    // A paired HID++ slot is a real peripheral rather than the receiver
+    // itself. Keep it visible when older firmware does not expose the
+    // mouse-specific feature list; the name checks above still suppress
+    // ordinary paired keyboards.
+    return true;
+}
+
+static const char *device_connection(const Device *device) {
+    if (device->device_number != 0xFF || is_wireless_device_product(device->iface->product_id)) {
+        return "Receiver";
+    }
+    if (text_contains_case_insensitive(device->iface->transport, "bluetooth")) {
+        return "Bluetooth";
+    }
+    return "Wired";
 }
 
 static uint16_t crc16_ccitt_false(const uint8_t *bytes, size_t length) {
@@ -1558,13 +1691,9 @@ static void print_feature_list(const Device *device) {
 }
 
 static void print_device_line(const Device *device, size_t index) {
-    if (device->device_number == 0xFF) {
-        printf("[%zu] direct/receiver interface  %s  (HID++ %.1f, product 0x%04X)\n",
-               index, device_label(device), device->protocol, device->iface->product_id);
-    } else {
-        printf("[%zu] receiver slot %u  %s  (HID++ %.1f, product 0x%04X)\n",
-               index, device->device_number, device_label(device), device->protocol, device->iface->product_id);
-    }
+    printf("[%zu] %s  %s  (HID++ %.1f, product 0x%04X)\n",
+           index, device_connection(device), device_label(device),
+           device->protocol, device->iface->product_id);
 }
 
 static int write_all(int fd, const uint8_t *bytes, size_t length) {
@@ -1749,12 +1878,16 @@ static int run_list(void) {
         }
     }
     printf("Logitech HID++ vendor interfaces: %zu\n", vendor_interfaces);
-    if (count == 0) {
-        printf("No reachable Logitech HID++ devices found.\n");
-    } else {
-        for (size_t i = 0; i < count; i++) {
-            print_device_line(&devices[i], i);
+    size_t mouse_count = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!is_mouse_device(&devices[i])) {
+            continue;
         }
+        print_device_line(&devices[i], i);
+        mouse_count++;
+    }
+    if (mouse_count == 0) {
+        printf("No reachable Logitech mouse devices found.\n");
     }
     hid_context_release(&context);
     return 0;

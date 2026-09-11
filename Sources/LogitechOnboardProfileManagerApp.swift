@@ -53,14 +53,14 @@ struct BackupEntry: Identifiable {
     var isJSON: Bool { url.pathExtension.lowercased() == "json" }
 }
 
-struct DeviceChoice: Identifiable, Hashable {
+struct DeviceChoice: Identifiable, Hashable, Sendable {
     let id: Int
     let name: String
     let connection: String
     let productID: String
 
     var title: String {
-        "\(name) | \(connection) | \(productID)"
+        "\(name) — \(connection)"
     }
 }
 
@@ -125,6 +125,37 @@ private enum AppConstants {
     static let backupExtension = "logiob"
 }
 
+private enum EngineRunner {
+    static func run(executable: URL, arguments: [String], currentDirectory: URL) throws -> String {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.currentDirectoryURL = currentDirectory
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        let output = String(data: data, encoding: .utf8) ?? ""
+        guard process.terminationStatus == 0 else {
+            throw EngineError.failed(output.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return output
+    }
+}
+
+private struct RefreshSnapshot: Sendable {
+    let devices: [DeviceChoice]
+    let selectedDeviceIndex: Int?
+    let profileText: String?
+    let profileError: String?
+    let dpiText: String?
+    let dpiError: String?
+    let selectedProfileNumber: Int?
+    let errorMessage: String?
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var deviceSummary = "No Logitech HID++ device loaded"
@@ -151,6 +182,8 @@ final class AppModel: ObservableObject {
     private var baselineDefaultStage = 3
     private var baselineShiftStage = 1
     private var currentDeviceName = ""
+    private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration = 0
 
     let modifierChoices: [ModifierChoice] = [
         ModifierChoice(id: 0x01, label: "Ctrl"),
@@ -278,60 +311,198 @@ final class AppModel: ObservableObject {
     }
 
     func refresh() {
-        guard !busy else { return }
+        refreshTask?.cancel()
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let preferredDeviceIndex = selectedDeviceIndex
+        let preferredProfileNumber = profileNumber
+        let currentDirectory = backupDirectory
+
         busy = true
         status = "Reading the mouse…"
-        defer { busy = false }
-        refreshContents()
+
+        guard let engine else {
+            busy = false
+            status = EngineError.unavailable.localizedDescription
+            return
+        }
+
+        refreshTask = Task { [weak self] in
+            let snapshot = await Task.detached(priority: .userInitiated) {
+                Self.makeRefreshSnapshot(
+                    executable: engine,
+                    currentDirectory: currentDirectory,
+                    preferredDeviceIndex: preferredDeviceIndex,
+                    preferredProfileNumber: preferredProfileNumber
+                )
+            }.value
+
+            guard !Task.isCancelled, let self,
+                  self.refreshGeneration == generation else { return }
+            self.applyRefreshSnapshot(snapshot)
+        }
     }
 
-    private func refreshContents() {
-        do {
-            let list = try runEngine(["list"], selectingDevice: false)
-            let discovered = parseDevices(list)
-            devices = discovered
-            guard let selected = discovered.first(where: { $0.id == selectedDeviceIndex }) ?? discovered.first else {
-                selectedDeviceIndex = 0
-                currentDeviceName = ""
-                deviceSummary = "No reachable Logitech HID++ device"
-                profiles = []
-                buttons = []
-                status = list.trimmingCharacters(in: .whitespacesAndNewlines)
-                return
-            }
-            selectedDeviceIndex = selected.id
-            currentDeviceName = selected.name
-            deviceSummary = selected.title
-            let profileText: String
-            do {
-                profileText = try runEngine(["profiles"])
-            } catch {
-                profiles = []
-                buttons = []
-                dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
-                status = "Connected to \(selected.name), but no compatible onboard profile was found."
-                return
-            }
-            let parsed = parseProfiles(profileText)
-            profiles = parsed.choices
-            baselineProfileEnabled = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.enabled) })
-            if profiles.isEmpty {
-                buttons = []
-                status = "The mouse was found, but no onboard profiles were readable."
-                return
-            }
-            if !profiles.contains(where: { $0.id == profileNumber }) {
-                profileNumber = profiles[0].id
-            }
-            let selectedButtons = parsed.rowsByProfile[profileNumber] ?? []
-            buttons = selectedButtons
-            loadDPI()
-            status = "Read-only inspection complete. Changes are previewed before writing."
-        } catch {
+    func selectDevice(_ index: Int) {
+        guard devices.contains(where: { $0.id == index }), selectedDeviceIndex != index else { return }
+        selectedDeviceIndex = index
+        refresh()
+    }
+
+    private func applyRefreshSnapshot(_ snapshot: RefreshSnapshot) {
+        defer {
+            busy = false
+            refreshTask = nil
+        }
+
+        if let errorMessage = snapshot.errorMessage {
             devices = []
             deviceSummary = "Unable to access the Logitech HID++ interface"
-            status = error.localizedDescription
+            status = errorMessage
+            return
         }
+
+        devices = snapshot.devices
+        guard let selectedIndex = snapshot.selectedDeviceIndex,
+              let selected = devices.first(where: { $0.id == selectedIndex }) else {
+            selectedDeviceIndex = 0
+            currentDeviceName = ""
+            deviceSummary = "No editable Logitech mouse found"
+            profiles = []
+            buttons = []
+            status = "No Logitech mouse was found. USB receiver entries are hidden."
+            return
+        }
+
+        selectedDeviceIndex = selected.id
+        currentDeviceName = selected.name
+        deviceSummary = selected.title
+
+        guard let profileText = snapshot.profileText else {
+            profiles = []
+            buttons = []
+            dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
+            status = "Connected to \(selected.name), but no compatible onboard profile was found."
+            return
+        }
+
+        let parsed = parseProfiles(profileText)
+        profiles = parsed.choices
+        baselineProfileEnabled = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.enabled) })
+        if profiles.isEmpty {
+            buttons = []
+            status = "The mouse was found, but no onboard profiles were readable."
+            return
+        }
+        if let loadedProfile = snapshot.selectedProfileNumber,
+           profiles.contains(where: { $0.id == loadedProfile }) {
+            profileNumber = loadedProfile
+        } else if !profiles.contains(where: { $0.id == profileNumber }) {
+            profileNumber = profiles[0].id
+        }
+        buttons = parsed.rowsByProfile[profileNumber] ?? []
+        dpiDetails = ""
+        if let dpiText = snapshot.dpiText {
+            parseDPI(dpiText)
+        } else {
+            dpiDetails = snapshot.dpiError ?? "DPI capabilities could not be read."
+        }
+        status = "Read-only inspection complete. Changes are previewed before writing."
+    }
+
+    private nonisolated static func makeRefreshSnapshot(
+        executable: URL,
+        currentDirectory: URL,
+        preferredDeviceIndex: Int,
+        preferredProfileNumber: Int
+    ) -> RefreshSnapshot {
+        do {
+            let list = try EngineRunner.run(
+                executable: executable,
+                arguments: ["list"],
+                currentDirectory: currentDirectory
+            )
+            let discovered = parseDeviceChoices(list)
+            guard let selected = discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first else {
+                return RefreshSnapshot(
+                    devices: [],
+                    selectedDeviceIndex: nil,
+                    profileText: nil,
+                    profileError: nil,
+                    dpiText: nil,
+                    dpiError: nil,
+                    selectedProfileNumber: nil,
+                    errorMessage: nil
+                )
+            }
+
+            let profileText: String
+            do {
+                profileText = try EngineRunner.run(
+                    executable: executable,
+                    arguments: ["--device", String(selected.id), "profiles"],
+                    currentDirectory: currentDirectory
+                )
+            } catch {
+                return RefreshSnapshot(
+                    devices: discovered,
+                    selectedDeviceIndex: selected.id,
+                    profileText: nil,
+                    profileError: errorMessage(for: error),
+                    dpiText: nil,
+                    dpiError: nil,
+                    selectedProfileNumber: nil,
+                    errorMessage: nil
+                )
+            }
+
+            let availableProfileNumbers = profileNumbers(in: profileText)
+            let selectedProfileNumber = availableProfileNumbers.contains(preferredProfileNumber)
+                ? preferredProfileNumber
+                : availableProfileNumbers.first
+            var dpiText: String?
+            var dpiError: String?
+            if let selectedProfileNumber {
+                do {
+                    dpiText = try EngineRunner.run(
+                        executable: executable,
+                        arguments: [
+                            "--device", String(selected.id),
+                            "--profile", String(selectedProfileNumber),
+                            "dpi"
+                        ],
+                        currentDirectory: currentDirectory
+                    )
+                } catch {
+                    dpiError = errorMessage(for: error)
+                }
+            }
+            return RefreshSnapshot(
+                devices: discovered,
+                selectedDeviceIndex: selected.id,
+                profileText: profileText,
+                profileError: nil,
+                dpiText: dpiText,
+                dpiError: dpiError,
+                selectedProfileNumber: selectedProfileNumber,
+                errorMessage: nil
+            )
+        } catch {
+            return RefreshSnapshot(
+                devices: [],
+                selectedDeviceIndex: nil,
+                profileText: nil,
+                profileError: nil,
+                dpiText: nil,
+                dpiError: nil,
+                selectedProfileNumber: nil,
+                errorMessage: errorMessage(for: error)
+            )
+        }
+    }
+
+    private nonisolated static func errorMessage(for error: Error) -> String {
+        error.localizedDescription
     }
 
     func openInputMonitoringSettings() {
@@ -958,13 +1129,14 @@ final class AppModel: ObservableObject {
     func restore(_ url: URL) {
         guard !busy else { return }
         busy = true
-        defer { busy = false }
         do {
             _ = try runEngine(["restore", url.path, "--yes"])
-            refreshContents()
             refreshBackups()
+            busy = false
+            refresh()
             status = "Restored and verified \(url.lastPathComponent)."
         } catch {
+            busy = false
             status = error.localizedDescription
         }
     }
@@ -1018,7 +1190,7 @@ final class AppModel: ObservableObject {
         raw.filter { !$0.isWhitespace }.uppercased()
     }
 
-    private func parseDevices(_ text: String) -> [DeviceChoice] {
+    private nonisolated static func parseDeviceChoices(_ text: String) -> [DeviceChoice] {
         let pattern = try! NSRegularExpression(pattern: #"^\[(\d+)\]\s+(.+?)\s+\(HID\+\+\s+[0-9.]+,\s+product\s+(0x[0-9A-Fa-f]+)\)$"#)
         var result: [DeviceChoice] = []
         for line in text.split(separator: "\n").map(String.init) {
@@ -1039,6 +1211,18 @@ final class AppModel: ObservableObject {
             ))
         }
         return result.sorted { $0.id < $1.id }
+    }
+
+    private nonisolated static func profileNumbers(in text: String) -> [Int] {
+        let pattern = try! NSRegularExpression(pattern: #"^Profile\s+(\d+)\s+\("#)
+        var result: [Int] = []
+        for line in text.split(separator: "\n").map(String.init) {
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            guard let match = pattern.firstMatch(in: line, range: range),
+                  let number = Int(capture(match, in: line, index: 1)) else { continue }
+            result.append(number)
+        }
+        return result
     }
 
     private func parseProfiles(_ text: String) -> (choices: [ProfileChoice], rowsByProfile: [Int: [ButtonRow]]) {
@@ -1111,10 +1295,14 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func capture(_ match: NSTextCheckingResult, in text: String, index: Int) -> String {
+    private nonisolated static func capture(_ match: NSTextCheckingResult, in text: String, index: Int) -> String {
         let range = match.range(at: index)
         guard let swiftRange = Range(range, in: text) else { return "" }
         return String(text[swiftRange])
+    }
+
+    private func capture(_ match: NSTextCheckingResult, in text: String, index: Int) -> String {
+        Self.capture(match, in: text, index: index)
     }
 }
 
@@ -1153,9 +1341,6 @@ struct ContentView: View {
         }
         .padding(20)
         .frame(minWidth: 960, minHeight: 520)
-        .onChange(of: model.selectedDeviceIndex) { _ in
-            model.refresh()
-        }
         .onChange(of: model.profileNumber) { _ in
             model.reloadSelectedProfile()
         }
@@ -1182,7 +1367,9 @@ struct ContentView: View {
             }
             Spacer()
             if !model.devices.isEmpty {
-                Picker("Device", selection: $model.selectedDeviceIndex) {
+                Picker("Device", selection: Binding(
+                    get: { model.selectedDeviceIndex },
+                    set: { model.selectDevice($0) })) {
                     ForEach(model.devices) { device in
                         Text(device.title).tag(device.id)
                     }
@@ -1210,10 +1397,10 @@ struct ContentView: View {
             Image(systemName: "computermouse")
                 .font(.system(size: 42))
                 .foregroundStyle(.secondary)
-            Text(model.devices.isEmpty ? "No Logitech mouse detected" : "No editable onboard profile")
+            Text(model.devices.isEmpty ? "No editable Logitech mouse detected" : "No editable onboard profile")
                 .font(.title3.weight(.medium))
             Text(model.devices.isEmpty
-                 ? "The app cannot see a Logitech HID++ device. macOS may be blocking access even when the mouse is connected."
+                 ? "The app lists Logitech mice and hides USB receiver entries. macOS may also be blocking access even when the mouse is connected."
                  : "\(model.deviceSummary) is connected, but it does not expose an onboard profile format this app can edit.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -1335,7 +1522,7 @@ struct ContentView: View {
     private func profileEnableControl(_ profile: ProfileChoice) -> some View {
         let profileID = profile.id
         let label = String(profileID)
-        let crcLabel = profile.crcValid ? "CRC OK" : "CRC invalid"
+        let crcLabel = profile.crcValid ? "" : "Profile invalid"
         let crcColor: Color = profile.crcValid ? .secondary : .red
         let helpText = "Profile \(label) is \(profile.crcValid ? "CRC valid" : "CRC invalid")"
         let enabled = Binding<Bool>(
