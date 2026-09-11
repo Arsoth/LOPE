@@ -19,6 +19,35 @@ static int run_self_test(void) {
         fprintf(stderr, "CRC self-test failed\n");
         return 1;
     }
+    Reply g603_pairing = {0};
+    g603_pairing.status = REPLY_OK;
+    g603_pairing.length = 8;
+    g603_pairing.bytes[3] = 0x40;
+    g603_pairing.bytes[4] = 0x6C;
+    Reply unknown_pairing = g603_pairing;
+    unknown_pairing.bytes[3] = 0x40;
+    unknown_pairing.bytes[4] = 0x00;
+    if (strcmp(receiver_pairing_model_name(g603_pairing), "G603 LIGHTSPEED") != 0 ||
+        receiver_pairing_model_name(unknown_pairing) != NULL) {
+        fprintf(stderr, "receiver model-name fallback self-test failed\n");
+        return 1;
+    }
+    HidInterface connection_interface = {0};
+    Device connection_device = {0};
+    connection_device.iface = &connection_interface;
+    connection_device.device_number = 1;
+    connection_interface.product_id = 0xC539;
+    bool connection_types_ok = strcmp(device_connection(&connection_device), "LIGHTSPEED") == 0;
+    connection_interface.product_id = 0xC548;
+    connection_types_ok = connection_types_ok &&
+                         strcmp(device_connection(&connection_device), "Bolt") == 0;
+    connection_interface.product_id = 0xC52B;
+    connection_types_ok = connection_types_ok &&
+                         strcmp(device_connection(&connection_device), "Unifying") == 0;
+    if (!connection_types_ok) {
+        fprintf(stderr, "receiver connection-type self-test failed\n");
+        return 1;
+    }
     uint8_t frame[LONG_REPORT_BYTES];
     const uint8_t ping_params[3] = {0x00, 0x00, 0x5A};
     size_t frame_length = build_hidpp_frame(false, 0x01, 0x001B, ping_params, sizeof(ping_params), frame);
@@ -244,6 +273,6 @@ static int run_self_test(void) {
         fprintf(stderr, "batch failure-path self-test failed\n");
         return 1;
     }
-    printf("self-test: CRC-16, format/layout detection, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
+    printf("self-test: receiver model-name fallback, connection types, CRC-16, format/layout detection, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
     return 0;
 }

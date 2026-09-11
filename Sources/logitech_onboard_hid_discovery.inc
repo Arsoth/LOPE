@@ -124,27 +124,76 @@ static int add_device(Device *devices,
                       double protocol,
                       bool inspect_features);
 
-static void receiver_device_name(Device *device, uint8_t slot) {
-    Reply reply = receiver_register_read(device->iface,
-                                         REGISTER_RECEIVER_INFO,
-                                         true,
-                                         (uint8_t)(RECEIVER_INFO_DEVICE_NAME + slot - 1));
-    if (reply.status != REPLY_OK || reply.length < 2) {
+static bool receiver_device_name(Device *device, uint8_t slot) {
+    // The receiver name register can briefly time out while a sleeping
+    // LIGHTSPEED mouse is waking. Retry the name read independently of the
+    // slot ping so a transient receiver response does not become the visible
+    // device identity.
+    for (int attempt = 0; attempt < 3; attempt++) {
+        Reply reply = receiver_register_read(device->iface,
+                                             REGISTER_RECEIVER_INFO,
+                                             true,
+                                             (uint8_t)(RECEIVER_INFO_DEVICE_NAME + slot - 1));
+        if (reply.status != REPLY_OK || reply.length < 2) {
+            if (attempt < 2 && (reply.status == REPLY_TIMEOUT ||
+                                reply.status == REPLY_IO_ERROR)) {
+                usleep(50 * 1000);
+                continue;
+            }
+            return false;
+        }
+        size_t length = reply.bytes[1];
+        if (length > reply.length - 2) {
+            length = reply.length - 2;
+        }
+        if (length >= sizeof(device->name)) {
+            length = sizeof(device->name) - 1;
+        }
+        memcpy(device->name, reply.bytes + 2, length);
+        device->name[length] = '\0';
+        while (length > 0 && (device->name[length - 1] == '\0' ||
+                              device->name[length - 1] == '\n' ||
+                              device->name[length - 1] == '\r')) {
+            device->name[--length] = '\0';
+        }
+        if (length > 0) {
+            return true;
+        }
+        if (attempt < 2) {
+            usleep(50 * 1000);
+        }
+    }
+    return false;
+}
+
+static const char *receiver_pairing_model_name(Reply pairing_reply) {
+    // Lightspeed pairing information carries the mouse WPID at bytes 3..4.
+    // G603 is WPID 0x406C. This lets the list retain the model identity when
+    // the mouse is asleep and the receiver's codename register is transiently
+    // unavailable. Add future verified WPID mappings here as needed.
+    if (pairing_reply.status != REPLY_OK || pairing_reply.length < 5) {
+        return NULL;
+    }
+    uint16_t wpid = (uint16_t)(((uint16_t)pairing_reply.bytes[3] << 8) |
+                               pairing_reply.bytes[4]);
+    switch (wpid) {
+        case 0x406C:
+            return "G603 LIGHTSPEED";
+        default:
+            return NULL;
+    }
+}
+
+static void receiver_slot_name(Device *device, uint8_t slot, Reply pairing_reply) {
+    if (device->name[0] == '\0' && receiver_device_name(device, slot)) {
         return;
     }
-    size_t length = reply.bytes[1];
-    if (length > reply.length - 2) {
-        length = reply.length - 2;
+    if (device->name[0] != '\0') {
+        return;
     }
-    if (length >= sizeof(device->name)) {
-        length = sizeof(device->name) - 1;
-    }
-    memcpy(device->name, reply.bytes + 2, length);
-    device->name[length] = '\0';
-    while (length > 0 && (device->name[length - 1] == '\0' ||
-                          device->name[length - 1] == '\n' ||
-                          device->name[length - 1] == '\r')) {
-        device->name[--length] = '\0';
+    const char *fallback = receiver_pairing_model_name(pairing_reply);
+    if (fallback != NULL) {
+        snprintf(device->name, sizeof(device->name), "%s", fallback);
     }
 }
 
@@ -166,9 +215,7 @@ static bool add_receiver_slot_device(Device *devices,
         return false;
     }
     Device *device = &devices[*count - 1];
-    if (device->name[0] == '\0') {
-        receiver_device_name(device, slot);
-    }
+    receiver_slot_name(device, slot, pairing_reply);
     return true;
 }
 
@@ -570,7 +617,7 @@ static int discover_devices(HidContext *context,
                         add_device(devices, count, iface, resolved_device_number, slot,
                                    device_protocol, inspect_features);
                         if (*count > before && devices[*count - 1].name[0] == '\0') {
-                            receiver_device_name(&devices[*count - 1], slot);
+                            receiver_slot_name(&devices[*count - 1], slot, pairing_reply);
                         }
                     }
                 } else if (pairing_present) {
@@ -653,7 +700,7 @@ static int discover_device_by_key(HidContext *context,
                     add_device(devices, count, iface, resolved_device_number,
                                device_number, device_protocol, true);
                     if (*count > before && devices[*count - 1].name[0] == '\0') {
-                        receiver_device_name(&devices[*count - 1], device_number);
+                        receiver_slot_name(&devices[*count - 1], device_number, pairing_reply);
                     }
                 }
                 return 1;
@@ -693,6 +740,12 @@ static int discover_devices_for_options(HidContext *context,
 static const char *device_label(const Device *device) {
     if (device->name[0] != '\0') {
         return device->name;
+    }
+    // A receiver-backed slot is the paired peripheral, not the USB receiver
+    // interface. Never expose the interface's generic product string as the
+    // mouse name when the model-specific name read was unavailable.
+    if (device->device_number != 0xFF && is_receiver_interface(device->iface)) {
+        return "Paired Logitech mouse";
     }
     if (device->iface->product[0] != '\0') {
         return device->iface->product;
@@ -758,14 +811,72 @@ static bool is_duplicate_direct_mouse_endpoint(const Device *candidate,
     return false;
 }
 
+static const char *receiver_connection_type(const HidInterface *iface) {
+    if (iface == NULL) {
+        return NULL;
+    }
+    switch (iface->product_id) {
+        case 0xC548:
+            return "Bolt";
+        case 0xC52B:
+        case 0xC532:
+            return "Unifying";
+        case 0xC539:
+        case 0xC53A:
+        case 0xC53D:
+        case 0xC53F:
+        case 0xC541:
+        case 0xC545:
+        case 0xC547:
+        case 0xC54D:
+            return "LIGHTSPEED";
+        case 0xC517:
+            return "EX100";
+        case 0xC518:
+        case 0xC51A:
+        case 0xC51B:
+        case 0xC521:
+        case 0xC525:
+        case 0xC526:
+        case 0xC52E:
+        case 0xC52F:
+        case 0xC531:
+        case 0xC534:
+        case 0xC535:
+        case 0xC537:
+            return "Nano";
+        default:
+            break;
+    }
+    // Product IDs are the reliable path, but retain a readable fallback for
+    // newer receiver IDs that macOS exposes only by product name.
+    if (text_contains_case_insensitive(iface->product, "bolt")) {
+        return "Bolt";
+    }
+    if (text_contains_case_insensitive(iface->product, "unifying")) {
+        return "Unifying";
+    }
+    if (text_contains_case_insensitive(iface->product, "lightspeed")) {
+        return "LIGHTSPEED";
+    }
+    if (text_contains_case_insensitive(iface->product, "nano")) {
+        return "Nano";
+    }
+    return is_receiver_interface(iface) ? "Receiver" : NULL;
+}
+
 static const char *device_connection(const Device *device) {
-    if (device->device_number != 0xFF || is_receiver_product(device->iface->product_id) ||
-        is_wireless_device_product(device->iface->product_id)) {
-        return "Receiver";
+    const char *receiver_type = receiver_connection_type(device->iface);
+    if (receiver_type != NULL &&
+        (device->device_number != 0xFF || is_receiver_interface(device->iface))) {
+        return receiver_type;
     }
     if (text_contains_case_insensitive(device->iface->transport, "bluetooth") ||
         is_bluetooth_device_product(device->iface->product_id)) {
         return "Bluetooth";
+    }
+    if (is_wireless_device_product(device->iface->product_id)) {
+        return "Wireless";
     }
     return "Wired";
 }
