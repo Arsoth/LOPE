@@ -214,11 +214,22 @@ static int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
     channel->device = device;
     channel->run_loop = CFRunLoopGetCurrent();
     pthread_mutex_init(&channel->lock, NULL);
-    IOReturn result = IOHIDDeviceOpen(device, kIOHIDOptionsTypeNone);
-    hid_debug_log("hid-debug open product=0x%04X location=0x%llX result=0x%08X",
-                  number_property(device, CFSTR(kIOHIDProductIDKey)),
-                  (unsigned long long)location_property(device),
-                  result);
+    IOReturn result = kIOReturnError;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        result = IOHIDDeviceOpen(device, kIOHIDOptionsTypeNone);
+        hid_debug_log("hid-debug open product=0x%04X location=0x%llX attempt=%d result=0x%08X",
+                      number_property(device, CFSTR(kIOHIDProductIDKey)),
+                      (unsigned long long)location_property(device),
+                      attempt + 1,
+                      result);
+        if (result == kIOReturnSuccess || result != kIOReturnNotPermitted || attempt == 2) {
+            break;
+        }
+        // macOS can briefly reject a HID interface while another client is
+        // releasing it. Give that handoff a moment before treating the
+        // device as inaccessible.
+        usleep(150000);
+    }
     if (result != kIOReturnSuccess) {
         if (result == kIOReturnNotPermitted) {
             fprintf(stderr, "warning: macOS denied HID access to the Logitech interface; grant Input Monitoring to the terminal/app running this utility (0x%08X)\n", result);

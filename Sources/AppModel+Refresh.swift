@@ -57,7 +57,11 @@ extension AppModel {
         refreshTask?.cancel()
         refreshGeneration += 1
         let generation = refreshGeneration
-        let preferredProfileNumber = profileNumber
+        // Profile numbers are device-local. Reusing the previous mouse's
+        // selection can target a disabled/partially provisioned slot on the
+        // newly selected mouse, so let the engine choose its first enabled
+        // profile and report that actual slot back to the UI.
+        let preferredProfileNumber = 0
         let currentDirectory = backupDirectory
 
         busy = true

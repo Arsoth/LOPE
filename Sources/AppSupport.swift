@@ -25,7 +25,16 @@ enum AppConstants {
 }
 
 enum EngineRunner {
+    // A refresh can be cancelled after its Task has started, but Process does
+    // not stop synchronously with Swift task cancellation. Serialize helper
+    // invocations so a stale HID reader cannot hold an interface open while a
+    // newly selected device is being queried.
+    private static let invocationLock = NSLock()
+
     static func run(executable: URL, arguments: [String], currentDirectory: URL) throws -> String {
+        invocationLock.lock()
+        defer { invocationLock.unlock() }
+
         let process = Process()
         let pipe = Pipe()
         process.executableURL = executable

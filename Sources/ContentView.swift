@@ -78,6 +78,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(width: 310)
+                .disabled(model.busy)
             }
             if !model.profiles.isEmpty {
                 Picker("Profile", selection: $model.profileNumber) {
