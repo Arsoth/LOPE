@@ -188,6 +188,8 @@ extension AppModel {
 
     func selectDevice(_ index: Int) {
         guard let selected = devices.first(where: { $0.id == index }), selectedDeviceIndex != index else { return }
+        recoveryBackups.removeAll()
+        recoveryDeviceKey = nil
         selectedDeviceIndex = index
         rememberSelectedDevice(selected)
         // Profile numbers are device-local. Reusing the previous mouse's
@@ -225,7 +227,7 @@ extension AppModel {
             resetEditorState()
             status = snapshot.accessWarning
                 ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then Refresh."
-                : "No Logitech mouse was found. USB receiver entries are hidden."
+                : "No Logitech mouse was found"
             return
         }
 
@@ -381,7 +383,7 @@ extension AppModel {
                     self.resetEditorState()
                     self.status = enumeration.accessWarning
                         ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then choose Refresh."
-                        : "No Logitech mouse was found. USB receiver entries are hidden."
+                        : "No Logitech mouse was found."
                     return
                 }
 

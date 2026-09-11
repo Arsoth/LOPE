@@ -341,145 +341,160 @@ static int run_restore(const Options *options) {
         return 1;
     }
     HidContext context;
+    bool context_ready = false;
+    Device *device = NULL;
+    ProfileInfo info;
+    uint8_t *control = NULL;
+    uint16_t control_sector = 0;
+    ProfileHeader headers[MAX_HEADERS];
+    size_t header_count = 0;
+    uint8_t *current[MAX_BACKUP_SECTORS] = {0};
+    BackupSectorSource pre_restore_sectors[MAX_BACKUP_SECTORS];
+    bool has_changes = false;
+    int result = 1;
+    memset(&context, 0, sizeof(context));
+    memset(&info, 0, sizeof(info));
+    memset(headers, 0, sizeof(headers));
+    memset(pre_restore_sectors, 0, sizeof(pre_restore_sectors));
+
     if (!hid_context_create(&context)) {
-        package_release(&package);
-        return 1;
+        goto done;
     }
+    context_ready = true;
     Device devices[MAX_DEVICES];
     size_t count = 0;
     discover_devices_for_options(&context, options, devices, &count);
-    Device *device = NULL;
     if (!select_device(devices, count, options, &device)) {
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
+        goto done;
     }
     if (package.product_id != 0 && package.product_id != device->iface->product_id) {
         fprintf(stderr, "refusing restore: backup product 0x%04X does not match connected product 0x%04X\n",
                 package.product_id, device->iface->product_id);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
+        goto done;
     }
-    ProfileInfo info;
     if (!get_profile_info(device, &info)) {
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
+        goto done;
     }
-    if (package.size != info.sector_size || package.profile_format != info.profile_format) {
-        fprintf(stderr, "refusing restore: backup format/sector size (0x%02X/%u) does not match device (0x%02X/%u)\n",
-                package.profile_format, package.size, info.profile_format, info.sector_size);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
-    }
-    uint8_t *control = (uint8_t *)malloc(info.sector_size);
-    if (control == NULL) {
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
-    }
-    uint16_t control_sector = 0;
-    if (!read_profile_control(device, &info, &control_sector, control, info.sector_size)) {
-        free(control);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
-    }
-    ProfileHeader headers[MAX_HEADERS];
-    size_t header_count = 0;
-    size_t selected = 0;
-    bool found = package.sector == control_sector;
-    if (!found) {
-        if (!parse_profile_headers(&info, control, info.sector_size, headers, &header_count)) {
-            free(control);
-            hid_context_release(&context);
-            package_release(&package);
-            return 1;
+    for (size_t i = 0; i < package.sector_count; i++) {
+        if (package.sectors[i].size != info.sector_size || package.profile_format != info.profile_format) {
+            fprintf(stderr, "refusing restore: backup sector 0x%04X format/size (0x%02X/%u) does not match device (0x%02X/%u)\n",
+                    package.sectors[i].sector, package.profile_format, package.sectors[i].size,
+                    info.profile_format, info.sector_size);
+            goto done;
         }
-        for (size_t i = 0; i < header_count; i++) {
-            if (headers[i].sector == package.sector) {
-                selected = i;
-                found = true;
-                break;
-            }
-        }
-    }
-    if (!found) {
-        fprintf(stderr, "refusing restore: sector 0x%04X is not present in the connected device's profile headers\n", package.sector);
-        free(control);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
-    }
-    free(control);
-    uint8_t *current = (uint8_t *)malloc(info.sector_size);
-    if (current == NULL || !read_sector(device, package.sector, info.sector_size, current)) {
-        fprintf(stderr, "could not read the current target sector before restore\n");
-        free(current);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
-    }
-    printf("Restore target: %s, sector 0x%04X, %u bytes\n", device_label(device), package.sector, package.size);
-    printf("Backup CRC: OK; current CRC: %s\n", sector_crc_ok(current, info.sector_size) ? "OK" : "INVALID");
-    printf("The backup was made for device 0x%04X via device number 0x%02X; connected product is 0x%04X via 0x%02X.\n",
-           package.product_id, package.device_number, device->iface->product_id, device->device_number);
-    if (memcmp(current, package.data, package.size) == 0) {
-        printf("Nothing to do; the connected sector already matches the backup.\n");
-        free(current);
-        hid_context_release(&context);
-        package_release(&package);
-        return 0;
-    }
-    if (!options->yes) {
-        free(current);
-        hid_context_release(&context);
-        package_release(&package);
-        return ensure_write_confirmation("restore");
     }
 
-    Profile pre_restore;
-    memset(&pre_restore, 0, sizeof(pre_restore));
-    pre_restore.info = info;
-    pre_restore.headers[0].sector = package.sector;
-    pre_restore.headers[0].enabled = package.sector == control_sector ? 1 : headers[selected].enabled;
-    pre_restore.selected_header = 0;
-    pre_restore.data = current;
-    pre_restore.data_length = info.sector_size;
+    control = (uint8_t *)malloc(info.sector_size);
+    if (control == NULL || !read_profile_control(device, &info, &control_sector, control, info.sector_size)) {
+        fprintf(stderr, "could not read the current profile control sector before restore\n");
+        goto done;
+    }
+    bool needs_headers = false;
+    for (size_t i = 0; i < package.sector_count; i++) {
+        needs_headers = needs_headers || package.sectors[i].sector != control_sector;
+    }
+    if (needs_headers &&
+        (!sector_crc_ok(control, info.sector_size) ||
+         !parse_profile_headers(&info, control, info.sector_size, headers, &header_count))) {
+        fprintf(stderr, "refusing restore: the current control sector or profile headers were not validated\n");
+        goto done;
+    }
+    for (size_t i = 0; i < package.sector_count; i++) {
+        bool found = package.sectors[i].sector == control_sector;
+        if (!found) {
+            for (size_t header = 0; header < header_count; header++) {
+                if (headers[header].sector == package.sectors[i].sector) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            fprintf(stderr, "refusing restore: sector 0x%04X is not present in the connected device's profile headers\n",
+                    package.sectors[i].sector);
+            goto done;
+        }
+        current[i] = (uint8_t *)malloc(package.sectors[i].size);
+        if (current[i] == NULL ||
+            !read_sector(device, package.sectors[i].sector, package.sectors[i].size, current[i])) {
+            fprintf(stderr, "could not read current sector 0x%04X before restore\n", package.sectors[i].sector);
+            goto done;
+        }
+        has_changes = has_changes || memcmp(current[i], package.sectors[i].data, package.sectors[i].size) != 0;
+    }
+
+    printf("Restore target: %s, %zu sector(s)\n", device_label(device), package.sector_count);
+    printf("The backup was made for device 0x%04X via device number 0x%02X; connected product is 0x%04X via 0x%02X.\n",
+           package.product_id, package.device_number, device->iface->product_id, device->device_number);
+    for (size_t i = 0; i < package.sector_count; i++) {
+        printf("  Sector 0x%04X: backup CRC OK; current CRC: %s; %s\n",
+               package.sectors[i].sector,
+               sector_crc_ok(current[i], package.sectors[i].size) ? "OK" : "INVALID",
+               memcmp(current[i], package.sectors[i].data, package.sectors[i].size) == 0 ? "already matches" : "will be restored");
+    }
+    if (!has_changes) {
+        printf("Nothing to do; all connected sectors already match the backup.\n");
+        result = 0;
+        goto done;
+    }
+    if (!options->yes) {
+        result = ensure_write_confirmation("restore");
+        goto done;
+    }
+
+    for (size_t i = 0; i < package.sector_count; i++) {
+        pre_restore_sectors[i] = (BackupSectorSource){
+            .sector = package.sectors[i].sector,
+            .size = package.sectors[i].size,
+            .data = current[i]
+        };
+    }
     char pre_restore_path[512];
-    snprintf(pre_restore_path, sizeof(pre_restore_path), "%s.pre-restore.bin", options->path);
-    if (!package_write(pre_restore_path, device, &pre_restore, current, false)) {
-        fprintf(stderr, "could not save the pre-restore sector; no mouse write was attempted\n");
-        free(current);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
+    int pre_restore_length = snprintf(pre_restore_path, sizeof(pre_restore_path), "%s.pre-restore.logiob", options->path);
+    if (pre_restore_length <= 0 || pre_restore_length >= (int)sizeof(pre_restore_path) ||
+        !package_write_multi(pre_restore_path, device, info.profile_format,
+                             pre_restore_sectors, package.sector_count, false)) {
+        fprintf(stderr, "could not save the combined pre-restore state; no mouse write was attempted\n");
+        goto done;
     }
-    printf("Saved pre-restore state to %s\n", pre_restore_path);
-    if (!write_sector(device, package.sector, package.data, package.size)) {
-        fprintf(stderr, "restore write failed; pre-restore state is at %s\n", pre_restore_path);
-        free(current);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
-    }
-    uint8_t *readback = (uint8_t *)malloc(package.size);
-    bool readback_ok = readback != NULL && read_sector(device, package.sector, package.size, readback);
-    bool verified = readback_ok && sector_crc_ok(readback, package.size) && memcmp(readback, package.data, package.size) == 0;
-    if (!verified) {
-        fprintf(stderr, "restore read-back verification failed; pre-restore state is at %s\n", pre_restore_path);
+    printf("Saved pre-restore state for %zu sector(s) to %s\n", package.sector_count, pre_restore_path);
+    size_t restored_count = 0;
+    for (size_t i = 0; i < package.sector_count; i++) {
+        if (memcmp(current[i], package.sectors[i].data, package.sectors[i].size) == 0) {
+            continue;
+        }
+        printf("Restoring sector 0x%04X\n", package.sectors[i].sector);
+        if (!write_sector(device, package.sectors[i].sector,
+                          package.sectors[i].data, package.sectors[i].size)) {
+            fprintf(stderr, "restore failed after %zu sector(s); pre-restore state is at %s\n",
+                    restored_count, pre_restore_path);
+            goto done;
+        }
+        uint8_t *readback = (uint8_t *)malloc(package.sectors[i].size);
+        bool verified = readback != NULL &&
+                        read_sector(device, package.sectors[i].sector, package.sectors[i].size, readback) &&
+                        sector_crc_ok(readback, package.sectors[i].size) &&
+                        memcmp(readback, package.sectors[i].data, package.sectors[i].size) == 0;
         free(readback);
-        free(current);
-        hid_context_release(&context);
-        package_release(&package);
-        return 1;
+        if (!verified) {
+            fprintf(stderr, "restore read-back verification failed after %zu sector(s); pre-restore state is at %s\n",
+                    restored_count, pre_restore_path);
+            goto done;
+        }
+        restored_count++;
+        printf("Restored sector 0x%04X and verified an exact read-back match.\n", package.sectors[i].sector);
     }
-    printf("Restored sector 0x%04X and verified an exact read-back match.\n", package.sector);
-    free(readback);
-    free(current);
-    hid_context_release(&context);
+    printf("Restored and verified %zu sector(s).\n", restored_count);
+    result = 0;
+
+done:
+    for (size_t i = 0; i < MAX_BACKUP_SECTORS; i++) {
+        free(current[i]);
+    }
+    free(control);
+    if (context_ready) {
+        hid_context_release(&context);
+    }
     package_release(&package);
-    return 0;
+    return result;
 }

@@ -1,3 +1,18 @@
+typedef struct {
+    const bool *outcomes;
+    size_t outcome_count;
+    size_t calls;
+} BatchWriterTestContext;
+
+static bool batch_test_writer(void *context, const BatchSector *sector) {
+    BatchWriterTestContext *test = (BatchWriterTestContext *)context;
+    (void)sector;
+    if (test->calls >= test->outcome_count) {
+        return false;
+    }
+    return test->outcomes[test->calls++];
+}
+
 static int run_self_test(void) {
     const uint8_t sample[] = "123456789";
     if (crc16_ccitt_false(sample, 9) != 0x29B1) {
@@ -142,16 +157,93 @@ static int run_self_test(void) {
         package_ok = package_read(temp_path, &package);
     }
     if (package_ok) {
-        package_ok = package.sector == 0x0123 && package.size == 255 &&
-                     memcmp(package.data, profile.data, 255) == 0;
+        package_ok = package.sector_count == 1 &&
+                     package.sectors[0].sector == 0x0123 && package.sectors[0].size == 255 &&
+                     memcmp(package.sectors[0].data, profile.data, 255) == 0;
         package_release(&package);
     }
     unlink(temp_path);
+
+    uint8_t control_data[255] = {0};
+    control_data[2] = 1;
+    sector_put_crc(control_data, sizeof(control_data));
+    BackupSectorSource combined_sources[2] = {
+        {.sector = 0x0123, .size = 255, .data = profile.data},
+        {.sector = 0x0000, .size = 255, .data = control_data}
+    };
+    char combined_path[] = "/tmp/lomps-selftest-combined-XXXXXX";
+    int combined_fd = mkstemp(combined_path);
+    if (combined_fd < 0) {
+        free(profile.data);
+        return 1;
+    }
+    close(combined_fd);
+    unlink(combined_path);
+    bool combined_package_ok = package_write_multi(combined_path, &dummy_device, 5,
+                                                    combined_sources, 2, true);
+    if (combined_package_ok) {
+        combined_package_ok = package_read(combined_path, &package);
+    }
+    if (combined_package_ok) {
+        combined_package_ok = package.sector_count == 2 &&
+            package.sectors[0].sector == 0x0123 && package.sectors[1].sector == 0x0000 &&
+            memcmp(package.sectors[0].data, profile.data, 255) == 0 &&
+            memcmp(package.sectors[1].data, control_data, 255) == 0;
+        package_release(&package);
+    }
+    unlink(combined_path);
     free(profile.data);
-    if (!package_ok) {
+    if (!package_ok || !combined_package_ok) {
         fprintf(stderr, "backup package self-test failed\n");
         return 1;
     }
-    printf("self-test: CRC-16, format/layout detection, rear-thumb identification, and Alt+Tab encoding passed\n");
+
+    uint8_t unchanged_before[4] = {0x10, 0x20, 0x30, 0x40};
+    uint8_t unchanged_after[4] = {0x10, 0x20, 0x30, 0x40};
+    uint8_t changed_after[4] = {0x10, 0x20, 0x30, 0x41};
+    bool batch_plan_ok = !batch_sector_changed(unchanged_before, unchanged_after, sizeof(unchanged_before)) &&
+                         batch_sector_changed(unchanged_before, changed_after, sizeof(unchanged_before)) &&
+                         batch_affected_sector_count(true, false) == 1 &&
+                         batch_affected_sector_count(false, true) == 1 &&
+                         batch_affected_sector_count(true, true) == 2 &&
+                         batch_affected_sector_count(false, false) == 0;
+    if (!batch_plan_ok) {
+        fprintf(stderr, "batch sector planning self-test failed\n");
+        return 1;
+    }
+
+    bool first_failure[] = {false};
+    BatchWriterTestContext first_failure_context = {
+        .outcomes = first_failure, .outcome_count = 1, .calls = 0
+    };
+    bool later_failure[] = {true, false};
+    BatchWriterTestContext later_failure_context = {
+        .outcomes = later_failure, .outcome_count = 2, .calls = 0
+    };
+    bool all_success[] = {true, true};
+    BatchWriterTestContext all_success_context = {
+        .outcomes = all_success, .outcome_count = 2, .calls = 0
+    };
+    BatchSector test_plan[2] = {
+        {.sector = 0x0100, .data = unchanged_before, .length = sizeof(unchanged_before), .kind = "profile"},
+        {.sector = 0x0001, .data = unchanged_before, .length = sizeof(unchanged_before), .kind = "control"}
+    };
+    size_t test_verified = 0;
+    size_t test_failed = 0;
+    bool batch_failure_tests_ok =
+        !execute_batch_sector_plan(test_plan, 1, batch_test_writer, &first_failure_context,
+                                   &test_verified, &test_failed) &&
+        test_verified == 0 && test_failed == 0 && first_failure_context.calls == 1 &&
+        !execute_batch_sector_plan(test_plan, 2, batch_test_writer, &later_failure_context,
+                                   &test_verified, &test_failed) &&
+        test_verified == 1 && test_failed == 1 && later_failure_context.calls == 2 &&
+        execute_batch_sector_plan(test_plan, 2, batch_test_writer, &all_success_context,
+                                  &test_verified, &test_failed) &&
+        test_verified == 2 && all_success_context.calls == 2;
+    if (!batch_failure_tests_ok) {
+        fprintf(stderr, "batch failure-path self-test failed\n");
+        return 1;
+    }
+    printf("self-test: CRC-16, format/layout detection, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
     return 0;
 }

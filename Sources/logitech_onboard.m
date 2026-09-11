@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
     if (strcmp(options.command, "bind") == 0) return run_bind(&options);
     if (strcmp(options.command, "set-dpi") == 0) return run_set_dpi(&options);
     if (strcmp(options.command, "set-profile-state") == 0) return run_set_profile_state(&options);
+    if (strcmp(options.command, "apply") == 0) return run_apply(&options);
     if (strcmp(options.command, "restore") == 0) return run_restore(&options);
     fprintf(stderr, "unknown command '%s'\n", options.command);
     print_usage(argv[0]);

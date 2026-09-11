@@ -18,26 +18,7 @@ extension AppModel {
             status = "No button changes to apply."
             return
         }
-        busy = true
-        defer { busy = false }
-        do {
-            for button in changes {
-                let backup = backupURL(prefix: "profile\(profileNumber)-button\(button.id)")
-                let jsonBackup = makeEditableBackup(binaryBackup: backup, useDrafts: false)
-                _ = try runEngine([
-                    "--profile", String(profileNumber),
-                    "--button", String(button.id),
-                    "--backup", backup.path,
-                    "bind", normalize(button.draftRaw), "--yes"
-                ])
-                try? writeEditableBackup(jsonBackup, to: jsonURL(for: backup))
-            }
-            reloadSelectedProfileContents()
-            refreshBackups()
-            status = "Applied \(changes.count) button change(s); each write was backed up and read back."
-        } catch {
-            status = error.localizedDescription
-        }
+        executeBatchSave(buttonChanges: changes, dpiChanged: false, profileChanges: [])
     }
 
     func applyDPI() {
@@ -50,26 +31,7 @@ extension AppModel {
             status = "Enter one to five numeric DPI stages."
             return
         }
-        let stages = dpiStages.prefix(dpiCount).joined(separator: ",")
-        busy = true
-        defer { busy = false }
-        do {
-            let backup = backupURL(prefix: "profile\(profileNumber)-dpi")
-            let jsonBackup = makeEditableBackup(binaryBackup: backup, useDrafts: false)
-            _ = try runEngine([
-                "--profile", String(profileNumber),
-                "--default", String(defaultStage),
-                "--shift", String(shiftStage),
-                "--backup", backup.path,
-                "set-dpi", stages, "--yes"
-            ])
-            try? writeEditableBackup(jsonBackup, to: jsonURL(for: backup))
-            reloadSelectedProfileContents()
-            refreshBackups()
-            status = "Applied the DPI stages; the profile was backed up and read back."
-        } catch {
-            status = error.localizedDescription
-        }
+        executeBatchSave(buttonChanges: [], dpiChanged: true, profileChanges: [])
     }
 
     func applyAll() {
@@ -91,52 +53,120 @@ extension AppModel {
             status = "Enter one to five numeric DPI stages before saving."
             return
         }
+        executeBatchSave(buttonChanges: buttonChanges, dpiChanged: dpiChanged, profileChanges: profileChanges)
+    }
+
+    private func executeBatchSave(
+        buttonChanges: [ButtonRow],
+        dpiChanged: Bool,
+        profileChanges: [ProfileChoice]
+    ) {
+        guard !busy else { return }
         busy = true
         defer { busy = false }
+        let operationID = saveOperationID()
+        var arguments = [
+            "--profile", String(profileNumber),
+            "--backup-directory", backupDirectory.path,
+            "--operation-id", operationID,
+            "apply"
+        ]
+        arguments += buttonChanges.flatMap { ["--button-change", "\($0.id):\(normalize($0.draftRaw))"] }
+        if dpiChanged {
+            arguments += [
+                "--dpi", dpiStages.prefix(dpiCount).joined(separator: ","),
+                "--default", String(defaultStage),
+                "--shift", String(shiftStage)
+            ]
+        }
+        arguments += profileChanges.flatMap {
+            ["--profile-state-change", "\($0.id):\($0.enabled ? "enable" : "disable")"]
+        }
         do {
-            for button in buttonChanges {
-                let backup = backupURL(prefix: "profile\(profileNumber)-button\(button.id)")
-                let jsonBackup = makeEditableBackup(binaryBackup: backup, useDrafts: false)
-                _ = try runEngine([
-                    "--profile", String(profileNumber),
-                    "--button", String(button.id),
-                    "--backup", backup.path,
-                    "bind", normalize(button.draftRaw), "--yes"
-                ])
-                try? writeEditableBackup(jsonBackup, to: jsonURL(for: backup))
-            }
-            if dpiChanged {
-                let backup = backupURL(prefix: "profile\(profileNumber)-dpi")
-                let jsonBackup = makeEditableBackup(binaryBackup: backup, useDrafts: false)
-                let stages = dpiStages.prefix(dpiCount).joined(separator: ",")
-                _ = try runEngine([
-                    "--profile", String(profileNumber),
-                    "--default", String(defaultStage),
-                    "--shift", String(shiftStage),
-                    "--backup", backup.path,
-                    "set-dpi", stages, "--yes"
-                ])
-                try? writeEditableBackup(jsonBackup, to: jsonURL(for: backup))
-            }
-            for profile in profileChanges {
-                let backup = backupURL(prefix: "profile-state-\(profile.id)")
-                let jsonBackup = makeEditableBackup(binaryBackup: backup, useDrafts: false)
-                _ = try runEngine([
-                    "--backup", backup.path,
-                    "set-profile-state", String(profile.id), profile.enabled ? "enable" : "disable", "--yes"
-                ])
-                try? writeEditableBackup(jsonBackup, to: jsonURL(for: backup))
-            }
+            let output = try runEngine(arguments + ["--yes"])
+            recoveryBackups.removeAll()
+            recoveryDeviceKey = nil
             reloadSelectedProfileContents()
             refreshBackups()
-            var parts = [String]()
-            if !buttonChanges.isEmpty { parts.append("\(buttonChanges.count) button change(s)") }
-            if dpiChanged { parts.append("DPI changes") }
-            if !profileChanges.isEmpty { parts.append("\(profileChanges.count) profile state change(s)") }
-            status = "Applied \(parts.joined(separator: " and ")); each write was backed up and read back."
+            let verified = output.components(separatedBy: "\n")
+                .filter { $0.hasPrefix("Verified sector ") }
+                .count
+            status = "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back."
         } catch {
-            status = error.localizedDescription
+            let details = error.localizedDescription
+            recoveryBackups = batchRecoveryBackups(from: details)
+            recoveryDeviceKey = recoveryBackups.isEmpty
+                ? nil
+                : devices.first(where: { $0.id == selectedDeviceIndex })?.deviceKey
+            let summary = batchFailureSummary(from: details)
+            status = recoveryBackups.isEmpty
+                ? details
+                : "Save operation \(operationID) failed.\n\(summary)\nUse ‘Restore backups from this save’ to recover the pre-save sectors."
         }
+    }
+
+    func restoreLastSaveBackups() {
+        guard !busy, !recoveryBackups.isEmpty else { return }
+        guard recoveryDeviceKey == devices.first(where: { $0.id == selectedDeviceIndex })?.deviceKey else {
+            recoveryBackups.removeAll()
+            recoveryDeviceKey = nil
+            status = "Recovery backups belong to a different selected mouse. Choose the original mouse before restoring them."
+            return
+        }
+        let candidates = recoveryBackups.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !candidates.isEmpty else {
+            recoveryBackups.removeAll()
+            recoveryDeviceKey = nil
+            status = "The backups from the failed save are no longer available."
+            return
+        }
+        busy = true
+        defer { busy = false }
+        var restored = 0
+        do {
+            for backup in candidates {
+                _ = try runEngine(["restore", backup.path, "--yes"])
+                restored += 1
+            }
+            recoveryBackups.removeAll()
+            recoveryDeviceKey = nil
+            refreshBackups()
+            refresh()
+            status = "Restored and verified \(restored) sector backup(s) from the failed save operation."
+        } catch {
+            let remaining = Array(candidates.dropFirst(restored))
+            recoveryBackups = remaining
+            status = "Restored \(restored) sector backup(s), but recovery stopped: \(error.localizedDescription)"
+        }
+    }
+
+    private func saveOperationID() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
+        let suffix = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
+        return "save-\(formatter.string(from: Date()))-\(suffix)"
+    }
+
+    private func batchRecoveryBackups(from message: String) -> [URL] {
+        var result: [URL] = []
+        for line in message.components(separatedBy: "\n") where line.hasPrefix("Backup saved: ") {
+            let value = String(line.dropFirst("Backup saved: ".count))
+            let path = value.components(separatedBy: " (").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !path.isEmpty else { continue }
+            let url = URL(fileURLWithPath: path)
+            if !result.contains(url) { result.append(url) }
+        }
+        return result
+    }
+
+    private func batchFailureSummary(from message: String) -> String {
+        let lines = message.components(separatedBy: "\n").filter { line in
+            line.hasPrefix("Save operation") || line.hasPrefix("Preflight") ||
+            line.hasPrefix("Planned ") || line.hasPrefix("Backup saved: ") ||
+            line.hasPrefix("Writing ") || line.hasPrefix("Verified sector ") ||
+            line.contains("was not verified") || line.contains("stopped before any sector write")
+        }
+        return lines.isEmpty ? message : lines.joined(separator: "\n")
     }
 
     func dumpBackup() {
@@ -146,8 +176,6 @@ extension AppModel {
         do {
             let backup = backupURL(prefix: "profile\(profileNumber)-manual")
             _ = try runEngine(["--profile", String(profileNumber), "dump", backup.path])
-            let jsonBackup = makeEditableBackup(binaryBackup: backup, useDrafts: false)
-            try? writeEditableBackup(jsonBackup, to: jsonURL(for: backup))
             refreshBackups()
             status = "Saved a read-only profile backup at \(backup.path)."
         } catch {
@@ -325,10 +353,6 @@ extension AppModel {
         } catch {
             status = "Could not load JSON: \(error.localizedDescription)"
         }
-    }
-
-    private func jsonURL(for binaryURL: URL) -> URL {
-        binaryURL.deletingPathExtension().appendingPathExtension("json")
     }
 
     private func writeEditableBackup(_ backup: EditableBackup, to url: URL) throws {

@@ -24,6 +24,7 @@ final class AppModel: ObservableObject {
     @Published var loadingProfile = false
     @Published var inputMonitoringAuthorized = false
     @Published var backups: [BackupEntry] = []
+    @Published var recoveryBackups: [URL] = []
     @Published var backupDirectoryPath = ""
     @Published var showAdvancedFields = false
     @Published var highlightButtonPresses = false
@@ -41,6 +42,7 @@ final class AppModel: ObservableObject {
     var refreshGeneration = 0
     var globalMouseMonitor: Any?
     var localMouseMonitor: Any?
+    var recoveryDeviceKey: String?
 
     var currentMouseProfile: MouseProfileDescriptor {
         currentCatalogProfile ?? MouseProfileCatalog.genericProfile

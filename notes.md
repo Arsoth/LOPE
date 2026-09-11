@@ -6,31 +6,31 @@ ordered as `P0` (correctness/safety), `P1` (high-value UX), and `P2` (polish).
 
 ## P0 — safe writes and backup behavior
 
-### [ ] 1. Make a save operation batch its changes
+### [x] 1. Make a save operation batch its changes
 
 **Feasibility: Medium-high, with an important limitation.** The UI already has
-one `Save to mouse` action, but `AppModel+Writes.swift:applyAll()` currently
-loops over button changes and invokes the engine separately for each one. Each
-invocation reads, backs up, and writes a sector. The HID++ onboard-profiles
+one `Save to mouse` action. The previous `AppModel+Writes.swift:applyAll()`
+looped over button changes and invoked the engine separately for each one. Each
+invocation read, backed up, and wrote a sector. The HID++ onboard-profiles
 protocol only commits one sector at a time, so changes in the selected profile
 can be combined into one sector write, but a selected-profile sector and the
 profile-control sector cannot be made physically atomic together.
 
 **Implementation tasks:**
 
-- [ ] Add a batch/apply command or equivalent engine API that loads the
+- [x] Add a batch/apply command or equivalent engine API that loads the
       selected profile sector once, applies all button and DPI mutations in memory,
       recalculates CRC once, writes once, and performs one complete read-back.
-- [ ] Apply profile enable/disable changes as a separate control-sector batch
+- [x] Apply profile enable/disable changes as a separate control-sector batch
       when needed. Keep the UI as one save action and report the number of sectors
       written rather than implying a transaction across sectors.
-- [ ] Preflight every requested mutation before the first write: supported
+- [x] Preflight every requested mutation before the first write: supported
       layout, valid raw records, DPI values, profile-state invariant, CRC, and
       device/profile selection.
-- [ ] Define partial-failure behavior. If a later sector write fails, show
+- [x] Define partial-failure behavior. If a later sector write fails, show
       exactly which sector succeeded and offer restore from the backups created for
       this save operation.
-- [ ] Add engine/model tests proving that multiple button changes produce one
+- [x] Add engine/model tests proving that multiple button changes produce one
       profile-sector write and that unchanged sectors are not touched.
 
 **Done when:** one Save action creates a single operation record, makes all
@@ -38,23 +38,23 @@ required exact backups before any mutation, writes each affected sector at most
 once, verifies each write, and clearly reports any unavoidable multi-sector
 partial state.
 
-### [ ] 2. Create exact binary backups once, before the first write
+### [x] 2. Create exact binary backups once, before the first write
 
 **Feasibility: High after the batch design above.** The current backup package
 format already stores the complete sector and enough device information for
-restore. The missing piece is moving backup creation out of each per-button
-command and into a preflight phase, deduplicated by sector.
+restore. Backup creation now happens in the batch preflight phase and is
+deduplicated by sector.
 
 **Implementation tasks:**
 
-- [ ] Identify the unique affected sectors for a save operation.
-- [ ] Read and save each complete sector before any write, using one operation
+- [x] Identify the unique affected sectors for a save operation.
+- [x] Read and save each complete sector before any write, using one operation
       timestamp/ID in the filenames.
-- [ ] Do not create a second backup for another edit that targets the same
+- [x] Do not create a second backup for another edit that targets the same
       sector in the same Save operation.
-- [ ] Keep the existing restore safety checks: matching device/product and
+- [x] Keep the existing restore safety checks: matching device/product and
       profile format/sector size, valid target sector, and verified read-back.
-- [ ] Add failure-path tests for backup creation, first-sector write failure,
+- [x] Add failure-path tests for backup creation, first-sector write failure,
       and later-sector write failure.
 
 **Done when:** every affected sector has an exact, restorable binary snapshot
@@ -250,3 +250,10 @@ glance.
 - `Sources/logitech_onboard_commands_mutate.inc` and
   `Sources/logitech_onboard_profile_io.inc` — sector mutation/write behavior.
 - `docs/PROTOCOL.md` — current HID++ and onboard-sector constraints.
+
+unprocessed notes:
+
+- readme file and docs need overhauls again. Readme should be usability and at most how to build the app, docs should be everything else.
+- custom keyboard output is still weird. should we just combine function and special keys into one long dropdown? And put the modifiers before the keys so it's more logical what it is.
+- how many keys can be stored in a keyboard output anyway? what's the max length per mouse, that should be added to profile data. And shown as an X of Y or X/Y etc label at the end or similar of the textbox.
+- the highlight presses button should be below the footer line

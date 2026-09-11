@@ -46,18 +46,7 @@ Changes stay in the editor until you press Save to mouse. That button creates a 
 
 The app uses the physical control name, not the current assignment. Physical mappings live in one JSON descriptor per G-series mouse family under [Profiles/](Profiles/). This keeps unusual layouts—such as the two G502 generations, G600's G-Shift layer, G604's two-row thumb grid, and ambidextrous G903/PRO mice—separate and makes future devices additive.
 
-On a G502 X-style mouse, the useful labels are:
-
-| Button | Physical control |
-| ------ | ---------------- |
-| G7     | DPI Down         |
-| G8     | DPI Up           |
-| G9     | Profile          |
-| G6     | DPI Shift        |
-| G5     | Forward          |
-| G4     | Back             |
-
-Other mice use neutral names such as Primary click, Back, and Button 6 when their physical layout is not known. The output beside the name always shows what that profile will do.
+Unknown mice use neutral names such as Primary click, Back, and Button 6 when their physical layout is not in the list of profiles. The output beside the name always shows what that profile will do.
 
 The DPI editor supports one to five stages. If you prefer two stages, choose **2 of 5** and fill in those two values. The default stage and DPI Shift stage are selected separately.
 
@@ -84,7 +73,7 @@ There are two kinds of files:
 - **Exact binary** backups are automatic safety copies. Restore one when you want to put the mouse back exactly as it was.
 - **Editable JSON** files are readable profile descriptions. Load one into the editor, review the changes, and press Save to mouse when you are ready.
 
-Every write made from the app creates both kinds of backup. A binary backup preserves bytes the app does not understand, so it remains the most reliable emergency restore. JSON is the convenient format for reading and editing button assignments and DPI values.
+Each **Save to mouse** operation creates a binary backup before any write. A binary backup preserves bytes the app does not understand, so it remains the most reliable emergency restore. JSON is the convenient format for reading and editing button assignments and DPI values.
 
 You can also use **Export JSON** to save the current editor contents, or **Import JSON** to load a file someone edited. Importing JSON does not write to the mouse by itself.
 

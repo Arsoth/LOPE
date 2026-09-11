@@ -7,6 +7,7 @@ struct ContentView: View {
     @StateObject private var model = AppModel()
     @State private var confirmRestore = false
     @State private var restoreURL: URL?
+    @State private var confirmRecoveryRestore = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -62,6 +63,14 @@ struct ContentView: View {
             }
         } message: {
             Text(restoreURL?.lastPathComponent ?? "Selected backup")
+        }
+        .alert("Restore backups from this save?", isPresented: $confirmRecoveryRestore) {
+            Button("Cancel", role: .cancel) {}
+            Button("Restore and verify", role: .destructive) {
+                model.restoreLastSaveBackups()
+            }
+        } message: {
+            Text("LOPE will restore the exact pre-save sectors captured by the failed operation. Any sector that was already unchanged will be skipped safely.")
         }
     }
 
@@ -165,7 +174,7 @@ struct ContentView: View {
 
     private var emptyStateMessage: String {
         if model.devices.isEmpty {
-            return "The app lists Logitech mice and hides USB receiver entries. macOS may also be blocking access even when the mouse is connected."
+            return "The app lists Logitech mice. macOS may also be blocking access even when the mouse is connected."
         }
         if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
             return "\(model.deviceSummary) is connected, but LOPE does not have a profile JSON for this MX mouse’s button layout yet."
@@ -187,6 +196,21 @@ struct ContentView: View {
             Text("Change button outputs and DPI together, then save once. The original data is backed up automatically.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            if !model.recoveryBackups.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("The last save was only partially completed. Exact pre-save backups are available for recovery.")
+                        .font(.callout)
+                    Spacer()
+                    Button("Restore backups from this save") {
+                        confirmRecoveryRestore = true
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(8)
+                .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+            }
             if !model.currentMouseProfile.profileIO.canSave {
                 Text("This device is cataloged for read-only inspection until its profile-specific save format is validated.")
                     .font(.caption)
@@ -560,7 +584,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Backups")
                 .font(.headline)
-            Text("The app saves an exact binary copy before every mouse write. It also creates an editable JSON profile beside it. JSON loads into the editor; Save to mouse is the step that writes to the device.")
+            Text("Save to mouse creates one exact binary backup file containing every affected sector before any write. JSON is an explicit import/export format; older JSON sidecars remain available as editable files, but new mouse saves do not create them.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

@@ -126,6 +126,7 @@ static void print_usage(const char *program) {
     printf("  bind --button N alt-tab              preview an explicit profile button change\n");
     printf("  set-dpi 800,1600                       preview a one-to-five-stage onboard DPI change\n");
     printf("  set-profile-state N enable|disable   preview enabling or disabling profile N\n");
+    printf("  apply                                 apply a single GUI save operation\n");
     printf("  restore FILE                         preview restoring a backup package\n\n");
     printf("Global options:\n");
     printf("  --device N                           logical device index from list\n");
@@ -137,6 +138,11 @@ static void print_usage(const char *program) {
     printf("  --default N                          onboard default DPI stage, 1..5\n");
     printf("  --shift N                            onboard DPI-shift stage, 1..5\n");
     printf("  --backup FILE                        backup path for bind\n");
+    printf("  --button-change N:RAW                batch button record (apply; RAW is 8 hex digits)\n");
+    printf("  --dpi VALUES                         batch DPI stages, comma-separated\n");
+    printf("  --profile-state-change N:STATE       batch profile state (enable or disable)\n");
+    printf("  --backup-directory DIR               directory for an apply operation's backups\n");
+    printf("  --operation-id ID                    stable ID shared by all apply backups\n");
     printf("  --yes                                permit the requested mouse write\n");
     printf("  --help                               show this help\n");
 }
@@ -203,7 +209,9 @@ static int parse_options(int argc, char **argv, Options *options) {
         if (strcmp(arg, "--device") == 0 || strcmp(arg, "--device-key") == 0 || strcmp(arg, "--slot") == 0 ||
             strcmp(arg, "--profile") == 0 || strcmp(arg, "--button") == 0 ||
             strcmp(arg, "--backup") == 0 || strcmp(arg, "--default") == 0 ||
-            strcmp(arg, "--shift") == 0) {
+            strcmp(arg, "--shift") == 0 || strcmp(arg, "--dpi") == 0 ||
+            strcmp(arg, "--button-change") == 0 || strcmp(arg, "--profile-state-change") == 0 ||
+            strcmp(arg, "--backup-directory") == 0 || strcmp(arg, "--operation-id") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "%s requires a value\n", arg);
                 return 0;
@@ -241,6 +249,24 @@ static int parse_options(int argc, char **argv, Options *options) {
                     fprintf(stderr, "invalid --shift value '%s'\n", value);
                     return 0;
                 }
+            } else if (strcmp(arg, "--dpi") == 0) {
+                options->dpi_values = value;
+            } else if (strcmp(arg, "--button-change") == 0) {
+                if (options->button_change_count >= MAX_BATCH_BUTTON_CHANGES) {
+                    fprintf(stderr, "too many --button-change values\n");
+                    return 0;
+                }
+                options->button_changes[options->button_change_count++] = value;
+            } else if (strcmp(arg, "--profile-state-change") == 0) {
+                if (options->profile_state_change_count >= MAX_BATCH_PROFILE_CHANGES) {
+                    fprintf(stderr, "too many --profile-state-change values\n");
+                    return 0;
+                }
+                options->profile_state_changes[options->profile_state_change_count++] = value;
+            } else if (strcmp(arg, "--backup-directory") == 0) {
+                options->backup_directory = value;
+            } else if (strcmp(arg, "--operation-id") == 0) {
+                options->operation_id = value;
             } else {
                 options->backup_path = value;
             }
@@ -293,6 +319,11 @@ static int parse_options(int argc, char **argv, Options *options) {
     } else if (strcmp(options->command, "set-profile-state") == 0) {
         if (options->positional_count != 2) {
             fprintf(stderr, "set-profile-state syntax: set-profile-state N enable|disable\n");
+            return 0;
+        }
+    } else if (strcmp(options->command, "apply") == 0) {
+        if (options->positional_count != 0) {
+            fprintf(stderr, "apply does not take positional arguments\n");
             return 0;
         }
     } else if (options->positional_count != 0) {

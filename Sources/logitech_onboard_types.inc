@@ -43,6 +43,8 @@
 #define MAX_DEVICES 64
 #define MAX_HEADERS 32
 #define MAX_DPI_VALUES 1024
+#define MAX_BATCH_BUTTON_CHANGES 64
+#define MAX_BATCH_PROFILE_CHANGES MAX_HEADERS
 #define SW_ID 0x0B
 
 #define FEATURE_ROOT 0x0000
@@ -65,7 +67,8 @@
 #define ONBOARD_END_WRITE 0x80
 
 #define BACKUP_HEADER_BYTES 20
-#define BACKUP_MAGIC "LOGIOB01"
+#define BACKUP_MAGIC "LOGIOB02"
+#define MAX_BACKUP_SECTORS 32
 
 typedef struct HidReportNode {
     uint32_t report_id;
@@ -203,6 +206,13 @@ typedef struct {
     int button;
     int dpi_default;
     int dpi_shift;
+    const char *dpi_values;
+    const char *backup_directory;
+    const char *operation_id;
+    const char *button_changes[MAX_BATCH_BUTTON_CHANGES];
+    size_t button_change_count;
+    const char *profile_state_changes[MAX_BATCH_PROFILE_CHANGES];
+    size_t profile_state_change_count;
     bool yes;
     const char *positionals[8];
     size_t positional_count;
@@ -211,9 +221,20 @@ typedef struct {
 typedef struct {
     uint16_t sector;
     uint16_t size;
+    const uint8_t *data;
+} BackupSectorSource;
+
+typedef struct {
+    uint16_t sector;
+    uint16_t size;
+    uint8_t *data;
+} BackupSector;
+
+typedef struct {
     uint16_t vendor_id;
     uint16_t product_id;
     uint8_t device_number;
     uint8_t profile_format;
-    uint8_t *data;
+    size_t sector_count;
+    BackupSector sectors[MAX_BACKUP_SECTORS];
 } BackupPackage;
