@@ -9,6 +9,10 @@ import UniformTypeIdentifiers
 extension AppModel {
     func applyButtons() {
         guard !busy else { return }
+        guard currentMouseProfile.profileIO.canSave else {
+            status = "\(currentMouseProfile.name) is cataloged as read-only for onboard profile writes."
+            return
+        }
         let changes = buttons.filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
         guard !changes.isEmpty else {
             status = "No button changes to apply."
@@ -38,6 +42,10 @@ extension AppModel {
 
     func applyDPI() {
         guard !busy else { return }
+        guard currentMouseProfile.profileIO.canSave else {
+            status = "\(currentMouseProfile.name) is cataloged as read-only for onboard profile writes."
+            return
+        }
         guard canApplyDPI else {
             status = "Enter one to five numeric DPI stages."
             return
@@ -66,6 +74,10 @@ extension AppModel {
 
     func applyAll() {
         guard !busy else { return }
+        guard currentMouseProfile.profileIO.canSave else {
+            status = "\(currentMouseProfile.name) is cataloged as read-only for onboard profile writes."
+            return
+        }
         let buttonChanges = buttons.filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
         let dpiChanged = hasDPIChanges
         let profileChanges = profiles

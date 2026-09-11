@@ -1,0 +1,78 @@
+{
+	"schemaVersion": 1,
+	"id": "g400-g400s",
+	"name": "G400 / G400s",
+	"match": {
+		"nameContains": ["G400", "G400S"],
+		"productIDs": [],
+		"priority": 10
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI Shift",
+			"aliases": ["Sniper"],
+			"notes": null
+		},
+		{ "number": 7, "control": "G7 · DPI down", "aliases": [], "notes": null },
+		{ "number": 8, "control": "G8 · DPI up", "aliases": [], "notes": null }
+	],
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ profile transport",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy/runtime",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G400/G400s storage has not been validated by the modern sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware."
+		]
+	},
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+}

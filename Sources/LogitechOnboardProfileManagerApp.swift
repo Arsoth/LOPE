@@ -36,6 +36,11 @@ final class AppModel: ObservableObject {
     var refreshTask: Task<Void, Never>?
     var refreshGeneration = 0
 
+    var currentMouseProfile: MouseProfileDescriptor {
+        let productID = devices.first(where: { $0.id == selectedDeviceIndex })?.productID ?? ""
+        return MouseProfileCatalog.shared.profile(deviceName: currentDeviceName, productID: productID)
+    }
+
     var engine: URL? {
         if let bundled = Bundle.main.url(forResource: AppConstants.engineName, withExtension: nil) {
             return bundled

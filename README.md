@@ -44,18 +44,20 @@ The Buttons tab puts profiles, button assignments, and DPI settings together.
 
 Changes stay in the editor until you press Save to mouse. That button creates a backup automatically before writing anything.
 
-The app uses the physical control name, not the current assignment. On a G502-style mouse, the useful labels are:
+The app uses the physical control name, not the current assignment. Physical mappings live in one JSON descriptor per G-series mouse family under [Profiles/](Profiles/). This keeps unusual layouts—such as the two G502 generations, G600's G-Shift layer, G604's two-row thumb grid, and ambidextrous G903/PRO mice—separate and makes future devices additive.
 
-| Button | Physical control    |
-| ------ | ------------------- |
-| G7     | DPI Down            |
-| G8     | DPI Up              |
-| G9     | Profile             |
-| G6     | DPI Shift           |
-| G5     | Forward             |
-| G4     | Back and rear thumb |
+On a G502 X-style mouse, the useful labels are:
 
-Other mice use neutral names such as Primary click, Back / thumb, and Button 6 when their physical layout is not known. The output beside the name always shows what that profile will do.
+| Button | Physical control |
+| ------ | ---------------- |
+| G7     | DPI Down         |
+| G8     | DPI Up           |
+| G9     | Profile          |
+| G6     | DPI Shift        |
+| G5     | Forward          |
+| G4     | Back             |
+
+Other mice use neutral names such as Primary click, Back, and Button 6 when their physical layout is not known. The output beside the name always shows what that profile will do.
 
 The DPI editor supports one to five stages. If you prefer two stages, choose **2 of 5** and fill in those two values. The default stage and DPI Shift stage are selected separately.
 
@@ -116,7 +118,7 @@ Settings lets you choose the backup folder and turn on **Show raw HID++ fields**
 
 The app looks for Logitech HID++ devices and then asks each device what it supports. A mouse can be detected without having editable onboard profiles. In that case the app shows the mouse but explains that there is no compatible onboard profile to edit.
 
-The profile editor is intended to work with any Logitech model that exposes the standard onboard profile feature and a layout the app can validate. The G502 X is the first tested model. The G604, older G502 models, and MX Master 3 can be connected and identified; models that do not expose onboard profile memory will remain read-only or show no editable profile.
+The profile editor is intended to work with any Logitech model that exposes the standard onboard profile feature and a layout the app can validate. The catalog contains mappings for current and legacy G-series families, but profile writes remain enabled only for layouts whose HID++ storage has been validated. G600, G700/G700s, and newer HITS/LIGHTFORCE families are named and discoverable but remain read-only until their layer or firmware-specific save format is implemented. Unknown mice fall back to runtime button numbers.
 
 ## If something goes wrong
 

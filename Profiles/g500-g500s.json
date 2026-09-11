@@ -1,0 +1,90 @@
+{
+	"schemaVersion": 1,
+	"id": "g500-g500s",
+	"name": "G500 / G500s",
+	"match": {
+		"nameContains": ["G500", "G500S"],
+		"productIDs": ["0xC068", "0xC24E"],
+		"priority": 10
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI Shift",
+			"aliases": ["Sniper"],
+			"notes": null
+		},
+		{ "number": 7, "control": "G7 · DPI down", "aliases": [], "notes": null },
+		{ "number": 8, "control": "G8 · DPI up", "aliases": [], "notes": null },
+		{
+			"number": 9,
+			"control": "Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		}
+	],
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G500/G500s storage has not been validated by the modern sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping."
+		]
+	},
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+}

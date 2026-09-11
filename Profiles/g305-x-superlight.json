@@ -1,0 +1,70 @@
+{
+	"schemaVersion": 1,
+	"id": "g305-x-superlight",
+	"name": "G305 X SUPERLIGHT",
+	"match": {
+		"nameContains": ["G305 X SUPERLIGHT"],
+		"productIDs": [],
+		"priority": 40
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		}
+	],
+	"profileIO": {
+		"supported": false,
+		"capability": "HID++ profile transport unverified",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "runtime-detected",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Confirm the device's reported profile format and sector layout before enabling writes",
+			"backup": "required before any future implementation",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "runtime-validated",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The classic G305 shape has five primary profile controls in current product documentation; keep any extra runtime record neutral until verified."
+		]
+	},
+	"sources": ["https://www.logitechg.com/en-us/shop/p/g305-x-superlight"]
+}

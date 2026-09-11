@@ -1,0 +1,160 @@
+{
+	"schemaVersion": 1,
+	"id": "g600",
+	"name": "G600 MMO",
+	"match": {
+		"nameContains": ["G600"],
+		"productIDs": ["0xC24A"],
+		"priority": 50
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · G-Shift",
+			"aliases": ["Second mode"],
+			"notes": null
+		},
+		{ "number": 7, "control": "G7 · Top left", "aliases": [], "notes": null },
+		{
+			"number": 8,
+			"control": "G8 · Mode switch",
+			"aliases": ["Profile cycle"],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Thumb 1",
+			"aliases": ["Numpad 1 position"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "G10 · Thumb 2",
+			"aliases": ["Numpad 2 position"],
+			"notes": null
+		},
+		{
+			"number": 11,
+			"control": "G11 · Thumb 3",
+			"aliases": ["Numpad 3 position"],
+			"notes": null
+		},
+		{
+			"number": 12,
+			"control": "G12 · Thumb 4",
+			"aliases": ["Numpad 4 position"],
+			"notes": null
+		},
+		{
+			"number": 13,
+			"control": "G13 · Thumb 5",
+			"aliases": ["Numpad 5 position"],
+			"notes": null
+		},
+		{
+			"number": 14,
+			"control": "G14 · Thumb 6",
+			"aliases": ["Numpad 6 position"],
+			"notes": null
+		},
+		{
+			"number": 15,
+			"control": "G15 · Thumb 7",
+			"aliases": ["Numpad 7 position"],
+			"notes": null
+		},
+		{
+			"number": 16,
+			"control": "G16 · Thumb 8",
+			"aliases": ["Numpad 8 position"],
+			"notes": null
+		},
+		{
+			"number": 17,
+			"control": "G17 · Thumb 9",
+			"aliases": ["Numpad 9 position"],
+			"notes": null
+		},
+		{
+			"number": 18,
+			"control": "G18 · Thumb 10",
+			"aliases": ["Numpad 0 position"],
+			"notes": null
+		},
+		{
+			"number": 19,
+			"control": "G19 · Thumb 11",
+			"aliases": ["Numpad minus position"],
+			"notes": null
+		},
+		{
+			"number": 20,
+			"control": "G20 · Thumb 12",
+			"aliases": ["Numpad plus position"],
+			"notes": null
+		}
+	],
+	"profileIO": {
+		"supported": false,
+		"capability": "G600 layered onboard profile",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy/runtime",
+			"readSector": "runtime-detected",
+			"controlSector": "runtime-detected",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "G600 normal and G-Shift layers need a dedicated layer-aware writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "runtime-validated",
+			"layers": "normal + G-Shift",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The G600 has 20 physical/profile controls and a second G-Shift assignment layer. The current editor must not overwrite the alternate layer."
+		]
+	},
+	"sources": [
+		"https://www.logitechg.com/es-ar/shop/p/g600-mmo-gaming-mouse",
+		"https://support.logi.com/hc/en-au/articles/360023248894-Using-G-Shift-on-the-G600-gaming-mouse",
+		"https://secure.logitech.com/assets/44964/g600-mmo-gaming-mouse-quickstart-guide.pdf"
+	]
+}

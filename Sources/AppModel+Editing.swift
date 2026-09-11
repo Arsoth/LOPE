@@ -145,26 +145,13 @@ extension AppModel {
     }
 
     func physicalButtonLabel(_ number: Int) -> String {
-        if !currentDeviceName.lowercased().contains("g502") {
-            switch number {
-            case 1: return "Primary click"
-            case 2: return "Secondary click"
-            case 3: return "Middle click"
-            default: return "Button \(number)"
-            }
+        if let known = currentMouseProfile.button(for: number) {
+            return known.label
         }
         switch number {
-        case 1: return "G1 (Left)"
-        case 2: return "G2 (Right)"
-        case 3: return "G3 (Middle)"
-        case 4: return "G4 (Back)"
-        case 5: return "G6 (DPI Shift)"
-        case 6: return "G5 (Forward)"
-        case 7: return "Wheel tilt left"
-        case 8: return "Wheel tilt right"
-        case 9: return "G9 (Profile)"
-        case 10: return "G8 (DPI Up)"
-        case 11: return "G7 (DPI Down)"
+        case 1: return "Primary click"
+        case 2: return "Secondary click"
+        case 3: return "Middle click"
         default: return "Button \(number)"
         }
     }

@@ -125,7 +125,7 @@ struct ContentView: View {
                 Button("Revert edits") { model.reloadSelectedProfile() }
                 Button("Save to mouse", action: model.applyAll)
                     .buttonStyle(.borderedProminent)
-                    .disabled(!model.hasPendingChanges || model.busy)
+                    .disabled(!model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave)
             }
             Text("Modify profiles, button outputs and DPI together, then save once. The original data is backed up automatically.")
                 .font(.callout)
@@ -133,6 +133,14 @@ struct ContentView: View {
             Text("Choose a standard output or use Custom for a keyboard chord. Raw HID++ fields are available in Settings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("Physical mapping: \(model.currentMouseProfile.name) · \(model.currentMouseProfile.profileIO.capability)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !model.currentMouseProfile.profileIO.canSave {
+                Text("This device is cataloged for read-only inspection until its profile-specific save format is validated.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     profilesEditor

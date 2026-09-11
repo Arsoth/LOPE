@@ -1,0 +1,80 @@
+{
+	"schemaVersion": 1,
+	"id": "g603",
+	"name": "G603 LIGHTSPEED",
+	"match": {
+		"nameContains": ["G603"],
+		"productIDs": ["0xB01C"],
+		"priority": 30
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI button",
+			"aliases": ["Top DPI"],
+			"notes": null
+		}
+	],
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES · format-3 DPI variant",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"dpiUnusedStage": "0x0000 on known format-3 firmware",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": [
+			"The engine accepts both zero-filled and 0xFFFF unused DPI slots for this family; retry a sleeping wireless device before reporting a missing profile."
+		]
+	},
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+}

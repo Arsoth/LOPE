@@ -6,6 +6,7 @@ C_MODULES := $(wildcard Sources/logitech_onboard_*.inc)
 GUI_APP := LogitechOnboardProfileManager.app
 GUI_BIN := bin/LogitechOnboardProfileManager
 GUI_SRC := $(wildcard Sources/*.swift)
+PROFILE_FILES := $(wildcard Profiles/*.json)
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
 SWIFT_MODULE_CACHE := .build/module-cache
@@ -34,14 +35,15 @@ $(APP): $(SRC) $(C_MODULES)
 
 gui: $(GUI_BIN)
 
-$(GUI_BIN): $(GUI_SRC)
+$(GUI_BIN): $(GUI_SRC) $(PROFILE_FILES)
 	@mkdir -p bin $(SWIFT_MODULE_CACHE)
 	swiftc -O -parse-as-library -target $(GUI_TARGET) -module-cache-path $(SWIFT_MODULE_CACHE) -framework SwiftUI -framework AppKit $(GUI_SRC) -o $(GUI_BIN)
 
 app: build gui
-	@mkdir -p $(GUI_BUNDLE)/Contents/MacOS $(GUI_BUNDLE)/Contents/Resources
+	@mkdir -p $(GUI_BUNDLE)/Contents/MacOS $(GUI_BUNDLE)/Contents/Resources/MouseProfiles
 	cp -f $(GUI_BIN) $(GUI_BUNDLE)/Contents/MacOS/LogitechOnboardProfileManager
 	cp -f bin/$(APP) $(GUI_BUNDLE)/Contents/Resources/$(APP)
+	cp -f $(PROFILE_FILES) $(GUI_BUNDLE)/Contents/Resources/MouseProfiles/
 	cp -f App/Info.plist $(GUI_BUNDLE)/Contents/Info.plist
 	@codesign --force --deep --sign "$(SIGNING_IDENTITY)" $(GUI_BUNDLE) >/dev/null
 

@@ -1,0 +1,121 @@
+{
+	"schemaVersion": 1,
+	"id": "g700-g700s",
+	"name": "G700 / G700s",
+	"match": {
+		"nameContains": ["G700", "G700S"],
+		"productIDs": ["0xC06B", "0xC07C"],
+		"priority": 30
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "G10 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 11,
+			"control": "G11 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 12,
+			"control": "G12 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 13,
+			"control": "G13 · Side/top button",
+			"aliases": [],
+			"notes": null
+		}
+	],
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G700/G700s macro/profile records are not compatible with the standard sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"Keep this family cataloged so its physical controls are named correctly, but do not route it through the modern writer until a legacy-safe implementation exists."
+		]
+	},
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://support.logi.com/hc/en-150/articles/360023399193-LED-indicator-lights-on-the-G700s-gaming-mouse"
+	]
+}
