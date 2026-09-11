@@ -130,7 +130,7 @@ tracks whether it was reported or derived from readable headers.
 - [x] Parse and store `onboardProfileCapacity` in `AppModel`; fall back to the
       number of readable headers if older engine output does not include it.
 - [x] Show it during/after load, for example `Onboard profiles (2 of 5
-      supported)` or `Profile 1 of 1`, and make the distinction between capacity and
+    supported)` or `Profile 1 of 1`, and make the distinction between capacity and
       readable slots clear.
 - [x] Keep the UI honest for devices that report unavailable or inconsistent
       profile metadata.
@@ -257,3 +257,7 @@ unprocessed notes:
 - custom keyboard output is still weird. should we just combine function and special keys into one long dropdown? And put the modifiers before the keys so it's more logical what it is.
 - how many keys can be stored in a keyboard output anyway? what's the max length per mouse, that should be added to profile data. And shown as an X of Y or X/Y etc label at the end or similar of the textbox.
 - the highlight presses button should be below the footer line
+- for the 603, specify the sleep time / that you need ot keep mouse active then click refresh instead of saying there's no onboard profile
+- don't show fallback UI for MX mice, the bottom warning shouldn't be there either
+- put disabled, custom, then the rest of the keys
+- custom should just have a record input option, and settings should have a checkbox to display non-standard keys in an override dropdown (F13 onwards for the most part)
