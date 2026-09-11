@@ -72,3 +72,10 @@ struct RefreshSnapshot: Sendable {
     let errorMessage: String?
     let accessWarning: Bool
 }
+
+struct DeviceEnumerationSnapshot: Sendable {
+    let devices: [DeviceChoice]
+    let selectedDeviceIndex: Int?
+    let accessWarning: Bool
+    let errorMessage: String?
+}

@@ -88,7 +88,7 @@ struct MouseProfileCatalog: Sendable {
         profiles = Self.loadProfiles()
     }
 
-    func profile(deviceName: String, productID: String) -> MouseProfileDescriptor {
+    func matchingProfile(deviceName: String, productID: String) -> MouseProfileDescriptor? {
         let normalizedName = deviceName.lowercased()
         let normalizedProductID = productID.lowercased()
 
@@ -116,7 +116,11 @@ struct MouseProfileCatalog: Sendable {
         return candidates.max { left, right in
             if left.1 != right.1 { return left.1 < right.1 }
             return left.0.id > right.0.id
-        }?.0 ?? Self.genericProfile
+        }?.0
+    }
+
+    func profile(deviceName: String, productID: String) -> MouseProfileDescriptor {
+        matchingProfile(deviceName: deviceName, productID: productID) ?? Self.genericProfile
     }
 
     private static func loadProfiles() -> [MouseProfileDescriptor] {

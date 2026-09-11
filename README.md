@@ -118,7 +118,7 @@ Settings lets you choose the backup folder and turn on **Show raw HID++ fields**
 
 The app looks for Logitech HID++ devices and then asks each device what it supports. A mouse can be detected without having editable onboard profiles. In that case the app shows the mouse but explains that there is no compatible onboard profile to edit.
 
-The profile editor is intended to work with any Logitech model that exposes the standard onboard profile feature and a layout the app can validate. The catalog contains mappings for current and legacy G-series families, but profile writes remain enabled only for layouts whose HID++ storage has been validated. G600, G700/G700s, and newer HITS/LIGHTFORCE families are named and discoverable but remain read-only until their layer or firmware-specific save format is implemented. Unknown mice fall back to runtime button numbers.
+The profile editor is intended to work with any Logitech model that exposes the standard onboard profile feature and a layout the app can validate. The catalog contains mappings for current and legacy G-series families, but profile writes remain enabled only for layouts whose HID++ storage has been validated. G600, G700/G700s, and newer HITS/LIGHTFORCE families are named and discoverable but remain read-only until their layer or firmware-specific save format is implemented. Unknown non-MX mice fall back to runtime button numbers; MX-series mice stay out of the button editor until a dedicated profile JSON describes their layout.
 
 ## If something goes wrong
 

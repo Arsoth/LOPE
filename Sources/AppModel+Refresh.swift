@@ -32,13 +32,14 @@ extension AppModel {
         busy = true
         loadingProfile = true
         status = "Reading the mouse…"
-        updateInputMonitoringAuthorization()
         // Receiver and Bluetooth HID++ interfaces are protected by macOS
-        // Input Monitoring. Request access on the normal refresh path too,
-        // since a wired G502 can otherwise make the app look healthy while
-        // the other mice are silently denied.
-        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-        updateInputMonitoringAuthorization()
+        // Input Monitoring. Avoid asking an already-authorized app for access
+        // on every refresh; the access request can otherwise delay the first
+        // device enumeration even though no prompt is needed.
+        if !inputMonitoringAuthorized {
+            IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+            updateInputMonitoringAuthorization()
+        }
 
         guard let engine else {
             busy = false
@@ -47,21 +48,58 @@ extension AppModel {
             return
         }
 
-        // A zero profile asks the engine to choose the first enabled slot
-        // when a different device is selected. The editor still needs a
-        // valid picker tag while that asynchronous read is in progress.
-        prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
         refreshTask = Task { [weak self] in
-            let snapshot = await Task.detached(priority: .userInitiated) {
-                Self.makeRefreshSnapshot(
+            let enumeration = await Task.detached(priority: .userInitiated) {
+                Self.makeDeviceEnumerationSnapshot(
                     executable: engine,
                     currentDirectory: currentDirectory,
-                    preferredDeviceIndex: preferredDeviceIndex,
-                    preferredProfileNumber: preferredProfileNumber
+                    preferredDeviceIndex: preferredDeviceIndex
                 )
             }.value
 
             guard !Task.isCancelled, let self,
+                  self.refreshGeneration == generation else { return }
+
+            guard enumeration.errorMessage == nil,
+                  let selectedIndex = enumeration.selectedDeviceIndex,
+                  let selected = enumeration.devices.first(where: { $0.id == selectedIndex }) else {
+                self.applyRefreshSnapshot(RefreshSnapshot(
+                    devices: enumeration.devices,
+                    selectedDeviceIndex: nil,
+                    profileText: nil,
+                    profileError: nil,
+                    dpiText: nil,
+                    dpiError: nil,
+                    selectedProfileNumber: nil,
+                    errorMessage: enumeration.errorMessage,
+                    accessWarning: enumeration.accessWarning
+                ))
+                return
+            }
+
+            // Publish the device list as soon as enumeration completes. The
+            // profile read is slower, but the picker can now populate while
+            // the button editor remains in its explicit loading state.
+            self.devices = enumeration.devices
+            self.selectedDeviceIndex = selected.id
+            self.currentDeviceName = selected.name
+            self.deviceSummary = selected.title
+            self.resetEditorState()
+            self.status = "Found \(selected.name). Reading onboard profile…"
+
+            let snapshot = await Task.detached(priority: .userInitiated) {
+                Self.makeProfileSnapshot(
+                    executable: engine,
+                    currentDirectory: currentDirectory,
+                    devices: enumeration.devices,
+                    selectedDeviceKey: selected.deviceKey,
+                    selectedDeviceIndex: selected.id,
+                    preferredProfileNumber: preferredProfileNumber,
+                    accessWarning: enumeration.accessWarning
+                )
+            }.value
+
+            guard !Task.isCancelled,
                   self.refreshGeneration == generation else { return }
             self.applyRefreshSnapshot(snapshot)
         }
@@ -159,22 +197,6 @@ extension AppModel {
         resetDPIState()
     }
 
-    private func prepareLoadingEditor(profileNumber placeholderProfileNumber: Int) {
-        let placeholderNumber = max(placeholderProfileNumber, 1)
-        profiles = [ProfileChoice(
-            id: placeholderNumber,
-            sector: "Loading…",
-            enabled: true,
-            crcValid: nil
-        )]
-        profileNumber = placeholderNumber
-        baselineProfileEnabled = [placeholderNumber: true]
-        keyInputDrafts.removeAll()
-        buttons = loadingButtonRows()
-        resetDPIState()
-        dpiDetails = "Loading DPI capabilities from the mouse…"
-    }
-
     private func resetDPIState() {
         dpiStages = ["", "", "", "", ""]
         dpiCount = 5
@@ -194,12 +216,11 @@ extension AppModel {
         return "Couldn’t read \(deviceName)’s onboard profile. Is the mouse turned on and awake? Wake it, then choose Refresh."
     }
 
-    private nonisolated static func makeRefreshSnapshot(
+    private nonisolated static func makeDeviceEnumerationSnapshot(
         executable: URL,
         currentDirectory: URL,
-        preferredDeviceIndex: Int,
-        preferredProfileNumber: Int
-    ) -> RefreshSnapshot {
+        preferredDeviceIndex: Int
+    ) -> DeviceEnumerationSnapshot {
         do {
             let list = try runDeviceListWithRetry(
                 executable: executable,
@@ -207,28 +228,19 @@ extension AppModel {
             )
             let discovered = parseDeviceChoices(list)
             let accessWarning = list.contains("macOS denied HID access")
-            guard let selected = discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first else {
-                return RefreshSnapshot(
-                    devices: [], selectedDeviceIndex: nil, profileText: nil, profileError: nil,
-                    dpiText: nil, dpiError: nil, selectedProfileNumber: nil, errorMessage: nil,
-                    accessWarning: accessWarning
-                )
-            }
-
-            return makeProfileSnapshot(
-                executable: executable,
-                currentDirectory: currentDirectory,
+            let selectedIndex = (discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first)?.id
+            return DeviceEnumerationSnapshot(
                 devices: discovered,
-                selectedDeviceKey: selected.deviceKey,
-                selectedDeviceIndex: selected.id,
-                preferredProfileNumber: preferredProfileNumber,
-                accessWarning: accessWarning
+                selectedDeviceIndex: selectedIndex,
+                accessWarning: accessWarning,
+                errorMessage: nil
             )
         } catch {
-            return RefreshSnapshot(
-                devices: [], selectedDeviceIndex: nil, profileText: nil, profileError: nil,
-                dpiText: nil, dpiError: nil, selectedProfileNumber: nil,
-                errorMessage: errorMessage(for: error), accessWarning: false
+            return DeviceEnumerationSnapshot(
+                devices: [],
+                selectedDeviceIndex: nil,
+                accessWarning: false,
+                errorMessage: errorMessage(for: error)
             )
         }
     }

@@ -15,13 +15,12 @@ struct ContentView: View {
             Divider()
             TabView {
                 ZStack {
-                    if model.profiles.isEmpty && !model.loadingProfile {
+                    if model.loadingProfile {
+                        loadingProfileState
+                    } else if !model.shouldShowButtonEditor {
                         emptyState
                     } else {
                         buttonsPane
-                    }
-                    if model.loadingProfile {
-                        loadingProfileOverlay
                     }
                 }
                 .tabItem { Label("Buttons", systemImage: "cursorarrow.click") }
@@ -95,25 +94,17 @@ struct ContentView: View {
         }
     }
 
-    private var loadingProfileOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.28)
-            VStack(spacing: 10) {
-                ProgressView()
-                    .controlSize(.regular)
-                Text("Loading profiles from mouse…")
-                    .font(.headline)
-                Text(model.currentDeviceName.isEmpty ? "Reading onboard assignments and DPI data" : "Reading \(model.currentDeviceName)")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 22)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .shadow(radius: 12)
+    private var loadingProfileState: some View {
+        VStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.regular)
+            Text("Loading profiles from mouse…")
+                .font(.headline)
+            Text(model.currentDeviceName.isEmpty ? "Finding Logitech mice and reading onboard data" : "Reading \(model.currentDeviceName)")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
     }
 
     private var emptyState: some View {
@@ -122,11 +113,9 @@ struct ContentView: View {
             Image(systemName: "computermouse")
                 .font(.system(size: 42))
                 .foregroundStyle(.secondary)
-            Text(model.devices.isEmpty ? "No editable Logitech mouse detected" : "No editable onboard profile")
+            Text(emptyStateTitle)
                 .font(.title3.weight(.medium))
-            Text(model.devices.isEmpty
-                 ? "The app lists Logitech mice and hides USB receiver entries. macOS may also be blocking access even when the mouse is connected."
-                 : "\(model.deviceSummary) is connected, but it does not expose an onboard profile format this app can edit.")
+            Text(emptyStateMessage)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 560)
@@ -136,6 +125,24 @@ struct ContentView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyStateTitle: String {
+        if model.devices.isEmpty { return "No editable Logitech mouse detected" }
+        if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
+            return "No MX mouse profile descriptor"
+        }
+        return "No editable onboard profile"
+    }
+
+    private var emptyStateMessage: String {
+        if model.devices.isEmpty {
+            return "The app lists Logitech mice and hides USB receiver entries. macOS may also be blocking access even when the mouse is connected."
+        }
+        if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
+            return "\(model.deviceSummary) is connected, but LOPE does not have a profile JSON for this MX mouse’s button layout yet."
+        }
+        return "\(model.deviceSummary) is connected, but it does not expose an onboard profile format this app can edit."
     }
 
     private var buttonsPane: some View {

@@ -38,8 +38,31 @@ final class AppModel: ObservableObject {
     var refreshGeneration = 0
 
     var currentMouseProfile: MouseProfileDescriptor {
+        currentCatalogProfile ?? MouseProfileCatalog.genericProfile
+    }
+
+    var currentCatalogProfile: MouseProfileDescriptor? {
         let productID = devices.first(where: { $0.id == selectedDeviceIndex })?.productID ?? ""
-        return MouseProfileCatalog.shared.profile(deviceName: currentDeviceName, productID: productID)
+        guard !currentDeviceName.isEmpty || !productID.isEmpty else { return nil }
+        return MouseProfileCatalog.shared.matchingProfile(deviceName: currentDeviceName, productID: productID)
+    }
+
+    var hasSpecificMouseProfile: Bool {
+        currentCatalogProfile != nil
+    }
+
+    var isMXSeriesMouse: Bool {
+        let tokens = currentDeviceName.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+        return tokens.contains("mx")
+    }
+
+    var shouldShowButtonEditor: Bool {
+        guard !loadingProfile, !profiles.isEmpty else { return false }
+        // MX mice do not share the G-series physical-button layout. Do not
+        // present runtime-numbered fallback controls until a dedicated JSON
+        // descriptor has been added to the catalog.
+        return !isMXSeriesMouse || hasSpecificMouseProfile
     }
 
     var engine: URL? {
