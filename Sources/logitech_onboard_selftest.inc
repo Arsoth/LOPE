@@ -4,18 +4,6 @@ static int run_self_test(void) {
         fprintf(stderr, "CRC self-test failed\n");
         return 1;
     }
-    Reply short_pairing_reply;
-    memset(&short_pairing_reply, 0, sizeof(short_pairing_reply));
-    short_pairing_reply.status = REPLY_OK;
-    short_pairing_reply.length = 3;
-    Reply empty_pairing_reply;
-    memset(&empty_pairing_reply, 0, sizeof(empty_pairing_reply));
-    empty_pairing_reply.status = REPLY_HIDPP20_ERROR;
-    if (receiver_pairing_reply_is_definitive_empty(short_pairing_reply) ||
-        !receiver_pairing_reply_is_definitive_empty(empty_pairing_reply)) {
-        fprintf(stderr, "receiver pairing fallback self-test failed\n");
-        return 1;
-    }
     uint8_t frame[LONG_REPORT_BYTES];
     const uint8_t ping_params[3] = {0x00, 0x00, 0x5A};
     size_t frame_length = build_hidpp_frame(false, 0x01, 0x001B, ping_params, sizeof(ping_params), frame);

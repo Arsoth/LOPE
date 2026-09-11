@@ -116,17 +116,6 @@ static bool receiver_pairing_reply_is_present(Reply reply) {
     return reply.status == REPLY_OK && reply.length >= 8;
 }
 
-static bool receiver_pairing_reply_is_definitive_empty(Reply reply) {
-    // Known receiver firmware reports an empty pairing record as a protocol
-    // error. A successful but undersized record is ambiguous: some
-    // Lightspeed receivers return a short paired-device record, so keep the
-    // compatibility ping for every successful response. Timeouts and I/O
-    // errors remain eligible for the same fallback because the receiver may
-    // simply be waking up.
-    return reply.status == REPLY_HIDPP10_ERROR ||
-           reply.status == REPLY_HIDPP20_ERROR;
-}
-
 static int add_device(Device *devices,
                       size_t *count,
                       HidInterface *iface,
@@ -559,27 +548,31 @@ static int discover_devices(HidContext *context,
                 log_receiver_register_reply(iface, 0x02B5,
                                             (uint8_t)(0x20 + slot - 1),
                                             pairing_reply);
-                if (receiver_pairing_reply_is_present(pairing_reply)) {
-                    // Pairing information is more reliable than a routed ping:
-                    // a sleeping or busy mouse can return RESOURCE_ERROR even
-                    // though it is paired and its HID++ endpoint is usable.
-                    add_receiver_slot_device(devices, count, iface, slot,
-                                             pairing_reply, inspect_features);
-                    continue;
-                }
-                // C5xx receivers have a reliable pairing table. Do not issue
-                // a second, potentially one-second ping for a slot that the
-                // table has already identified as empty. Keep the ping for
-                // unknown/name-only receivers and transport failures.
-                if (is_receiver_product(iface->product_id) &&
-                    receiver_pairing_reply_is_definitive_empty(pairing_reply)) {
-                    continue;
-                }
+                bool pairing_present = receiver_pairing_reply_is_present(pairing_reply);
+                // The pairing table identifies the slot, but the routed ping
+                // still primes the LIGHTSPEED path before feature requests.
+                // G603 firmware can otherwise be listed but fail its first
+                // 0x8100 profile read after the fast startup path.
                 double protocol = 0;
                 uint8_t resolved_device_number = slot;
                 if (ping_interface(iface, slot, 1.0, &protocol, &resolved_device_number)) {
-                    add_device(devices, count, iface, resolved_device_number, slot,
-                               protocol, inspect_features);
+                    // Empty receiver slots answer the compatibility ping with
+                    // a HID++ 1.0 error. Do not expose those errors as mice;
+                    // a real profile-capable slot must answer HID++ 2.0 unless
+                    // the pairing table already confirmed it.
+                    if (pairing_present || protocol >= 2.0) {
+                        size_t before = *count;
+                        add_device(devices, count, iface, resolved_device_number, slot,
+                                   protocol, inspect_features);
+                        if (*count > before && devices[*count - 1].name[0] == '\0') {
+                            receiver_device_name(&devices[*count - 1], slot);
+                        }
+                    }
+                } else if (pairing_present) {
+                    // Preserve the positive pairing-table result if the
+                    // mouse is asleep; the profile-read retry can wake it.
+                    add_receiver_slot_device(devices, count, iface, slot,
+                                             pairing_reply, inspect_features);
                 }
             }
 
@@ -640,14 +633,24 @@ static int discover_device_by_key(HidContext *context,
             Reply pairing_reply = receiver_register_read(
                 iface, 0x02B5, true,
                 (uint8_t)(RECEIVER_INFO_PAIRING + device_number - 1));
-            if (receiver_pairing_reply_is_present(pairing_reply)) {
-                // Match the list path: pairing presence is authoritative even
-                // when a routed ping reports RESOURCE_ERROR for a sleeping
-                // G603/G604.
-                add_receiver_slot_device(devices, count, iface, device_number,
-                                         pairing_reply, true);
+            bool pairing_present = receiver_pairing_reply_is_present(pairing_reply);
+            if (ping_interface(iface, device_number, 1.0,
+                               &protocol, &resolved_device_number)) {
+                if (pairing_present || protocol >= 2.0) {
+                    size_t before = *count;
+                    add_device(devices, count, iface, resolved_device_number,
+                               device_number, protocol, true);
+                    if (*count > before && devices[*count - 1].name[0] == '\0') {
+                        receiver_device_name(&devices[*count - 1], device_number);
+                    }
+                }
                 return 1;
             }
+            if (pairing_present) {
+                add_receiver_slot_device(devices, count, iface, device_number,
+                                         pairing_reply, true);
+            }
+            return 1;
         }
         if (ping_interface(iface, device_number, 1.0, &protocol, &resolved_device_number)) {
             add_device(devices, count, iface, resolved_device_number, device_number,
