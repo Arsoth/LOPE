@@ -176,7 +176,7 @@ struct ContentView: View {
     private var buttonsPane: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Profiles, buttons and DPI")
+                Text("Button assignments")
                     .font(.headline)
                 Spacer()
                 Button("Revert edits") { model.reloadSelectedProfile() }
@@ -184,7 +184,7 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(!model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave)
             }
-            Text("Modify profiles, button outputs and DPI together, then save once. The original data is backed up automatically.")
+            Text("Change button outputs and DPI together, then save once. The original data is backed up automatically.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             if !model.currentMouseProfile.profileIO.canSave {
@@ -207,6 +207,26 @@ struct ContentView: View {
                 .padding(.vertical, 4)
             }
             .id(model.selectedDeviceIndex)
+
+            HStack(spacing: 8) {
+                Spacer()
+                if !model.inputMonitoringAuthorized {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .help("Input Monitoring permission is required to detect mouse presses while LOPE is in the background.")
+                }
+                Toggle(isOn: Binding(
+                    get: { model.highlightButtonPresses },
+                    set: { model.setHighlightButtonPresses($0) })) {
+                    Label(
+                        model.highlightButtonPresses ? "Highlighting on" : "Highlight presses",
+                        systemImage: "sparkles"
+                    )
+                }
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("When enabled, the matching button row glows for about a second after you press that mouse button.")
+            }
         }
         .padding(.top, 4)
     }
@@ -214,15 +234,16 @@ struct ContentView: View {
     private func buttonRow(_ buttonID: Int) -> some View {
         Group {
             if let button = model.buttons.first(where: { $0.id == buttonID }) {
+                let isHighlighted = model.highlightedButtonID == button.id
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Text("Button \(button.id)")
                             .font(.body.weight(.medium))
-                            .frame(width: 78, alignment: .leading)
+                            .frame(width: 76, alignment: .leading)
                         Text(button.label)
                             .font(.callout)
                             .foregroundStyle(.secondary)
-                            .frame(width: 210, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .lineLimit(1)
                         Picker("", selection: Binding(
                             get: { model.buttons.first(where: { $0.id == buttonID })?.draftChoice ?? "custom" },
@@ -236,7 +257,7 @@ struct ContentView: View {
                             Text("Custom").tag("custom")
                         }
                         .labelsHidden()
-                        .frame(width: 215)
+                        .frame(width: 190)
                         if model.showAdvancedFields {
                             TextField("8 hex digits", text: Binding(
                                 get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
@@ -253,8 +274,26 @@ struct ContentView: View {
                         keyboardChordEditor(buttonID)
                     }
                 }
-                .padding(10)
-                .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isHighlighted ? Color.accentColor.opacity(0.2) : Color.white.opacity(0.045))
+                )
+                .overlay(alignment: .leading) {
+                    Capsule(style: .continuous)
+                        .fill(isHighlighted ? Color.accentColor : Color.clear)
+                        .frame(width: 3)
+                        .padding(.vertical, 7)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(
+                            isHighlighted ? Color.accentColor.opacity(0.7) : Color.white.opacity(0.055),
+                            lineWidth: isHighlighted ? 1 : 0.5
+                        )
+                }
+                .animation(.easeOut(duration: 0.25), value: isHighlighted)
             }
         }
     }
@@ -335,125 +374,163 @@ struct ContentView: View {
     }
 
     private func keyboardChordEditor(_ buttonID: Int) -> some View {
-        HStack(spacing: 8) {
-            Text("Custom")
-                .font(.caption.weight(.medium))
-                .frame(width: 78, alignment: .leading)
-            ForEach(model.modifierChoices) { modifier in
-                Toggle(modifier.label, isOn: Binding(
-                    get: {
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return false }
-                        return model.isModifierEnabled(buttonIndex: index, bit: modifier.id)
-                    },
-                    set: { enabled in
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                        model.setModifier(buttonIndex: index, bit: modifier.id, enabled: enabled)
-                    }))
-                    .toggleStyle(.checkbox)
-                    .disabled({
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return true }
-                        return !model.isKeyboardRecord(buttonIndex: index)
-                    }())
-            }
-            TextField("Key name", text: Binding(
-                get: {
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return "" }
-                    return model.keyboardKeyText(buttonIndex: index)
-                },
-                set: { text in
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                    model.setKeyboardKeyText(buttonIndex: index, text: text)
-                }))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 130)
-            Text("F key")
-                .font(.caption)
-            Picker("", selection: Binding(
-                get: {
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
-                    return model.functionKeyChoice(buttonIndex: index)
-                },
-                set: { number in
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                    model.setFunctionKey(buttonIndex: index, number: number)
-                })) {
-                Text("None").tag(0)
-                ForEach(1...24, id: \.self) { number in
-                    Text("F\(number)").tag(number)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Label("Custom keyboard output", systemImage: "keyboard")
+                    .font(.caption.weight(.medium))
+                Spacer()
+                Text("Modifiers")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ForEach(model.modifierChoices) { modifier in
+                    Toggle(modifier.label, isOn: Binding(
+                        get: {
+                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return false }
+                            return model.isModifierEnabled(buttonIndex: index, bit: modifier.id)
+                        },
+                        set: { enabled in
+                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                            model.setModifier(buttonIndex: index, bit: modifier.id, enabled: enabled)
+                        }))
+                        .toggleStyle(.checkbox)
+                        .controlSize(.small)
+                        .disabled({
+                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return true }
+                            return !model.isKeyboardRecord(buttonIndex: index)
+                        }())
                 }
             }
-            .labelsHidden()
-            .frame(width: 92)
-            Text("Special")
-                .font(.caption)
-            Picker("", selection: Binding(
-                get: {
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
-                    return model.specialKeyChoice(buttonIndex: index)
-                },
-                set: { key in
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                    model.setSpecialKey(buttonIndex: index, key: key)
-                })) {
-                Text("None").tag(0)
-                ForEach(model.specialKeyboardKeys) { key in
-                    Text(key.label).tag(Int(key.id))
+
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Typed key")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("A, Tab, or 0x04", text: Binding(
+                        get: {
+                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return "" }
+                            return model.keyboardKeyText(buttonIndex: index)
+                        },
+                        set: { text in
+                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                            model.setKeyboardKeyText(buttonIndex: index, text: text)
+                        }))
+                        .textFieldStyle(.roundedBorder)
+                        .controlSize(.small)
+                        .frame(width: 150)
                 }
+
+                keyboardChoiceCard(buttonID: buttonID, title: "Function key", systemImage: "f.square")
+                keyboardChoiceCard(buttonID: buttonID, title: "Special key", systemImage: "command.square")
+                Spacer()
             }
-            .labelsHidden()
-            .frame(width: 142)
         }
-        .padding(.leading, 0)
-        .help("Type a key name such as A or F13, choose an F key or special key, and add modifiers with the checkboxes.")
+        .padding(.leading, 76)
+        .padding(.top, 2)
+        .help("Type a key name such as A or F13, choose a function or special key, and add modifiers with the checkboxes.")
+    }
+
+    private func keyboardChoiceCard(buttonID: Int, title: String, systemImage: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: systemImage)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if title == "Function key" {
+                Picker("", selection: Binding(
+                    get: {
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
+                        return model.functionKeyChoice(buttonIndex: index)
+                    },
+                    set: { number in
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                        model.setFunctionKey(buttonIndex: index, number: number)
+                    })) {
+                    Text("None").tag(0)
+                    ForEach(1...24, id: \.self) { number in
+                        Text("F\(number)").tag(number)
+                    }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(width: 112)
+            } else {
+                Picker("", selection: Binding(
+                    get: {
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
+                        return model.specialKeyChoice(buttonIndex: index)
+                    },
+                    set: { key in
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                        model.setSpecialKey(buttonIndex: index, key: key)
+                    })) {
+                    Text("None").tag(0)
+                    ForEach(model.specialKeyboardKeys) { key in
+                        Text(key.label).tag(Int(key.id))
+                    }
+                }
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(width: 156)
+            }
+        }
     }
 
     private var dpiEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Onboard DPI stages")
-                    .font(.headline)
-            }
-            Text("Choose one to five active stages for the selected profile. Unused slots are cleared.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        Picker("Active stages", selection: Binding(
-                            get: { model.dpiCount },
-                            set: { model.setDPIStageCount($0) })) {
-                            ForEach(1...5, id: \.self) { count in
-                                Text("\(count) of 5").tag(count)
-                            }
-                        }
-                        Text("of 5 stages active")
-                            .foregroundStyle(.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Onboard DPI")
+                        .font(.headline)
+                    Text("Set the active sensitivity stages for this profile.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("Active stages", selection: Binding(
+                    get: { model.dpiCount },
+                    set: { model.setDPIStageCount($0) })) {
+                    ForEach(1...5, id: \.self) { count in
+                        Text("\(count) stages").tag(count)
                     }
-                    HStack(spacing: 10) {
-                        ForEach(0..<model.dpiCount, id: \.self) { index in
-                            VStack(spacing: 4) {
-                                Text("Stage \(index + 1)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                }
+                .labelsHidden()
+                .controlSize(.small)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    ForEach(0..<model.dpiCount, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Stage \(index + 1)")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
                                 TextField("DPI", text: Binding(
                                     get: { model.dpiStages[index] },
                                     set: { model.dpiStages[index] = $0.filter { $0.isNumber } }))
                                     .textFieldStyle(.roundedBorder)
-                                    .frame(width: 92)
+                                    .controlSize(.small)
+                                Text("DPI")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
                             }
                         }
-                    }
-                    HStack(spacing: 14) {
-                        Picker("Default stage", selection: $model.defaultStage) {
-                            ForEach(1...model.dpiCount, id: \.self) { Text("Stage \($0)").tag($0) }
-                        }
-                        Picker("DPI-shift stage", selection: $model.shiftStage) {
-                            ForEach(1...model.dpiCount, id: \.self) { Text("Stage \($0)").tag($0) }
-                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                 }
-                .padding(4)
+
+                HStack(spacing: 8) {
+                    dpiStagePicker(title: "Default", selection: $model.defaultStage)
+                    dpiStagePicker(title: "DPI shift", selection: $model.shiftStage)
+                    Spacer()
+                }
             }
+            .padding(12)
+            .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+
             Text(model.dpiDetails)
                 .font(.system(.callout, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -461,6 +538,22 @@ struct ContentView: View {
             Spacer()
         }
         .padding(.top, 4)
+    }
+
+    private func dpiStagePicker(title: String, selection: Binding<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Picker(title, selection: selection) {
+                ForEach(1...model.dpiCount, id: \.self) { stage in
+                    Text("Stage \(stage)").tag(stage)
+                }
+            }
+            .labelsHidden()
+            .controlSize(.small)
+            .frame(width: 126)
+        }
     }
 
     private var backupsPane: some View {

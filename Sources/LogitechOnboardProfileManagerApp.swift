@@ -26,6 +26,8 @@ final class AppModel: ObservableObject {
     @Published var backups: [BackupEntry] = []
     @Published var backupDirectoryPath = ""
     @Published var showAdvancedFields = false
+    @Published var highlightButtonPresses = false
+    @Published var highlightedButtonID: Int?
 
     var keyInputDrafts: [Int: String] = [:]
     var baselineProfileEnabled: [Int: Bool] = [:]
@@ -35,7 +37,10 @@ final class AppModel: ObservableObject {
     var baselineShiftStage = 1
     var currentDeviceName = ""
     var refreshTask: Task<Void, Never>?
+    var highlightExpiryTask: Task<Void, Never>?
     var refreshGeneration = 0
+    var globalMouseMonitor: Any?
+    var localMouseMonitor: Any?
 
     var currentMouseProfile: MouseProfileDescriptor {
         currentCatalogProfile ?? MouseProfileCatalog.genericProfile
@@ -93,9 +98,14 @@ final class AppModel: ObservableObject {
         backupDirectoryPath = selectedDirectory.path
         let advancedFieldsKey = "\(AppConstants.defaultsPrefix).showAdvancedFields"
         showAdvancedFields = defaults.bool(forKey: advancedFieldsKey)
+        let highlightButtonPressesKey = "\(AppConstants.defaultsPrefix).highlightButtonPresses"
+        highlightButtonPresses = defaults.bool(forKey: highlightButtonPressesKey)
         inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
         refreshBackups()
+        if highlightButtonPresses {
+            startButtonPressMonitor()
+        }
         Task { @MainActor in
             initialRefresh()
         }

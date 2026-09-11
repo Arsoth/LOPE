@@ -118,12 +118,13 @@ static bool receiver_pairing_reply_is_present(Reply reply) {
 
 static bool receiver_pairing_reply_is_definitive_empty(Reply reply) {
     // Known receiver firmware reports an empty pairing record as a protocol
-    // error. A successful but undersized record is also not a paired-device
-    // record. Timeouts and I/O errors remain eligible for the compatibility
-    // ping below because the receiver may simply be waking up.
+    // error. A successful but undersized record is ambiguous: some
+    // Lightspeed receivers return a short paired-device record, so keep the
+    // compatibility ping for every successful response. Timeouts and I/O
+    // errors remain eligible for the same fallback because the receiver may
+    // simply be waking up.
     return reply.status == REPLY_HIDPP10_ERROR ||
-           reply.status == REPLY_HIDPP20_ERROR ||
-           (reply.status == REPLY_OK && reply.length < 8);
+           reply.status == REPLY_HIDPP20_ERROR;
 }
 
 static int add_device(Device *devices,

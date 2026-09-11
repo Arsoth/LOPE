@@ -549,6 +549,7 @@ extension AppModel {
 
     func updateInputMonitoringAuthorization() {
         inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+        refreshButtonPressMonitor()
     }
 
     func reloadSelectedProfile() {
