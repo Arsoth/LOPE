@@ -15,12 +15,17 @@ struct ContentView: View {
             Divider()
             TabView {
                 ZStack {
-                    if model.loadingProfile {
+                    if model.loadingProfile && model.buttons.isEmpty {
                         loadingProfileState
-                    } else if !model.shouldShowButtonEditor {
+                    } else if !model.loadingProfile && !model.shouldShowButtonEditor {
                         emptyState
                     } else {
                         buttonsPane
+                            .opacity(model.loadingProfile ? 0.72 : 1)
+                            .allowsHitTesting(!model.loadingProfile)
+                    }
+                    if model.loadingProfile && !model.buttons.isEmpty {
+                        loadingProfileOverlay
                     }
                 }
                 .tabItem { Label("Buttons", systemImage: "cursorarrow.click") }
@@ -76,7 +81,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(width: 310)
-                .disabled(model.busy)
+                .disabled(model.devices.isEmpty)
             }
             if !model.profiles.isEmpty {
                 Picker("Profile", selection: $model.profileNumber) {
@@ -92,6 +97,29 @@ struct ContentView: View {
                 .disabled(model.busy)
             if model.busy { ProgressView().controlSize(.small) }
         }
+    }
+
+    private var loadingProfileOverlay: some View {
+        ZStack {
+            Rectangle()
+                .fill(.clear)
+                .contentShape(Rectangle())
+            VStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.regular)
+                Text("Loading profiles from mouse…")
+                    .font(.headline)
+                Text(model.currentDeviceName.isEmpty ? "Finding Logitech mice and reading onboard data" : "Reading \(model.currentDeviceName)")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 22)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .shadow(radius: 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
     }
 
     private var loadingProfileState: some View {

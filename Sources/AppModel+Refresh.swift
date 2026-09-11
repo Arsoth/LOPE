@@ -48,6 +48,12 @@ extension AppModel {
             return
         }
 
+        // Keep the identified device's physical button layout visible while
+        // the slower profile read is in flight. A zero profile lets the
+        // engine choose the first enabled slot, so use a valid placeholder
+        // number until the read reports the actual slot.
+        prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
+
         refreshTask = Task { [weak self] in
             let enumeration = await Task.detached(priority: .userInitiated) {
                 Self.makeDeviceEnumerationSnapshot(
@@ -84,7 +90,7 @@ extension AppModel {
             self.selectedDeviceIndex = selected.id
             self.currentDeviceName = selected.name
             self.deviceSummary = selected.title
-            self.resetEditorState()
+            self.prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
             self.status = "Found \(selected.name). Reading onboard profile…"
 
             let snapshot = await Task.detached(priority: .userInitiated) {
@@ -195,6 +201,22 @@ extension AppModel {
         baselineProfileEnabled.removeAll()
         keyInputDrafts.removeAll()
         resetDPIState()
+    }
+
+    private func prepareLoadingEditor(profileNumber placeholderProfileNumber: Int) {
+        let placeholderNumber = max(placeholderProfileNumber, 1)
+        profiles = [ProfileChoice(
+            id: placeholderNumber,
+            sector: "Loading…",
+            enabled: true,
+            crcValid: nil
+        )]
+        profileNumber = placeholderNumber
+        baselineProfileEnabled = [placeholderNumber: true]
+        keyInputDrafts.removeAll()
+        buttons = loadingButtonRows()
+        resetDPIState()
+        dpiDetails = "Loading DPI capabilities from the mouse…"
     }
 
     private func resetDPIState() {
