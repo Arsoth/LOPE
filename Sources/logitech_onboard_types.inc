@@ -199,6 +199,7 @@ typedef struct {
     bool headers_only;
     bool summary_only;
     bool sensor_only;
+    bool include_dpi;
     int button;
     int dpi_default;
     int dpi_shift;

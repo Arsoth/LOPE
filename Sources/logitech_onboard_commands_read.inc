@@ -1,3 +1,5 @@
+static void print_supported_dpi(const uint16_t *values, size_t count);
+
 static int run_list(void) {
     HidContext context;
     if (!hid_context_create(&context)) {
@@ -5,7 +7,10 @@ static int run_list(void) {
     }
     Device devices[MAX_DEVICES];
     size_t count = 0;
-    discover_devices(&context, -1, devices, &count);
+    // Listing only needs stable identities and pairing presence. Capability
+    // discovery is deferred until the selected device is queried, avoiding
+    // dozens of HID++ requests on every GUI refresh.
+    discover_devices(&context, -1, devices, &count, false);
     size_t vendor_interfaces = 0;
     for (size_t i = 0; i < context.count; i++) {
         if (context.items[i].is_vendor) {
@@ -144,17 +149,33 @@ static int run_profiles(const Options *options) {
     }
     size_t first = 0;
     size_t last = header_count;
-    if (options->profile > 0) {
-        if ((size_t)options->profile > header_count) {
+    int requested_profile = options->profile;
+    if (options->include_dpi && requested_profile > 0 &&
+        (size_t)requested_profile > header_count) {
+        // The GUI keeps the last selected profile while the user changes
+        // devices. If that slot does not exist on the new mouse, use its
+        // first enabled slot and report the actual selection below.
+        requested_profile = 0;
+    }
+    if (requested_profile > 0) {
+        if ((size_t)requested_profile > header_count) {
             fprintf(stderr, "profile %d is out of range 1..%zu\n", options->profile, header_count);
             hid_context_release(&context);
             return 1;
         }
-        first = (size_t)options->profile - 1;
+        first = (size_t)requested_profile - 1;
+        last = first + 1;
+    } else if (options->include_dpi) {
+        for (size_t i = 0; i < header_count; i++) {
+            if (headers[i].enabled != 0) {
+                first = i;
+                break;
+            }
+        }
         last = first + 1;
     }
     printf("Onboard profiles for %s:\n", device_label(device));
-    if (options->headers_only) {
+    if (options->headers_only && !options->include_dpi) {
         for (size_t i = 0; i < header_count; i++) {
             printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
                    i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
@@ -168,8 +189,26 @@ static int run_profiles(const Options *options) {
             ? load_profile_summary_with_headers(device, &info, headers, header_count, (int)i + 1, &profile)
             : load_profile_with_headers(device, &info, headers, header_count, (int)i + 1, &profile);
         if (loaded) {
+            if (options->include_dpi) {
+                printf("Selected profile: %zu\n", profile.selected_header + 1);
+            }
             print_profile_summary(&profile, true);
             free(profile.data);
+        }
+    }
+    if (options->include_dpi) {
+        uint16_t values[MAX_DPI_VALUES];
+        size_t value_count = 0;
+        uint8_t sensor_count = 0;
+        uint16_t current = 0;
+        if (adjustable_dpi_values(device, values, &value_count, MAX_DPI_VALUES,
+                                  &sensor_count, &current)) {
+            printf("Device: %s\n", device_label(device));
+            printf("DPI sensors: %u\n", sensor_count);
+            print_supported_dpi(values, value_count);
+            printf("Current sensor 1 DPI: %u\n", current);
+        } else {
+            printf("DPI error: adjustable DPI feature 0x2201 is unavailable or unreadable\n");
         }
     }
     hid_context_release(&context);
@@ -285,4 +324,3 @@ static int parse_dpi_values(const char *text, uint16_t values[5], size_t *count_
     }
     return 1;
 }
-

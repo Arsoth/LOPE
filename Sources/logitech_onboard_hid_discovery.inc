@@ -116,6 +116,14 @@ static bool receiver_pairing_reply_is_present(Reply reply) {
     return reply.status == REPLY_OK && reply.length >= 8;
 }
 
+static int add_device(Device *devices,
+                      size_t *count,
+                      HidInterface *iface,
+                      uint8_t device_number,
+                      uint8_t request_device_number,
+                      double protocol,
+                      bool inspect_features);
+
 static void receiver_device_name(Device *device, uint8_t slot) {
     Reply reply = receiver_register_read(device->iface,
                                          REGISTER_RECEIVER_INFO,
@@ -144,7 +152,8 @@ static bool add_receiver_slot_device(Device *devices,
                                      size_t *count,
                                      HidInterface *iface,
                                      uint8_t slot,
-                                     Reply pairing_reply) {
+                                     Reply pairing_reply,
+                                     bool inspect_features) {
     if (!receiver_pairing_reply_is_present(pairing_reply)) {
         return false;
     }
@@ -152,7 +161,7 @@ static bool add_receiver_slot_device(Device *devices,
     // Pairing information is the authoritative presence signal. A routed
     // ping can legitimately return RESOURCE_ERROR while the receiver still
     // has a paired device, so do not require ping success to list it.
-    add_device(devices, count, iface, slot, slot, 2.0);
+    add_device(devices, count, iface, slot, slot, 2.0, inspect_features);
     if (*count == before) {
         return false;
     }
@@ -410,7 +419,8 @@ static int add_device(Device *devices,
                       HidInterface *iface,
                       uint8_t device_number,
                       uint8_t request_device_number,
-                      double protocol) {
+                      double protocol,
+                      bool inspect_features) {
     if (*count >= MAX_DEVICES) {
         return 0;
     }
@@ -421,7 +431,7 @@ static int add_device(Device *devices,
     device->request_device_number = request_device_number;
     device->protocol = protocol;
     device->prefer_long_reports = iface->prefer_long_reports;
-    if (protocol >= 2.0) {
+    if (inspect_features && protocol >= 2.0) {
         discover_features(device);
         device_name(device);
     }
@@ -498,7 +508,11 @@ static bool parse_device_key(const char *text,
     return true;
 }
 
-static int discover_devices(HidContext *context, int requested_slot, Device *devices, size_t *count) {
+static int discover_devices(HidContext *context,
+                            int requested_slot,
+                            Device *devices,
+                            size_t *count,
+                            bool inspect_features) {
     *count = 0;
     open_vendor_channels(context);
     for (size_t i = 0; i < context->count; i++) {
@@ -512,7 +526,7 @@ static int discover_devices(HidContext *context, int requested_slot, Device *dev
         // are unavailable, rather than silently dropping the mouse.
         if (!iface->channel_open) {
             if (iface->is_mouse && !is_receiver_interface(iface)) {
-                add_device(devices, count, iface, 0xFF, 0xFF, 0.0);
+                add_device(devices, count, iface, 0xFF, 0xFF, 0.0, inspect_features);
             }
             continue;
         }
@@ -523,25 +537,30 @@ static int discover_devices(HidContext *context, int requested_slot, Device *dev
                                1.0,
                                &protocol, &resolved_device_number)) {
                 add_device(devices, count, iface, resolved_device_number,
-                           (uint8_t)requested_slot, protocol);
+                           (uint8_t)requested_slot, protocol, inspect_features);
             }
             continue;
         }
         if (is_receiver_interface(iface)) {
-            Reply connection_reply = receiver_register_read(iface, 0x0002, false, 0);
-            log_receiver_register_reply(iface, 0x0002, 0, connection_reply);
-            Reply receiver_info_reply = receiver_register_read(iface, 0x02B5, true, 0x03);
-            log_receiver_register_reply(iface, 0x02B5, 0x03, receiver_info_reply);
             for (uint8_t slot = 1; slot <= receiver_slot_limit(iface); slot++) {
                 Reply pairing_reply = receiver_register_read(iface, 0x02B5, true,
                                                               (uint8_t)(0x20 + slot - 1));
                 log_receiver_register_reply(iface, 0x02B5,
                                             (uint8_t)(0x20 + slot - 1),
                                             pairing_reply);
+                if (receiver_pairing_reply_is_present(pairing_reply)) {
+                    // Pairing information is more reliable than a routed ping:
+                    // a sleeping or busy mouse can return RESOURCE_ERROR even
+                    // though it is paired and its HID++ endpoint is usable.
+                    add_receiver_slot_device(devices, count, iface, slot,
+                                             pairing_reply, inspect_features);
+                    continue;
+                }
                 double protocol = 0;
                 uint8_t resolved_device_number = slot;
                 if (ping_interface(iface, slot, 1.0, &protocol, &resolved_device_number)) {
-                    add_device(devices, count, iface, resolved_device_number, slot, protocol);
+                    add_device(devices, count, iface, resolved_device_number, slot,
+                               protocol, inspect_features);
                 }
             }
         }
@@ -555,12 +574,13 @@ static int discover_devices(HidContext *context, int requested_slot, Device *dev
             uint8_t reported_device_number = is_receiver_interface(iface)
                 ? 0xFF
                 : resolved_device_number;
-            add_device(devices, count, iface, reported_device_number, 0xFF, protocol);
+            add_device(devices, count, iface, reported_device_number, 0xFF,
+                       protocol, inspect_features);
         } else if (iface->is_mouse && !is_receiver_interface(iface)) {
             // Bluetooth and some direct wireless mice expose a normal mouse
             // collection even when HID++ ping is unavailable. They remain
             // selectable, but profile operations will correctly fail later.
-            add_device(devices, count, iface, 0xFF, 0xFF, 0.0);
+            add_device(devices, count, iface, 0xFF, 0xFF, 0.0, inspect_features);
         }
     }
     return 1;
@@ -578,24 +598,43 @@ static int discover_device_by_key(HidContext *context,
         fprintf(stderr, "invalid device key '%s'\n", key == NULL ? "" : key);
         return 0;
     }
-    open_vendor_channels(context);
     for (size_t i = 0; i < context->count; i++) {
         HidInterface *iface = &context->items[i];
-        if (!iface->is_vendor || !iface->channel_open ||
+        if (!iface->is_vendor ||
             iface->location_id != location_id ||
             iface->registry_id != registry_id) {
             continue;
         }
+        if (!iface->channel_open && !channel_open(&iface->channel, iface->device)) {
+            return 1;
+        }
+        iface->channel_open = true;
         double protocol = 0;
         uint8_t resolved_device_number = device_number;
+        if (is_receiver_interface(iface) && device_number >= 1 &&
+            device_number <= receiver_slot_limit(iface)) {
+            Reply pairing_reply = receiver_register_read(
+                iface, 0x02B5, true,
+                (uint8_t)(RECEIVER_INFO_PAIRING + device_number - 1));
+            if (receiver_pairing_reply_is_present(pairing_reply)) {
+                // Match the list path: pairing presence is authoritative even
+                // when a routed ping reports RESOURCE_ERROR for a sleeping
+                // G603/G604.
+                add_receiver_slot_device(devices, count, iface, device_number,
+                                         pairing_reply, true);
+                return 1;
+            }
+        }
         if (ping_interface(iface, device_number, 1.0, &protocol, &resolved_device_number)) {
-            add_device(devices, count, iface, resolved_device_number, device_number, protocol);
+            add_device(devices, count, iface, resolved_device_number, device_number,
+                       protocol, true);
         } else if (device_number != 0xFF && !is_receiver_interface(iface) &&
                    ping_interface(iface, 0xFF, 1.0, &protocol, &resolved_device_number)) {
             // The direct wireless HID endpoint may report its paired receiver
             // slot in response to an FF ping, while requiring FF as the
             // destination for all later feature calls.
-            add_device(devices, count, iface, resolved_device_number, 0xFF, protocol);
+            add_device(devices, count, iface, resolved_device_number, 0xFF,
+                       protocol, true);
         }
         return 1;
     }
@@ -609,7 +648,7 @@ static int discover_devices_for_options(HidContext *context,
     if (options->device_key != NULL) {
         return discover_device_by_key(context, options->device_key, devices, count);
     }
-    return discover_devices(context, options->slot, devices, count);
+    return discover_devices(context, options->slot, devices, count, true);
 }
 
 static const char *device_label(const Device *device) {

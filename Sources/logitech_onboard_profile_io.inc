@@ -303,10 +303,10 @@ static void detect_dpi_layout(Profile *profile) {
     profile->dpi_shift_index = 0;
     profile->dpi_layout_supported = false;
 
-    // Known format-4 sectors store one to five little-endian DPI stages at
-    // offsets 3..12; unused stage slots are 0xFFFF. Bytes 1 and 2 select the
-    // default and shift stages. Treat this as a validated format candidate,
-    // never as a universal offset.
+    // Known format-3/4 sectors store one to five little-endian DPI stages at
+    // offsets 3..12; unused stage slots are 0 or 0xFFFF. Bytes 1 and 2 select
+    // the default and shift stages. Treat this as a validated format
+    // candidate, never as a universal offset.
     if (profile->info.profile_format > 5 || profile->data_length < 15 ||
         profile->data_length - 2 < 13) {
         return;
@@ -316,7 +316,10 @@ static void detect_dpi_layout(Profile *profile) {
     bool inactive = false;
     for (size_t i = 0; i < 5; i++) {
         uint16_t dpi = read_le16(profile->data + 3 + i * 2);
-        if (dpi == UINT16_MAX) {
+        // G603 format-3 firmware uses zero for unused stages, while newer
+        // gaming mice commonly use 0xFFFF. Both values terminate the active
+        // ascending DPI list.
+        if (dpi == 0 || dpi == UINT16_MAX) {
             inactive = true;
             continue;
         }

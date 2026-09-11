@@ -93,6 +93,7 @@ extension AppModel {
 
         if let errorMessage = snapshot.errorMessage {
             devices = []
+            resetEditorState()
             deviceSummary = "Unable to access the Logitech HID++ interface"
             status = errorMessage
             return
@@ -106,6 +107,7 @@ extension AppModel {
             deviceSummary = "No editable Logitech mouse found"
             profiles = []
             buttons = []
+            resetEditorState()
             status = snapshot.accessWarning
                 ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then Refresh."
                 : "No Logitech mouse was found. USB receiver entries are hidden."
@@ -117,8 +119,7 @@ extension AppModel {
         deviceSummary = selected.title
 
         guard let profileText = snapshot.profileText else {
-            profiles = []
-            buttons = []
+            resetEditorState()
             dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
             status = "Connected to \(selected.name), but no compatible onboard profile was found."
             return
@@ -127,6 +128,8 @@ extension AppModel {
         let parsed = parseProfiles(profileText)
         profiles = parsed.choices
         baselineProfileEnabled = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.enabled) })
+        keyInputDrafts.removeAll()
+        resetDPIState()
         if profiles.isEmpty {
             buttons = []
             status = "The mouse was found, but no onboard profiles were readable."
@@ -140,14 +143,33 @@ extension AppModel {
         }
         buttons = parsed.rowsByProfile[profileNumber] ?? []
         dpiDetails = ""
-        if let dpiText = snapshot.dpiText {
-            parseDPI([profileText, dpiText].joined(separator: "\n"))
-        } else {
+        parseDPI(profileText)
+        if dpiDetails.isEmpty {
             dpiDetails = snapshot.dpiError ?? "DPI capabilities could not be read."
         }
         status = snapshot.accessWarning
             ? "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh."
             : "Read-only inspection complete. Changes are previewed before writing."
+    }
+
+    private func resetEditorState() {
+        profiles = []
+        buttons = []
+        baselineProfileEnabled.removeAll()
+        keyInputDrafts.removeAll()
+        resetDPIState()
+    }
+
+    private func resetDPIState() {
+        dpiStages = ["", "", "", "", ""]
+        dpiCount = 5
+        defaultStage = 1
+        shiftStage = 1
+        baselineDPIStages = ["", "", "", "", ""]
+        baselineDPICount = 5
+        baselineDefaultStage = 1
+        baselineShiftStage = 1
+        dpiDetails = "DPI capabilities have not been read."
     }
 
     private nonisolated static func makeRefreshSnapshot(
@@ -200,51 +222,25 @@ extension AppModel {
         accessWarning: Bool = false
     ) -> RefreshSnapshot {
         do {
-            let headerText = try EngineRunner.run(
+            // The engine keeps one HID context for this combined read. The
+            // previous implementation launched separate processes for headers,
+            // profile data, and DPI, repeating feature discovery each time.
+            let profileText = try EngineRunner.run(
                 executable: executable,
-                arguments: ["--device-key", selectedDeviceKey, "--headers-only", "profiles"],
+                arguments: [
+                    "--device-key", selectedDeviceKey,
+                    "--summary-only",
+                    "--with-dpi",
+                    "--profile", String(preferredProfileNumber),
+                    "profiles"
+                ],
                 currentDirectory: currentDirectory
             )
-
-            let availableProfileNumbers = profileNumbers(in: headerText)
-            let selectedProfileNumber = availableProfileNumbers.contains(preferredProfileNumber)
-                ? preferredProfileNumber
-                : availableProfileNumbers.first
-            let selectedProfileText: String
-            if let selectedProfileNumber {
-                selectedProfileText = try EngineRunner.run(
-                    executable: executable,
-                    arguments: [
-                        "--device-key", selectedDeviceKey,
-                        "--summary-only",
-                        "--profile", String(selectedProfileNumber),
-                        "profiles"
-                    ],
-                    currentDirectory: currentDirectory
-                )
-            } else {
-                selectedProfileText = ""
-            }
-            let profileText = [headerText, selectedProfileText]
-                .filter { !$0.isEmpty }
-                .joined(separator: "\n")
-            var dpiText: String?
-            var dpiError: String?
-            if selectedProfileNumber != nil {
-                do {
-                    dpiText = try EngineRunner.run(
-                        executable: executable,
-                        arguments: ["--device-key", selectedDeviceKey, "--sensor-only", "dpi"],
-                        currentDirectory: currentDirectory
-                    )
-                } catch {
-                    dpiError = errorMessage(for: error)
-                }
-            }
+            let selectedProfileNumber = Self.selectedProfileNumber(in: profileText)
             return RefreshSnapshot(
                 devices: devices, selectedDeviceIndex: selectedDeviceIndex,
-                profileText: profileText, profileError: nil, dpiText: dpiText,
-                dpiError: dpiError, selectedProfileNumber: selectedProfileNumber,
+                profileText: profileText, profileError: nil, dpiText: nil,
+                dpiError: nil, selectedProfileNumber: selectedProfileNumber,
                 errorMessage: nil, accessWarning: accessWarning
             )
         } catch {

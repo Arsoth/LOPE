@@ -421,6 +421,20 @@ static Reply channel_request(HidChannel *channel,
     }
 }
 
+static bool is_receiver_routed_device(const Device *device) {
+    return device != NULL && device->request_device_number != 0xFF &&
+           device->iface != NULL && is_receiver_product(device->iface->product_id);
+}
+
+static bool should_retry_short_report(Reply reply) {
+    // A few Lightspeed mouse firmware revisions accept the receiver's
+    // long-report probe but only answer a routed feature request on the
+    // short HID++ path. Resource errors are also seen while the radio route
+    // is waking up, so give the alternate framing one chance.
+    return reply.status == REPLY_TIMEOUT ||
+           (reply.status == REPLY_HIDPP10_ERROR && reply.error_code == 0x09);
+}
+
 static const char *reply_status_name(ReplyStatus status) {
     switch (status) {
         case REPLY_TIMEOUT: return "timeout";
@@ -469,13 +483,28 @@ static Reply device_call_with_report(Device *device,
         return reply;
     }
     uint16_t request_id = (uint16_t)(((uint16_t)feature_index << 8) | (function & 0xF0) | SW_ID);
-    return channel_request(&device->iface->channel,
-                           device->request_device_number,
-                           request_id,
-                           params,
-                           params_length,
-                           prefer_long || device->prefer_long_reports,
-                           timeout_seconds);
+    bool use_long = prefer_long || device->prefer_long_reports;
+    reply = channel_request(&device->iface->channel,
+                            device->request_device_number,
+                            request_id,
+                            params,
+                            params_length,
+                            use_long,
+                            timeout_seconds);
+    if (!prefer_long && use_long && is_receiver_routed_device(device) &&
+        should_retry_short_report(reply)) {
+        Reply short_reply = channel_request(&device->iface->channel,
+                                             device->request_device_number,
+                                             request_id,
+                                             params,
+                                             params_length,
+                                             false,
+                                             timeout_seconds);
+        if (short_reply.status != REPLY_TIMEOUT) {
+            return short_reply;
+        }
+    }
+    return reply;
 }
 
 static Reply device_call(Device *device,
@@ -504,11 +533,26 @@ static Reply raw_request(Device *device,
                          size_t params_length,
                          bool prefer_long,
                          double timeout_seconds) {
-    return channel_request(&device->iface->channel,
-                           device->request_device_number,
-                           request_id,
-                           params,
-                           params_length,
-                           prefer_long || device->prefer_long_reports,
-                           timeout_seconds);
+    bool use_long = prefer_long || device->prefer_long_reports;
+    Reply reply = channel_request(&device->iface->channel,
+                                  device->request_device_number,
+                                  request_id,
+                                  params,
+                                  params_length,
+                                  use_long,
+                                  timeout_seconds);
+    if (!prefer_long && use_long && is_receiver_routed_device(device) &&
+        should_retry_short_report(reply)) {
+        Reply short_reply = channel_request(&device->iface->channel,
+                                             device->request_device_number,
+                                             request_id,
+                                             params,
+                                             params_length,
+                                             false,
+                                             timeout_seconds);
+        if (short_reply.status != REPLY_TIMEOUT) {
+            return short_reply;
+        }
+    }
+    return reply;
 }

@@ -132,6 +132,7 @@ static void print_usage(const char *program) {
     printf("  --slot N|ff                          receiver slot 1..6 or direct 0xff\n");
     printf("  --profile N                          1-based profile number\n");
     printf("  --summary-only                       read only the selected profile prefix\n");
+    printf("  --with-dpi                           include sensor and onboard DPI data\n");
     printf("  --button N                           explicit profile button number for bind\n");
     printf("  --default N                          onboard default DPI stage, 1..5\n");
     printf("  --shift N                            onboard DPI-shift stage, 1..5\n");
@@ -193,6 +194,10 @@ static int parse_options(int argc, char **argv, Options *options) {
         }
         if (strcmp(arg, "--sensor-only") == 0) {
             options->sensor_only = true;
+            continue;
+        }
+        if (strcmp(arg, "--with-dpi") == 0) {
+            options->include_dpi = true;
             continue;
         }
         if (strcmp(arg, "--device") == 0 || strcmp(arg, "--device-key") == 0 || strcmp(arg, "--slot") == 0 ||
@@ -296,4 +301,3 @@ static int parse_options(int argc, char **argv, Options *options) {
     }
     return 1;
 }
-

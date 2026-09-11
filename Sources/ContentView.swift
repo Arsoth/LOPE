@@ -133,8 +133,8 @@ struct ContentView: View {
                     profilesEditor
                     Divider()
                     VStack(spacing: 8) {
-                        ForEach(model.buttons.indices, id: \.self) { index in
-                            buttonRow(index)
+                        ForEach(model.buttons) { button in
+                            buttonRow(button.id)
                         }
                     }
                     Divider()
@@ -142,47 +142,57 @@ struct ContentView: View {
                 }
                 .padding(.vertical, 4)
             }
+            .id(model.selectedDeviceIndex)
         }
         .padding(.top, 4)
     }
 
-    private func buttonRow(_ index: Int) -> some View {
-        let button = model.buttons[index]
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text("Button \(button.id)")
-                    .font(.body.weight(.medium))
-                    .frame(width: 78, alignment: .leading)
-                Text(button.label)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 210, alignment: .leading)
-                    .lineLimit(1)
-                Picker("", selection: Binding(
-                    get: { model.buttons[index].draftChoice },
-                    set: { model.selectOutput(buttonIndex: index, choice: $0) })) {
-                    ForEach(model.presets) { preset in
-                        Text(preset.label).tag(preset.raw)
+    private func buttonRow(_ buttonID: Int) -> some View {
+        Group {
+            if let button = model.buttons.first(where: { $0.id == buttonID }) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text("Button \(button.id)")
+                            .font(.body.weight(.medium))
+                            .frame(width: 78, alignment: .leading)
+                        Text(button.label)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 210, alignment: .leading)
+                            .lineLimit(1)
+                        Picker("", selection: Binding(
+                            get: { model.buttons.first(where: { $0.id == buttonID })?.draftChoice ?? "custom" },
+                            set: { choice in
+                                guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                                model.selectOutput(buttonIndex: index, choice: choice)
+                            })) {
+                            ForEach(model.presets) { preset in
+                                Text(preset.label).tag(preset.raw)
+                            }
+                            Text("Custom").tag("custom")
+                        }
+                        .labelsHidden()
+                        .frame(width: 215)
+                        if model.showAdvancedFields {
+                            TextField("8 hex digits", text: Binding(
+                                get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
+                                set: { raw in
+                                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                                    model.setRaw(buttonIndex: index, raw: raw)
+                                }))
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 122)
+                        }
+                        Spacer()
                     }
-                    Text("Custom").tag("custom")
+                    if model.buttons.first(where: { $0.id == buttonID })?.draftChoice == "custom" {
+                        keyboardChordEditor(buttonID)
+                    }
                 }
-                .labelsHidden()
-                .frame(width: 215)
-                if model.showAdvancedFields {
-                    TextField("8 hex digits", text: Binding(
-                        get: { model.buttons[index].draftRaw },
-                        set: { model.setRaw(buttonIndex: index, raw: $0) }))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 122)
-                }
-                Spacer()
-            }
-            if model.buttons[index].draftChoice == "custom" {
-                keyboardChordEditor(index)
+                .padding(10)
+                .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: 8))
             }
         }
-        .padding(10)
-        .background(.quaternary.opacity(0.32), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var profilesEditor: some View {
@@ -260,28 +270,49 @@ struct ContentView: View {
         .help(helpText)
     }
 
-    private func keyboardChordEditor(_ index: Int) -> some View {
+    private func keyboardChordEditor(_ buttonID: Int) -> some View {
         HStack(spacing: 8) {
             Text("Custom")
                 .font(.caption.weight(.medium))
                 .frame(width: 78, alignment: .leading)
             ForEach(model.modifierChoices) { modifier in
                 Toggle(modifier.label, isOn: Binding(
-                    get: { model.isModifierEnabled(buttonIndex: index, bit: modifier.id) },
-                    set: { model.setModifier(buttonIndex: index, bit: modifier.id, enabled: $0) }))
+                    get: {
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return false }
+                        return model.isModifierEnabled(buttonIndex: index, bit: modifier.id)
+                    },
+                    set: { enabled in
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                        model.setModifier(buttonIndex: index, bit: modifier.id, enabled: enabled)
+                    }))
                     .toggleStyle(.checkbox)
-                    .disabled(!model.isKeyboardRecord(buttonIndex: index))
+                    .disabled({
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return true }
+                        return !model.isKeyboardRecord(buttonIndex: index)
+                    }())
             }
             TextField("Key name", text: Binding(
-                get: { model.keyboardKeyText(buttonIndex: index) },
-                set: { model.setKeyboardKeyText(buttonIndex: index, text: $0) }))
+                get: {
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return "" }
+                    return model.keyboardKeyText(buttonIndex: index)
+                },
+                set: { text in
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                    model.setKeyboardKeyText(buttonIndex: index, text: text)
+                }))
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 130)
             Text("F key")
                 .font(.caption)
             Picker("", selection: Binding(
-                get: { model.functionKeyChoice(buttonIndex: index) },
-                set: { model.setFunctionKey(buttonIndex: index, number: $0) })) {
+                get: {
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
+                    return model.functionKeyChoice(buttonIndex: index)
+                },
+                set: { number in
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                    model.setFunctionKey(buttonIndex: index, number: number)
+                })) {
                 Text("None").tag(0)
                 ForEach(1...24, id: \.self) { number in
                     Text("F\(number)").tag(number)
@@ -292,8 +323,14 @@ struct ContentView: View {
             Text("Special")
                 .font(.caption)
             Picker("", selection: Binding(
-                get: { model.specialKeyChoice(buttonIndex: index) },
-                set: { model.setSpecialKey(buttonIndex: index, key: $0) })) {
+                get: {
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
+                    return model.specialKeyChoice(buttonIndex: index)
+                },
+                set: { key in
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                    model.setSpecialKey(buttonIndex: index, key: key)
+                })) {
                 Text("None").tag(0)
                 ForEach(model.specialKeyboardKeys) { key in
                     Text(key.label).tag(Int(key.id))

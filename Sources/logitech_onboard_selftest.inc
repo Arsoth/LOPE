@@ -74,6 +74,14 @@ static int run_self_test(void) {
     detect_dpi_layout(&profile);
     passed = passed && profile.dpi_layout_supported && profile.dpi_count == 2 &&
              profile.dpi_default_index == 0 && profile.dpi_shift_index == 1;
+    write_le16(profile.data + 3 + 2 * 2, 1600);
+    write_le16(profile.data + 3 + 3 * 2, 3200);
+    write_le16(profile.data + 3 + 4 * 2, 0);
+    profile.data[1] = 1;
+    profile.data[2] = 0;
+    detect_dpi_layout(&profile);
+    passed = passed && profile.dpi_layout_supported && profile.dpi_count == 4 &&
+             profile.dpi_default_index == 1 && profile.dpi_shift_index == 0;
     free(profile.data);
     if (!passed) {
         fprintf(stderr, "profile/layout self-test failed\n");
@@ -147,4 +155,3 @@ static int run_self_test(void) {
     printf("self-test: CRC-16, format/layout detection, rear-thumb identification, and Alt+Tab encoding passed\n");
     return 0;
 }
-

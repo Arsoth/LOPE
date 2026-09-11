@@ -98,6 +98,18 @@ extension AppModel {
         return result
     }
 
+    nonisolated static func selectedProfileNumber(in text: String) -> Int? {
+        let pattern = try! NSRegularExpression(pattern: #"^Selected profile:\s+(\d+)\s*$"#)
+        for line in text.split(separator: "\n").map(String.init) {
+            let range = NSRange(line.startIndex..<line.endIndex, in: line)
+            if let match = pattern.firstMatch(in: line, range: range),
+               let number = Int(capture(match, in: line, index: 1)) {
+                return number
+            }
+        }
+        return nil
+    }
+
     func parseProfiles(_ text: String) -> (choices: [ProfileChoice], rowsByProfile: [Int: [ButtonRow]]) {
         let profilePattern = try! NSRegularExpression(pattern: #"^Profile\s+(\d+)\s+\(sector\s+(0x[0-9A-Fa-f]+),\s+enabled=(yes|no)\)"#)
         let buttonPattern = try! NSRegularExpression(pattern: #"^\s*button\s+(\d+):\s*(.*?)\s*\[([0-9A-Fa-f ]+)\]"#)
@@ -173,6 +185,9 @@ extension AppModel {
                 }
             }
             if line.hasPrefix("Supported DPI:") || line.hasPrefix("Current sensor") {
+                dpiDetails = [dpiDetails, line].filter { !$0.isEmpty }.joined(separator: "\n")
+            }
+            if line.hasPrefix("DPI error:") {
                 dpiDetails = [dpiDetails, line].filter { !$0.isEmpty }.joined(separator: "\n")
             }
         }
