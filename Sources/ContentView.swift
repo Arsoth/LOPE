@@ -38,8 +38,11 @@ private struct PointerCursorModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onHover { isHovering in
-            guard enabled else { return }
-            (isHovering ? NSCursor.pointingHand : NSCursor.arrow).set()
+            guard isHovering else {
+                NSCursor.arrow.set()
+                return
+            }
+            (enabled ? NSCursor.pointingHand : NSCursor.arrow).set()
         }
     }
 }
@@ -50,39 +53,104 @@ private extension View {
     }
 }
 
+private struct EscapeKeyMonitor: NSViewRepresentable {
+    let onEscape: () -> Void
+
+    final class Coordinator {
+        var onEscape: () -> Void
+        var monitor: Any?
+
+        init(onEscape: @escaping () -> Void) {
+            self.onEscape = onEscape
+        }
+
+        func install() {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 53 else { return event }
+                self?.onEscape()
+                return nil
+            }
+        }
+
+        func remove() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit { remove() }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onEscape: onEscape)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.install()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onEscape = onEscape
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.remove()
+    }
+}
+
 private struct DPIStageBar: View {
     let stages: [String]
     let defaultStage: Int
     let shiftStage: Int
     let capabilities: DPICapabilities
+    let isLoading: Bool
     let onDragValue: (Int, Int) -> Void
     let onAdjust: (Int, DPICapabilities.AdjustmentDirection) -> Void
     let onTextChange: (Int, String) -> Void
+    let onCommitText: (Int) -> Void
     let onSetDefault: (Int) -> Void
     let onSetShift: (Int) -> Void
     let onDelete: (Int) -> Void
 
     @State private var editingStage: DPIStageSelection?
     @State private var stageInteractionStart: TimeInterval?
+    @State private var presentedStage: DPIStageSelection?
+    @State private var fadingStage: DPIStageSelection?
+    @State private var popoverContentOpacity = 1.0
+    @FocusState private var focusedStageIndex: Int?
 
     private let clickDurationLimit: TimeInterval = 0.3
+    private let stageSwitchDuration: TimeInterval = 0.08
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
+                if editingStage != nil {
+                    Rectangle()
+                        .fill(Color.black.opacity(0.001))
+                        .contentShape(Rectangle())
+                        .onTapGesture { dismissStageEditor() }
+                        .zIndex(1)
+                    EscapeKeyMonitor(onEscape: dismissStageEditor)
+                        .frame(width: 0, height: 0)
+                        .allowsHitTesting(false)
+                }
+
                 Capsule()
-                    .fill(.quaternary)
-                    .frame(height: 8)
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.88), .purple.opacity(0.84)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 6)
                     .overlay {
                         Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.blue.opacity(0.55), .purple.opacity(0.55)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .padding(.vertical, 2)
+                            .stroke(.white.opacity(0.12), lineWidth: 0.5)
                     }
                     .frame(width: max(proxy.size.width - 28, 1))
                     .position(x: proxy.size.width / 2, y: 55)
@@ -94,7 +162,7 @@ private struct DPIStageBar: View {
                         .position(x: position(for: value, width: proxy.size.width), y: 55)
                 }
 
-                ForEach(Array(stages.enumerated()), id: \.offset) { item in
+                ForEach(Array(stages.enumerated()).filter { Int($0.element) != nil }, id: \.offset) { item in
                     stageHandle(index: item.offset, text: item.element, width: proxy.size.width)
                 }
 
@@ -112,21 +180,59 @@ private struct DPIStageBar: View {
                 .position(x: proxy.size.width / 2, y: 105)
 
             }
-            .coordinateSpace(name: "dpiBar")
-            .popover(
-                item: $editingStage,
-                attachmentAnchor: .point(popoverAnchor(for: proxy.size.width)),
-                arrowEdge: .top
-            ) {
-                stagePopover(index: $0.index)
+            // Keep one bubble alive while moving between stages. Replacing
+            // separate per-stage popovers was the source of the occasional
+            // remove/insert flicker and focus handoff.
+            .overlay(alignment: .bottomLeading) {
+                if !isLoading,
+                   let editingStage,
+                   stages.indices.contains(editingStage.index) {
+                    let value = Int(stages[editingStage.index]) ?? capabilities.minimum ?? 800
+                    VStack(spacing: -1) {
+                        ZStack(alignment: .topLeading) {
+                            if let fadingStage,
+                               stages.indices.contains(fadingStage.index) {
+                                stagePopover(index: fadingStage.index, isInteractive: false)
+                                    .opacity(1 - popoverContentOpacity)
+                                    .allowsHitTesting(false)
+                            }
+                            if let presentedStage,
+                               stages.indices.contains(presentedStage.index) {
+                                stagePopover(index: presentedStage.index, isInteractive: true)
+                                    .opacity(popoverContentOpacity)
+                            }
+                        }
+                        .frame(width: 230)
+                        DPIStageTriangle()
+                            .fill(Color.black.opacity(0.86))
+                            .frame(width: 22, height: 11)
+                            .rotationEffect(.degrees(180))
+                    }
+                    .frame(width: 230)
+                    .compositingGroup()
+                    .offset(
+                        x: position(for: value, width: proxy.size.width) - 115,
+                        y: -(proxy.size.height - 30)
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .bottom)))
+                    .zIndex(100)
+                }
             }
-            .transaction { transaction in
-                transaction.animation = .easeOut(duration: 0.08)
-                transaction.disablesAnimations = false
+            .coordinateSpace(name: "dpiBar")
+    }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("DPI stage bar")
+        .onChange(of: isLoading) { loading in
+            if loading { dismissStageEditor() }
+        }
+        .onChange(of: editingStage) { newValue in
+            focusedStageIndex = newValue?.index
+        }
+        .onChange(of: focusedStageIndex) { newValue in
+            if newValue == nil, let editingStage {
+                onCommitText(editingStage.index)
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("DPI stage bar")
     }
 
     private func stageHandle(index: Int, text: String, width: CGFloat) -> some View {
@@ -183,7 +289,6 @@ private struct DPIStageBar: View {
                     break
                 }
             }
-
             Text(displayValue)
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(parsedValue == nil ? .orange : .primary)
@@ -194,47 +299,31 @@ private struct DPIStageBar: View {
         }
         .frame(width: 84, height: 62)
         .position(x: x, y: 70)
-    }
-
-    private func popoverAnchor(for width: CGFloat) -> UnitPoint {
-        guard let editingStage, stages.indices.contains(editingStage.index) else {
-            return UnitPoint(x: 0.5, y: 55.0 / 120.0)
-        }
-        let value = Int(stages[editingStage.index]) ?? capabilities.minimum ?? 800
-        let x = position(for: value, width: width)
-        return UnitPoint(x: x / max(width, 1), y: 37.0 / 120.0)
+        .zIndex(2)
     }
 
     @ViewBuilder
     private func stageShape(isDefault: Bool, isShift: Bool, isValid: Bool) -> some View {
         if isDefault {
-            Circle()
-                .fill(isValid ? Color.blue : Color.orange)
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(isValid ? Color.red : Color.orange)
         } else if isShift {
-            DPIStageTriangle()
+            DPIStageDiamond()
                 .fill(isValid ? Color.orange : Color.red)
         } else {
-            DPIStageDiamond()
-                .fill(isValid ? Color.secondary : Color.red)
+            Circle()
+                .fill(isValid ? Color.blue : Color.red)
         }
     }
 
-    private func stagePopover(index: Int) -> some View {
+    private func stagePopover(index: Int, isInteractive: Bool) -> some View {
         let isDefault = defaultStage == index + 1
         let isShift = shiftStage == index + 1
         let canDelete = !isDefault && !isShift
         return VStack(alignment: .leading, spacing: 10) {
             Text("DPI stage \(index + 1)")
                 .font(.headline)
-            TextField(
-                "DPI",
-                text: Binding(
-                    get: { stages.indices.contains(index) ? stages[index] : "" },
-                    set: { onTextChange(index, $0) }
-                )
-            )
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
+            stageValueField(index: index, isInteractive: isInteractive)
 
             Divider()
 
@@ -246,6 +335,8 @@ private struct DPIStageBar: View {
                     roleIcon(isDefault: true, isShift: false, filled: isDefault, tint: .white)
                     Text(isDefault ? "Default" : "Make Default")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -262,6 +353,8 @@ private struct DPIStageBar: View {
                     roleIcon(isDefault: false, isShift: true, filled: isShift, tint: .white)
                     Text(isShift ? "DPI Shift" : "Make DPI Shift")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -275,6 +368,8 @@ private struct DPIStageBar: View {
                 dismissStageEditor()
             } label: {
                 Label("Delete stage", systemImage: "trash")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -289,7 +384,32 @@ private struct DPIStageBar: View {
         }
         .padding(14)
         .frame(width: 230)
-        .id(index)
+        .background(Color.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(.white.opacity(0.16), lineWidth: 0.75)
+        }
+        .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
+    }
+
+    @ViewBuilder
+    private func stageValueField(index: Int, isInteractive: Bool) -> some View {
+        let binding = Binding(
+            get: { stages.indices.contains(index) ? stages[index] : "" },
+            set: { onTextChange(index, $0) }
+        )
+        if isInteractive {
+            TextField("DPI", text: binding)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .focused($focusedStageIndex, equals: index)
+                .onSubmit { onCommitText(index) }
+        } else {
+            TextField("DPI", text: binding)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.small)
+                .allowsHitTesting(false)
+        }
     }
 
     private var dpiLegend: some View {
@@ -302,7 +422,7 @@ private struct DPIStageBar: View {
 
     private func legendItem(label: String, isDefault: Bool, isShift: Bool) -> some View {
         HStack(spacing: 3) {
-            let tint: Color = isDefault ? .blue : (isShift ? .orange : .secondary)
+            let tint: Color = isDefault ? .red : (isShift ? .orange : .blue)
             roleIcon(isDefault: isDefault, isShift: isShift, filled: true, tint: tint)
             Text(label)
         }
@@ -313,18 +433,18 @@ private struct DPIStageBar: View {
         Group {
             if isDefault {
                 if filled {
-                    Circle().fill(tint)
+                    RoundedRectangle(cornerRadius: 3, style: .continuous).fill(tint)
                 } else {
-                    Circle().stroke(tint, lineWidth: 1.25)
+                    RoundedRectangle(cornerRadius: 3, style: .continuous).stroke(tint, lineWidth: 1.25)
                 }
             } else if isShift {
                 if filled {
-                    DPIStageTriangle().fill(tint)
+                    DPIStageDiamond().fill(tint)
                 } else {
-                    DPIStageTriangle().stroke(tint, lineWidth: 1.25)
+                    DPIStageDiamond().stroke(tint, lineWidth: 1.25)
                 }
             } else {
-                DPIStageDiamond().fill(tint)
+                Circle().fill(tint)
             }
         }
         .frame(width: 14, height: 14)
@@ -339,11 +459,47 @@ private struct DPIStageBar: View {
     }
 
     private func presentStageEditor(_ index: Int) {
-        editingStage = DPIStageSelection(index: index)
+        if let editingStage, editingStage.index != index {
+            onCommitText(editingStage.index)
+            fadingStage = presentedStage
+            presentedStage = DPIStageSelection(index: index)
+            popoverContentOpacity = 0
+            withAnimation(.easeOut(duration: stageSwitchDuration)) {
+                self.editingStage = DPIStageSelection(index: index)
+                popoverContentOpacity = 1
+            }
+            focusedStageIndex = index
+            clearFadingStage(after: stageSwitchDuration, index: index)
+            return
+        }
+
+        if editingStage == nil {
+            presentedStage = DPIStageSelection(index: index)
+            fadingStage = nil
+            popoverContentOpacity = 1
+        }
+        withAnimation(.easeOut(duration: 0.04)) {
+            editingStage = DPIStageSelection(index: index)
+        }
     }
 
     private func dismissStageEditor() {
-        editingStage = nil
+        if let editingStage {
+            onCommitText(editingStage.index)
+        }
+        withAnimation(.easeOut(duration: 0.04)) {
+            editingStage = nil
+        }
+        presentedStage = nil
+        fadingStage = nil
+        popoverContentOpacity = 1
+    }
+
+    private func clearFadingStage(after duration: TimeInterval, index: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            guard self.editingStage?.index == index else { return }
+            fadingStage = nil
+        }
     }
 
     private func position(for value: Int, width: CGFloat) -> CGFloat {
@@ -918,6 +1074,7 @@ struct ContentView: View {
                     defaultStage: model.defaultStage,
                     shiftStage: model.shiftStage,
                     capabilities: model.dpiCapabilities,
+                    isLoading: model.loadingProfile,
                     onDragValue: { index, value in
                         model.setDPIStageValue(index: index, value: value)
                     },
@@ -926,6 +1083,9 @@ struct ContentView: View {
                     },
                     onTextChange: { index, text in
                         model.setDPIStageText(index: index, text: text)
+                    },
+                    onCommitText: { index in
+                        model.commitDPIStageText(index: index)
                     },
                     onSetDefault: { index in
                         model.setDefaultDPIStage(index + 1)
@@ -938,6 +1098,7 @@ struct ContentView: View {
                     }
                 )
                 .frame(height: 120)
+                .zIndex(10)
 
                 if let validation = model.dpiValidationMessage {
                     Label(validation, systemImage: "exclamationmark.triangle")

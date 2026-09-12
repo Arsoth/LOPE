@@ -95,10 +95,15 @@ changing the behavior for other devices.
 
 **Done when:** there's a light and a dark mode that are both colorblind safe defaulting to current OS preferences
 
-### [ ] 13. only request permissions if no mouse is found
+### [ ] 14. add a mock device which is "alow access for wired mice" if system access is not already approved
 
-- [ ] lightmode should be off white, not pure eye searing white.
-- [ ] defaults to system preference (most OS's expose this).
-- [ ] dark mode and light mode should be colorblind safe by default
+- [ ] if wireless (bluetooth, USB receiver), no system permissions needed, so lope will work fine
+- [ ] add a mock device at the bottom of the list which is "allow wired mice" (may need better verbiage) which on selection opens a popup giving instructions and a button to launch system preferences and add LOPE to the allow list which the user can then enable
 
-**Done when:** there's a light and a dark mode that are both colorblind safe defaulting to current OS preferences
+**Done when:** device dropdown, permissions popup.
+
+### [ ] 15. open backups in finder button
+
+- [ ] add a button that opens the backups directory in Finder
+
+**Done when:** there's a button that opens the backups directory in finder in the backups page

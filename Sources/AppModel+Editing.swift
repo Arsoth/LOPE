@@ -161,6 +161,12 @@ extension AppModel {
         dpiStages[index] = text.filter { $0.isNumber }
     }
 
+    func commitDPIStageText(index: Int) {
+        guard dpiStages.indices.contains(index), index < dpiCount,
+              let value = Int(dpiStages[index]) else { return }
+        setDPIStageValue(index: index, value: value)
+    }
+
     func setDPIStageValue(index: Int, value: Int) {
         guard dpiStages.indices.contains(index), index < dpiCount else { return }
         let lowerBound = index > 0 ? Int(dpiStages[index - 1]).map { $0 + 1 } : nil
