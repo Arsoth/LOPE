@@ -55,9 +55,9 @@ test: $(APP) $(SWIFT_PROFILE_PARSER_TEST) $(SWIFT_PROFILE_WRITE_TEST)
 	./$(SWIFT_PROFILE_PARSER_TEST)
 	./$(SWIFT_PROFILE_WRITE_TEST)
 
-$(SWIFT_PROFILE_PARSER_TEST): Sources/AppModels.swift Sources/AppSupport.swift Sources/BackupStorage.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Sources/RGBModel.swift $(PROFILE_FILES) Tests/ProfileOutputParserSelfTest.swift
+$(SWIFT_PROFILE_PARSER_TEST): Sources/AppModels.swift Sources/AppSupport.swift Sources/BackupStorage.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/PollingRateModel.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Sources/RGBModel.swift $(PROFILE_FILES) Tests/ProfileOutputParserSelfTest.swift
 	@mkdir -p .build
-	swiftc -O -target $(GUI_TARGET) Sources/AppModels.swift Sources/AppSupport.swift Sources/BackupStorage.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Sources/RGBModel.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
+	swiftc -O -target $(GUI_TARGET) Sources/AppModels.swift Sources/AppSupport.swift Sources/BackupStorage.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/PollingRateModel.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Sources/RGBModel.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
 
 $(SWIFT_PROFILE_WRITE_TEST): $(GUI_MODEL_SRC) $(PROFILE_FILES) Tests/ProfileWriteSelfTest.swift
 	@mkdir -p .build

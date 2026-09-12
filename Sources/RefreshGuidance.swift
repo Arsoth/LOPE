@@ -4,11 +4,11 @@
 import Foundation
 
 struct OnboardProfileRefreshGuidance: Codable, Hashable, Sendable {
-    let sleepDescription: String
-    let wakeInstructions: String
+  let sleepDescription: String
+  let wakeInstructions: String
 }
 
 enum OnboardProfileRefreshPolicy {
-    static let pollIntervalNanoseconds: UInt64 = 1_000_000_000
-    static let maximumPollAttempts = 60
+  static let pollIntervalNanoseconds: UInt64 = 1_000_000_000
+  static let maximumPollAttempts = 60
 }

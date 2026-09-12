@@ -9,7 +9,9 @@ README.
 The app has three layers:
 
 - `Sources/AppMain.swift` and `Sources/ContentView.swift` provide the SwiftUI
-  window, tabs, editor, settings, and status messages.
+  window, tabs, editor, settings, and status messages. The footer message fades
+  after 30 seconds; its info button opens the in-memory history of the ten most
+  recent status events.
 - `Sources/LogitechOnboardProfileManagerApp.swift` plus the `AppModel+*.swift`
   extensions own device selection, refresh state, parsing, backup management,
   editing, and writes.
@@ -70,11 +72,17 @@ reads the selected profile with retries; an incomplete profile read is not
 presented as a valid empty profile.
 
 For a cataloged mouse with a known onboard-profile capability that is not
-reachable, the editor preserves the device identity, clears stale profile data,
-shows a wake indicator, and polls once per second for up to 60 seconds. Polling
-ends when the requested device is found, when the user selects another device,
-or when the timeout expires. Another mouse appearing in the meantime does not
-satisfy the requested-device poll.
+reachable, the editor preserves the device identity and current profile-derived
+surface, blurs that surface slightly, shows a wake modal over it, and polls once
+per second for up to 60 seconds. Polling ends when the requested device is found,
+when the user selects another device, or when the timeout expires. Another mouse
+appearing in the meantime does not satisfy the requested-device poll.
+
+The Configure tab shows a polling-rate picker beside the active DPI-stage
+control when the connected mouse reports HID++ report-rate support. The native
+engine prefers feature `0x8061` and its active-connection rate list, falling back
+to `0x8060`; a selected rate is validated against the reported list and read back
+after applying it.
 
 The G603 and G604 descriptors add device-specific sleep text. The G603 can
 sleep very quickly in Endurance mode; the G604 can sleep after several minutes.

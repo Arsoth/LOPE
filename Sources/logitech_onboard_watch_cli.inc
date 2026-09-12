@@ -119,6 +119,7 @@ static void print_usage(const char *program) {
     printf("  profiles                             inspect profile headers and button records\n");
     printf("  dpi                                  show supported/current and onboard DPI stages\n");
     printf("  current-dpi                          read only the current sensor 1 DPI\n");
+    printf("  set-report-rate HZ                   set and verify the active polling rate\n");
     printf("  dump FILE                            save active profile as a backup package\n");
     printf("  watch                                identify physical mouse button reports\n");
     printf("  self-test                            run local CRC/layout tests\n\n");
@@ -135,6 +136,7 @@ static void print_usage(const char *program) {
     printf("  --profile N                          1-based profile number\n");
     printf("  --summary-only                       read only the selected profile prefix\n");
     printf("  --with-dpi                           include sensor and onboard DPI data\n");
+    printf("  --with-report-rate                   include active-connection polling-rate data\n");
     printf("  --button N                           explicit profile button number for bind\n");
     printf("  --default N                          onboard default DPI stage, 1..5\n");
     printf("  --shift N                            onboard DPI-shift stage, 1..5\n");
@@ -207,6 +209,10 @@ static int parse_options(int argc, char **argv, Options *options) {
         }
         if (strcmp(arg, "--with-dpi") == 0) {
             options->include_dpi = true;
+            continue;
+        }
+        if (strcmp(arg, "--with-report-rate") == 0) {
+            options->include_report_rate = true;
             continue;
         }
         if (strcmp(arg, "--device") == 0 || strcmp(arg, "--device-key") == 0 || strcmp(arg, "--slot") == 0 ||
@@ -329,6 +335,11 @@ static int parse_options(int argc, char **argv, Options *options) {
     } else if (strcmp(options->command, "set-profile-state") == 0) {
         if (options->positional_count != 2) {
             fprintf(stderr, "set-profile-state syntax: set-profile-state N enable|disable\n");
+            return 0;
+        }
+    } else if (strcmp(options->command, "set-report-rate") == 0) {
+        if (options->positional_count != 1) {
+            fprintf(stderr, "set-report-rate syntax: set-report-rate HZ\n");
             return 0;
         }
     } else if (strcmp(options->command, "apply") == 0) {

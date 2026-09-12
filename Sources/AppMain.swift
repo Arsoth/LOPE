@@ -5,9 +5,9 @@ import SwiftUI
 
 @main
 struct LOPEApp: App {
-    var body: some Scene {
-        WindowGroup(AppConstants.displayName) {
-            ContentView()
-        }
+  var body: some Scene {
+    WindowGroup(AppConstants.displayName) {
+      ContentView()
     }
+  }
 }

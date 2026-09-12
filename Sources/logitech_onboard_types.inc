@@ -53,6 +53,8 @@
 #define FEATURE_SET 0x0001
 #define FEATURE_DEVICE_NAME 0x0005
 #define FEATURE_ADJUSTABLE_DPI 0x2201
+#define FEATURE_ADJUSTABLE_REPORT_RATE 0x8060
+#define FEATURE_EXTENDED_REPORT_RATE 0x8061
 #define FEATURE_ONBOARD_PROFILES 0x8100
 
 // HID++ 1.0 receiver registers used to enumerate paired devices.
@@ -138,6 +140,22 @@ typedef struct {
     uint8_t index;
     uint8_t version;
 } Feature;
+
+#define MAX_REPORT_RATES 8
+
+typedef struct {
+    uint32_t hertz;
+    uint8_t wire_value;
+} ReportRateEntry;
+
+typedef struct {
+    uint16_t feature_id;
+    uint16_t supported_mask;
+    ReportRateEntry rates[MAX_REPORT_RATES];
+    size_t rate_count;
+    uint32_t current_hertz;
+    bool current_valid;
+} ReportRateCapabilities;
 
 typedef struct {
     HidInterface *iface;
@@ -232,6 +250,7 @@ typedef struct {
     bool summary_only;
     bool sensor_only;
     bool include_dpi;
+    bool include_report_rate;
     int button;
     int dpi_default;
     int dpi_shift;

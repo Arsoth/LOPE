@@ -167,7 +167,7 @@ static int run_profiles(const Options *options) {
         return 1;
     }
     int requested_profile = options->profile;
-    if (options->include_dpi && requested_profile > 0 &&
+    if ((options->include_dpi || options->include_report_rate) && requested_profile > 0 &&
         (size_t)requested_profile > header_count) {
         // The GUI keeps the last selected profile while the user changes
         // devices. If that slot does not exist on the new mouse, use its
@@ -183,7 +183,7 @@ static int run_profiles(const Options *options) {
     size_t selected_stage_count = 0;
     int selected_default_stage = 0;
     int selected_profile_number = 0;
-    if (options->headers_only && !options->include_dpi) {
+    if (options->headers_only && !options->include_dpi && !options->include_report_rate) {
         for (size_t i = 0; i < header_count; i++) {
             printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
                    i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
@@ -192,7 +192,7 @@ static int run_profiles(const Options *options) {
         return 0;
     }
 
-    if (options->include_dpi) {
+    if (options->include_dpi || options->include_report_rate) {
         // The GUI needs the complete profile list, but only the selected
         // profile's records and onboard DPI stages. Emit lightweight headers
         // for every slot before the detailed selected-profile summary so the
@@ -276,6 +276,14 @@ static int run_profiles(const Options *options) {
             printf("Current sensor 1 DPI: %u\n", current);
         } else {
             printf("DPI error: adjustable DPI feature 0x2201 is unavailable or unreadable\n");
+        }
+    }
+    if (options->include_report_rate) {
+        ReportRateCapabilities report_rate;
+        if (read_report_rate_capabilities(device, &report_rate)) {
+            print_report_rate_capabilities(&report_rate);
+        } else {
+            printf("Report rate error: no readable HID++ report-rate feature (0x8061 or 0x8060)\n");
         }
     }
     hid_context_release(&context);

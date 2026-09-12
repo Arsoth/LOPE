@@ -8,6 +8,7 @@
 #include "logitech_onboard_types.inc"
 #include "logitech_onboard_hid_transport.inc"
 #include "logitech_onboard_hid_discovery.inc"
+#include "logitech_onboard_report_rate.inc"
 #include "logitech_onboard_profile_io.inc"
 #include "logitech_onboard_profile_rendering.inc"
 #include "logitech_onboard_g600.inc"
@@ -32,6 +33,7 @@ int main(int argc, char **argv) {
     if (strcmp(options.command, "profiles") == 0) return run_profiles(&options);
     if (strcmp(options.command, "dpi") == 0) return run_dpi(&options);
     if (strcmp(options.command, "current-dpi") == 0) return run_current_dpi(&options);
+    if (strcmp(options.command, "set-report-rate") == 0) return run_set_report_rate(&options);
     if (strcmp(options.command, "dump") == 0) return run_dump(&options);
     if (strcmp(options.command, "watch") == 0) return run_watch(&options);
     if (strcmp(options.command, "bind") == 0) return run_bind(&options);
