@@ -350,6 +350,9 @@ extension AppModel {
 
         let parsed = parseProfiles(profileText)
         profiles = parsed.choices
+        rgbZones.removeAll()
+        baselineRGBColors.removeAll()
+        rgbEditingAllZones = false
         let reportedCapacity = Self.onboardProfileCapacity(in: profileText)
         onboardProfileCapacity = reportedCapacity ?? parsed.choices.count
         onboardProfileCapacityWasReported = reportedCapacity != nil
@@ -367,6 +370,10 @@ extension AppModel {
             preferredProfileNumber: profileNumber
         ) ?? profiles[0].id
         buttons = parsed.rowsByProfile[profileNumber] ?? []
+        applyRGBZones(
+            parsed.rgbByProfile[profileNumber] ?? [],
+            profileFormat: parsed.profileFormatsByProfile[profileNumber]
+        )
         dpiDetails = ""
         parseDPI(profileText)
         if dpiDetails.isEmpty {
@@ -401,6 +408,9 @@ extension AppModel {
         buttons = []
         baselineProfileEnabled.removeAll()
         keyInputDrafts.removeAll()
+        rgbZones.removeAll()
+        baselineRGBColors.removeAll()
+        rgbEditingAllZones = false
         resetDPIState()
     }
 
@@ -418,6 +428,9 @@ extension AppModel {
         baselineProfileEnabled = [placeholderNumber: true]
         keyInputDrafts.removeAll()
         buttons = loadingButtonRows()
+        rgbZones.removeAll()
+        baselineRGBColors.removeAll()
+        rgbEditingAllZones = false
         resetDPIState()
         dpiCapabilities = currentMouseProfile.initialDPICapabilities
         dpiDetails = "Loading DPI capabilities from the mouse…"
@@ -946,6 +959,10 @@ extension AppModel {
             ])
             let parsed = parseProfiles(profileText)
             buttons = parsed.rowsByProfile[profileNumber] ?? parsed.rowsByProfile.values.first ?? []
+            applyRGBZones(
+                parsed.rgbByProfile[profileNumber] ?? [],
+                profileFormat: parsed.profileFormatsByProfile[profileNumber]
+            )
             loadDPI(profileText: profileText)
             status = "Reloaded profile \(profileNumber)."
         } catch {

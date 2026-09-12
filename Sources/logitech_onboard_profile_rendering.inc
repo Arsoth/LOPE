@@ -169,6 +169,20 @@ static void print_profile_summary(const Profile *profile, bool show_buttons) {
     } else {
         printf("  DPI stages: not recognized; stage editing is disabled\n");
     }
+    if (profile->rgb_layout_supported) {
+        printf("  RGB zones: %zu (legacy 11-byte records at offset %zu)\n",
+               profile->rgb_zone_count, profile->rgb_offset);
+        for (size_t i = 0; i < profile->rgb_zone_count; i++) {
+            const uint8_t *record = profile->data + profile->rgb_offset +
+                i * RGB_PROFILE_RECORD_BYTES;
+            printf("  RGB zone %zu: %02X%02X%02X (mode 0x%02X)\n", i + 1,
+                   record[RGB_PROFILE_COLOR_OFFSET],
+                   record[RGB_PROFILE_COLOR_OFFSET + 1],
+                   record[RGB_PROFILE_COLOR_OFFSET + 2], record[0]);
+        }
+    } else {
+        printf("  RGB zones: not recognized; color editing is disabled\n");
+    }
     if (profile->button_offset != 0 || profile->layout_supported) {
         printf("  button array: offset %zu (%zu/%u structurally valid, %zu recognized)\n",
                profile->button_offset,
@@ -240,4 +254,3 @@ static void print_device_line(const Device *device, size_t index) {
            index, device_connection(device), device_label(device),
            device->protocol, device->iface->product_id, key);
 }
-

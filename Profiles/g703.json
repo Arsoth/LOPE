@@ -76,6 +76,20 @@
 			"The wired G403-style shell and G703 LIGHTSPEED share the six-control mapping."
 		]
 	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{ "index": 0, "name": "Scroll wheel" },
+			{ "index": 1, "name": "Logo" }
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the scroll-wheel and logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
 	"sources": [
 		"https://www.logitechg.com/en-my/shop/p/g703-hero-wireless-gaming-mouse.910-005642",
 		"https://github.com/libratbag/libratbag/wiki/Devices"

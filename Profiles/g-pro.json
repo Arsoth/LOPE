@@ -76,5 +76,18 @@
 			"The plain G PRO descriptor is lower priority than the G PRO Wireless descriptor."
 		]
 	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{ "index": 0, "name": "Logo and side lighting" }
+		],
+		"notes": [
+			"Validated legacy onboard RGB record: the combined Logo and side-lighting zone is record 0. Only the three-byte solid-color field is edited."
+		]
+	},
 	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
 }

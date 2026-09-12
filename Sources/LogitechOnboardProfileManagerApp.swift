@@ -26,6 +26,7 @@ final class AppModel: ObservableObject {
     @Published var shiftStage = 1
     @Published var dpiCapabilities = DPICapabilities()
     @Published var dpiDetails = "DPI capabilities have not been read."
+    @Published var rgbZones: [RGBZoneState] = []
     @Published var busy = false
     @Published var loadingProfile = false
     @Published var inputMonitoringAuthorized = false
@@ -48,6 +49,8 @@ final class AppModel: ObservableObject {
     var baselineDPICount = 5
     var baselineDefaultStage = 3
     var baselineShiftStage = 1
+    var baselineRGBColors: [Int: RGBColor] = [:]
+    var rgbEditingAllZones = false
     var currentDeviceName = ""
     var refreshTask: Task<Void, Never>?
     var refreshGeneration = 0
@@ -58,6 +61,10 @@ final class AppModel: ObservableObject {
     var liveDPIPollTask: Task<Void, Never>?
     var knownDisconnectedDevice: DeviceChoice?
     var initialBackupKeys = Set<String>()
+
+    // Test and diagnostic callers can replace the process boundary without
+    // changing the production HID++ command construction.
+    var engineRunnerOverride: (([String]) throws -> String)?
 
     var currentMouseProfile: MouseProfileDescriptor {
         currentCatalogProfile ?? MouseProfileCatalog.genericProfile
@@ -139,7 +146,7 @@ final class AppModel: ObservableObject {
     var backupDirectory: URL
     let defaultBackupDirectory: URL
 
-    init() {
+    init(startInitialRefresh: Bool = true) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(AppConstants.appSupportDirectory, isDirectory: true)
             .appendingPathComponent("Backups", isDirectory: true)
@@ -159,11 +166,13 @@ final class AppModel: ObservableObject {
         inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
         refreshBackups()
-        applyWindowAppearance(appearancePreference)
-        isDarkAppearance = effectiveAppearanceIsDark(for: appearancePreference)
-        Task { @MainActor in
-            initialRefresh()
-            startReconnectMonitor()
+        if startInitialRefresh {
+            applyWindowAppearance(appearancePreference)
+            isDarkAppearance = effectiveAppearanceIsDark(for: appearancePreference)
+            Task { @MainActor in
+                initialRefresh()
+                startReconnectMonitor()
+            }
         }
     }
 
@@ -221,6 +230,24 @@ final class AppModel: ObservableObject {
             defaultStage != baselineDefaultStage || shiftStage != baselineShiftStage
     }
 
+    func rgbCapabilities(profileFormat: Int? = nil) -> MouseProfileDescriptor.RGBProfile? {
+        let selected = devices.first(where: { $0.id == selectedDeviceIndex })
+        guard currentMouseProfile.profileIO.canSave else { return nil }
+        return currentMouseProfile.rgbCapabilities(
+            deviceName: currentDeviceName.isEmpty ? (selected?.name ?? "") : currentDeviceName,
+            productID: selected?.productID ?? "",
+            profileFormat: profileFormat
+        )
+    }
+
+    var shouldShowRGBEditor: Bool {
+        !loadingProfile && !rgbZones.isEmpty && rgbCapabilities() != nil
+    }
+
+    var hasRGBChanges: Bool {
+        rgbZones.contains { $0.current != $0.draft }
+    }
+
     var canApplyDPI: Bool {
         dpiValidationMessage == nil
     }
@@ -240,6 +267,6 @@ final class AppModel: ObservableObject {
     }
 
     var hasPendingChanges: Bool {
-        hasButtonChanges || hasDPIChanges || hasProfileChanges
+        hasButtonChanges || hasDPIChanges || hasProfileChanges || hasRGBChanges
     }
 }

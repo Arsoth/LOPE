@@ -21,7 +21,10 @@ extension AppModel {
     }
 
     func runEngine(_ arguments: [String]) throws -> String {
-        try runEngine(arguments, selectingDevice: true)
+        if let engineRunnerOverride {
+            return try engineRunnerOverride(arguments)
+        }
+        return try runEngine(arguments, selectingDevice: true)
     }
 
     private func runEngine(_ arguments: [String], selectingDevice: Bool) throws -> String {
@@ -116,11 +119,18 @@ extension AppModel {
         ProfileOutputParser.onboardProfileCapacity(in: text)
     }
 
-    func parseProfiles(_ text: String) -> (choices: [ProfileChoice], rowsByProfile: [Int: [ButtonRow]]) {
+    func parseProfiles(_ text: String) -> (
+        choices: [ProfileChoice],
+        rowsByProfile: [Int: [ButtonRow]],
+        rgbByProfile: [Int: [ParsedRGBZone]],
+        profileFormatsByProfile: [Int: Int]
+    ) {
         let profilePattern = try! NSRegularExpression(pattern: #"^Profile\s+(\d+)\s+\(sector\s+(0x[0-9A-Fa-f]+),\s+enabled=(yes|no)\)"#)
         let buttonPattern = try! NSRegularExpression(pattern: #"^\s*button\s+(\d+):\s*(.*?)\s*\[([0-9A-Fa-f ]+)\]"#)
         var choices: [ProfileChoice] = []
         var rows: [Int: [ButtonRow]] = [:]
+        var rgb: [Int: [ParsedRGBZone]] = [:]
+        var profileFormats: [Int: Int] = [:]
         var currentProfile: Int?
         for line in text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
             let full = NSRange(line.startIndex..<line.endIndex, in: line)
@@ -139,6 +149,7 @@ extension AppModel {
                     ))
                 }
                 rows[id] = []
+                rgb[id] = []
                 continue
             }
             if let profile = currentProfile,
@@ -153,6 +164,16 @@ extension AppModel {
                 default:
                     break
                 }
+            }
+            if let profile = currentProfile,
+               let format = ProfileOutputParser.profileFormat(from: line) {
+                profileFormats[profile] = format
+                continue
+            }
+            if let profile = currentProfile,
+               let parsedRGB = ProfileOutputParser.rgbZone(from: line) {
+                rgb[profile, default: []].append(parsedRGB)
+                continue
             }
             guard let profile = currentProfile,
                   let match = buttonPattern.firstMatch(in: line, range: full),
@@ -174,7 +195,7 @@ extension AppModel {
                 draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke"
             ))
         }
-        return (choices, rows)
+        return (choices, rows, rgb, profileFormats)
     }
 
     func parseDPI(_ text: String) {

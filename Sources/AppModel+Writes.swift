@@ -18,6 +18,7 @@ extension AppModel {
             status = "No button changes to apply."
             return
         }
+        guard validatePrimaryClickBeforeWrite() else { return }
         executeBatchSave(buttonChanges: changes, dpiChanged: false, profileChanges: [])
     }
 
@@ -31,6 +32,7 @@ extension AppModel {
             status = "Enter one to five numeric DPI stages."
             return
         }
+        guard validatePrimaryClickBeforeWrite() else { return }
         executeBatchSave(buttonChanges: [], dpiChanged: true, profileChanges: [])
     }
 
@@ -42,10 +44,11 @@ extension AppModel {
         }
         let buttonChanges = buttons.filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
         let dpiChanged = hasDPIChanges
+        let rgbChanges = rgbZones.filter { $0.current != $0.draft }
         let profileChanges = profiles
             .filter { $0.enabled != (baselineProfileEnabled[$0.id] ?? $0.enabled) }
             .sorted { $0.enabled && !$1.enabled }
-        guard !buttonChanges.isEmpty || dpiChanged || !profileChanges.isEmpty else {
+        guard !buttonChanges.isEmpty || dpiChanged || !rgbChanges.isEmpty || !profileChanges.isEmpty else {
             status = "No changes to apply."
             return
         }
@@ -53,21 +56,30 @@ extension AppModel {
             status = "Enter one to five numeric DPI stages before saving."
             return
         }
-        executeBatchSave(buttonChanges: buttonChanges, dpiChanged: dpiChanged, profileChanges: profileChanges)
+        guard validatePrimaryClickBeforeWrite() else { return }
+        executeBatchSave(buttonChanges: buttonChanges, dpiChanged: dpiChanged,
+                         rgbChanges: rgbChanges, profileChanges: profileChanges)
     }
 
     private func executeBatchSave(
         buttonChanges: [ButtonRow],
         dpiChanged: Bool,
+        rgbChanges: [RGBZoneState] = [],
         profileChanges: [ProfileChoice]
     ) {
         guard !busy else { return }
+        guard validatePrimaryClickBeforeWrite() else { return }
         busy = true
         defer { busy = false }
         let operationID = saveOperationID()
+        let operationBackupDirectory = mouseBackupDirectory()
+        try? FileManager.default.createDirectory(
+            at: operationBackupDirectory,
+            withIntermediateDirectories: true
+        )
         var arguments = [
             "--profile", String(profileNumber),
-            "--backup-directory", backupDirectory.path,
+            "--backup-directory", operationBackupDirectory.path,
             "--operation-id", operationID,
             "apply"
         ]
@@ -79,6 +91,7 @@ extension AppModel {
                 "--shift", String(shiftStage)
             ]
         }
+        arguments += rgbChanges.map { ["--rgb-change", "\($0.id + 1):\($0.draft.bareHex)"] }.flatMap { $0 }
         arguments += profileChanges.flatMap {
             ["--profile-state-change", "\($0.id):\($0.enabled ? "enable" : "disable")"]
         }
@@ -94,7 +107,8 @@ extension AppModel {
             let liveDPI = output.components(separatedBy: "\n")
                 .first { $0.hasPrefix("Live default DPI:") }
             let liveSuffix = liveDPI.map { " \($0)" } ?? ""
-            status = "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back.\(liveSuffix)"
+            let rgbSuffix = rgbChanges.isEmpty ? "" : " RGB colors were read back from the profile summary."
+            status = "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back.\(rgbSuffix)\(liveSuffix)"
         } catch {
             let details = error.localizedDescription
             recoveryBackups = batchRecoveryBackups(from: details)
@@ -106,6 +120,20 @@ extension AppModel {
                 ? details
                 : "Save operation \(operationID) failed.\n\(summary)\nUse ‘Restore backups from this save’ to recover the pre-save sectors."
         }
+    }
+
+    var primaryClickValidationMessage: String? {
+        ProfileWriteValidation.missingPrimaryClickMessage(
+            profileNumber: profileNumber,
+            profileName: currentMouseProfile.name,
+            buttonRaws: buttons.map(\.draftRaw)
+        )
+    }
+
+    private func validatePrimaryClickBeforeWrite() -> Bool {
+        guard let message = primaryClickValidationMessage else { return true }
+        status = message
+        return false
     }
 
     func restoreLastSaveBackups() {
@@ -128,7 +156,7 @@ extension AppModel {
         var restored = 0
         do {
             for backup in candidates {
-                _ = try runEngine(["restore", backup.path, "--yes"])
+                _ = try runEngine(BackupStorage.restoreArguments(for: backup))
                 restored += 1
             }
             recoveryBackups.removeAll()
@@ -175,6 +203,10 @@ extension AppModel {
         defer { busy = false }
         do {
             let backup = backupURL(prefix: "profile-\(profileNumber)-manual")
+            try? FileManager.default.createDirectory(
+                at: backup.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             _ = try runEngine(["--profile", String(profileNumber), "dump", backup.path])
             refreshBackups()
             status = "Saved a read-only profile backup at \(backup.path)."
@@ -192,6 +224,7 @@ extension AppModel {
             UTType(filenameExtension: AppConstants.backupExtension) ?? .data,
             UTType(filenameExtension: "bin") ?? .data
         ]
+        panel.directoryURL = backupDirectory
         return panel.runModal() == .OK ? panel.url : nil
     }
 
@@ -244,6 +277,7 @@ extension AppModel {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [UTType.json]
+        panel.directoryURL = defaultDocumentsDirectory
         return panel.runModal() == .OK ? panel.url : nil
     }
 
@@ -251,7 +285,7 @@ extension AppModel {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
         panel.allowedContentTypes = [UTType.json]
-        panel.directoryURL = backupDirectory
+        panel.directoryURL = defaultDocumentsDirectory
         panel.nameFieldStringValue = editableJSONExportName()
         panel.message = "Export the selected profile as an editable JSON file."
         return panel.runModal() == .OK ? panel.url : nil
@@ -327,6 +361,24 @@ extension AppModel {
                 proposedDPI = dpi
             }
 
+            var proposedRGB: [Int: RGBColor] = [:]
+            if let rgb = backup.profile.rgb {
+                guard let capability = rgbCapabilities(), !capability.zones.isEmpty else {
+                    status = "This JSON contains RGB settings, but the selected device/profile does not advertise writable RGB zones."
+                    return
+                }
+                let allowedZones = Set(capability.zones.map(\.index))
+                for zone in rgb {
+                    guard allowedZones.contains(zone.zone),
+                          proposedRGB[zone.zone] == nil,
+                          let color = RGBColor(hex: zone.color) else {
+                        status = "The JSON RGB zones or colors are invalid for this device."
+                        return
+                    }
+                    proposedRGB[zone.zone] = color
+                }
+            }
+
             for profile in profiles {
                 if let enabled = proposedStates[profile.id],
                    let index = self.profiles.firstIndex(where: { $0.id == profile.id }) {
@@ -341,6 +393,9 @@ extension AppModel {
                 dpiStages = dpi.stages.map(String.init) + Array(repeating: "", count: 5 - dpi.stages.count)
                 defaultStage = dpi.defaultStage
                 shiftStage = dpi.shiftStage
+            }
+            for (zoneID, color) in proposedRGB {
+                setRGBColor(zoneID: zoneID, color: color)
             }
 
             let sourceWarning = backup.device.productID.isEmpty || devices.first(where: { $0.id == selectedDeviceIndex })?.productID == backup.device.productID
@@ -379,6 +434,21 @@ extension AppModel {
             let values = baselineDPIStages.prefix(baselineDPICount).compactMap(Int.init)
             dpi = values.count == baselineDPICount ? EditableBackup.DPI(stages: values, defaultStage: baselineDefaultStage, shiftStage: baselineShiftStage) : nil
         }
+        let rgb: [EditableBackup.Profile.RGB]?
+        if let capability = rgbCapabilities(), !rgbZones.isEmpty {
+            let colors = rgbZones.compactMap { zone -> EditableBackup.Profile.RGB? in
+                let color = useDrafts ? zone.draft : zone.current
+                guard capability.zones.contains(where: { $0.index == zone.id }) else { return nil }
+                return EditableBackup.Profile.RGB(
+                    zone: zone.id,
+                    name: zone.name,
+                    color: color.hex
+                )
+            }
+            rgb = colors.isEmpty ? nil : colors
+        } else {
+            rgb = nil
+        }
         let states = profiles.map { profile in
             EditableBackup.ProfileState(
                 number: profile.id,
@@ -398,7 +468,8 @@ extension AppModel {
                 sector: selectedProfile?.sector,
                 enabled: useDrafts ? (selectedProfile?.enabled ?? false) : (baselineProfileEnabled[profileNumber] ?? false),
                 buttons: profileButtons,
-                dpi: dpi
+                dpi: dpi,
+                rgb: rgb
             ),
             exactBinaryBackup: binaryBackup?.lastPathComponent
         )
@@ -437,7 +508,7 @@ extension AppModel {
         guard !busy else { return }
         busy = true
         do {
-            _ = try runEngine(["restore", url.path, "--yes"])
+            _ = try runEngine(BackupStorage.restoreArguments(for: url))
             refreshBackups()
             busy = false
             refresh()

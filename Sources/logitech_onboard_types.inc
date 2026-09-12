@@ -44,6 +44,7 @@
 #define MAX_HEADERS 32
 #define MAX_DPI_VALUES 1024
 #define MAX_BATCH_BUTTON_CHANGES 64
+#define MAX_BATCH_RGB_CHANGES 4
 #define MAX_BATCH_PROFILE_CHANGES MAX_HEADERS
 #define SW_ID 0x0B
 
@@ -78,6 +79,13 @@
 #define BACKUP_HEADER_BYTES 20
 #define BACKUP_MAGIC "LOGIOB02"
 #define MAX_BACKUP_SECTORS 32
+
+// Format-4/5 profile sectors reserve four 11-byte lighting records after the
+// profile name. The first byte is the effect mode and bytes 1..3 are RGB.
+#define RGB_PROFILE_BASE_OFFSET 208
+#define RGB_PROFILE_RECORD_BYTES 11
+#define RGB_PROFILE_COLOR_OFFSET 1
+#define RGB_PROFILE_RECORD_COUNT 4
 
 typedef struct HidReportNode {
     uint32_t report_id;
@@ -200,6 +208,9 @@ typedef struct {
     // family-specific: some mice use 0 while others use 0xFFFF.
     uint16_t dpi_unused_value;
     bool dpi_layout_supported;
+    size_t rgb_offset;
+    size_t rgb_zone_count;
+    bool rgb_layout_supported;
 } Profile;
 
 typedef struct {
@@ -223,6 +234,8 @@ typedef struct {
     const char *operation_id;
     const char *button_changes[MAX_BATCH_BUTTON_CHANGES];
     size_t button_change_count;
+    const char *rgb_changes[MAX_BATCH_RGB_CHANGES];
+    size_t rgb_change_count;
     const char *profile_state_changes[MAX_BATCH_PROFILE_CHANGES];
     size_t profile_state_change_count;
     bool yes;

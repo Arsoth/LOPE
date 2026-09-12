@@ -109,6 +109,18 @@ static int run_self_test(void) {
     for (size_t i = 0; i < 5; i++) {
         write_le16(profile.data + 3 + i * 2, sample_dpi[i]);
     }
+    for (size_t i = 0; i < RGB_PROFILE_RECORD_COUNT; i++) {
+        memset(profile.data + RGB_PROFILE_BASE_OFFSET + i * RGB_PROFILE_RECORD_BYTES,
+               0xFF, RGB_PROFILE_RECORD_BYTES);
+    }
+    profile.data[RGB_PROFILE_BASE_OFFSET] = 0x01;
+    profile.data[RGB_PROFILE_BASE_OFFSET + 1] = 0x10;
+    profile.data[RGB_PROFILE_BASE_OFFSET + 2] = 0x20;
+    profile.data[RGB_PROFILE_BASE_OFFSET + 3] = 0x30;
+    profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES] = 0x01;
+    profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES + 1] = 0x40;
+    profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES + 2] = 0x50;
+    profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES + 3] = 0x60;
     profile.data[1] = 2;
     profile.data[2] = 0;
     sector_put_crc(profile.data, profile.data_length);
@@ -120,6 +132,28 @@ static int run_self_test(void) {
     snprintf(g203_device.name, sizeof(g203_device.name), "G203 LIGHTSYNC Gaming Mouse");
     g203_device.iface = &g203_interface;
     detect_dpi_layout(&profile, &g203_device);
+    detect_rgb_layout(&profile);
+    uint8_t parsed_rgb_color[3] = {0};
+    int parsed_rgb_zone = 0;
+    bool rgb_parser_ok = parse_batch_rgb_change("2:A1B2C3", &parsed_rgb_zone,
+                                               parsed_rgb_color) &&
+                         parsed_rgb_zone == 2 && parsed_rgb_color[0] == 0xA1 &&
+                         parsed_rgb_color[1] == 0xB2 && parsed_rgb_color[2] == 0xC3 &&
+                         !parse_batch_rgb_change("3:GG0000", &parsed_rgb_zone,
+                                                 parsed_rgb_color);
+    uint8_t rgb_zones[1] = {1};
+    uint8_t rgb_colors[1][3] = {{0xAA, 0xBB, 0xCC}};
+    bool rgb_write_ok = write_rgb_zone_colors(profile.data, &profile, rgb_zones,
+                                               rgb_colors, 1) &&
+                        profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES + 1] == 0xAA &&
+                        profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES + 2] == 0xBB &&
+                        profile.data[RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES + 3] == 0xCC;
+    uint8_t saved_invalid_mode = profile.data[RGB_PROFILE_BASE_OFFSET + 2 * RGB_PROFILE_RECORD_BYTES];
+    profile.data[RGB_PROFILE_BASE_OFFSET + 2 * RGB_PROFILE_RECORD_BYTES] = 0x7F;
+    detect_rgb_layout(&profile);
+    bool rgb_unsupported_ok = !profile.rgb_layout_supported;
+    profile.data[RGB_PROFILE_BASE_OFFSET + 2 * RGB_PROFILE_RECORD_BYTES] = saved_invalid_mode;
+    detect_rgb_layout(&profile);
     uint8_t alt_tab[4];
     bool target_ok = parse_target("alt-tab", alt_tab) && alt_tab[0] == 0x80 && alt_tab[1] == 0x02 &&
                      alt_tab[2] == 0x04 && alt_tab[3] == 0x2B;
@@ -127,7 +161,9 @@ static int run_self_test(void) {
     bool passed = profile.crc_ok && profile.layout_supported && profile.button_offset == 32 &&
                   profile.dpi_layout_supported && profile.dpi_offset == 3 &&
                   read_le16(profile.data + profile.dpi_offset + 2 * 2) == 1600 &&
-                  rear == 4 && target_ok;
+                  rear == 4 && target_ok && rgb_parser_ok && rgb_write_ok &&
+                  rgb_unsupported_ok && profile.rgb_layout_supported &&
+                  profile.rgb_zone_count == 2;
     uint16_t compacted_dpi[4] = {800, 1200, 2400, 3200};
     bool compacted_write_ok = write_dpi_stage_table(profile.data, &profile,
                                                      compacted_dpi, 4);

@@ -611,6 +611,81 @@ static void detect_dpi_layout(Profile *profile, const Device *device) {
     profile->dpi_layout_supported = true;
 }
 
+static bool rgb_mode_is_known(uint8_t mode) {
+    // Legacy onboard RGB records use off, solid, cycling, and breathing.
+    return mode == 0x00 || mode == 0x01 || mode == 0x03 || mode == 0x0A;
+}
+
+static bool rgb_record_is_disabled(const uint8_t record[RGB_PROFILE_RECORD_BYTES]) {
+    for (size_t i = 0; i < RGB_PROFILE_RECORD_BYTES; i++) {
+        if (record[i] != 0xFF) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void detect_rgb_layout(Profile *profile) {
+    profile->rgb_offset = 0;
+    profile->rgb_zone_count = 0;
+    profile->rgb_layout_supported = false;
+
+    // The 208..251 RGB area is part of the validated format-4/5 layout.
+    // Newer formats may move or repurpose these bytes, so they stay read-only.
+    if (profile->info.profile_format < 4 || profile->info.profile_format > 5 ||
+        profile->data_length < RGB_PROFILE_BASE_OFFSET +
+            RGB_PROFILE_RECORD_BYTES * RGB_PROFILE_RECORD_COUNT + 2) {
+        return;
+    }
+
+    size_t count = 0;
+    for (size_t index = 0; index < RGB_PROFILE_RECORD_COUNT; index++) {
+        const uint8_t *record = profile->data + RGB_PROFILE_BASE_OFFSET +
+            index * RGB_PROFILE_RECORD_BYTES;
+        if (rgb_record_is_disabled(record)) {
+            break;
+        }
+        if (!rgb_mode_is_known(record[0])) {
+            // Do not expose an earlier prefix when the record stream is not
+            // proven; a later firmware variant may use a different layout.
+            return;
+        }
+        count++;
+    }
+    if (count == 0) {
+        return;
+    }
+    profile->rgb_offset = RGB_PROFILE_BASE_OFFSET;
+    profile->rgb_zone_count = count;
+    profile->rgb_layout_supported = true;
+}
+
+static bool write_rgb_zone_colors(uint8_t *data,
+                                  const Profile *profile,
+                                  const uint8_t zones[],
+                                  const uint8_t colors[][3],
+                                  size_t count) {
+    if (data == NULL || profile == NULL || zones == NULL || colors == NULL ||
+        !profile->rgb_layout_supported || count == 0 ||
+        count > RGB_PROFILE_RECORD_COUNT ||
+        profile->rgb_offset + RGB_PROFILE_RECORD_BYTES * profile->rgb_zone_count + 2 >
+            profile->data_length) {
+        return false;
+    }
+    bool seen[RGB_PROFILE_RECORD_COUNT] = {false};
+    for (size_t i = 0; i < count; i++) {
+        size_t zone = zones[i];
+        if (zone >= profile->rgb_zone_count || seen[zone]) {
+            return false;
+        }
+        seen[zone] = true;
+        size_t offset = profile->rgb_offset + zone * RGB_PROFILE_RECORD_BYTES +
+            RGB_PROFILE_COLOR_OFFSET;
+        memcpy(data + offset, colors[i], 3);
+    }
+    return true;
+}
+
 static bool write_dpi_stage_table(uint8_t *data,
                                   const Profile *profile,
                                   const uint16_t *stages,
@@ -765,6 +840,7 @@ static int load_profile_with_headers(Device *device,
     profile->crc_checked = true;
     detect_button_layout(profile);
     detect_dpi_layout(profile, device);
+    detect_rgb_layout(profile);
     return 1;
 }
 
@@ -807,7 +883,8 @@ static int load_profile_summary_with_headers(Device *device,
     // its first pass. Avoid reading the rest of a large sector; a full sector
     // read remains available to explicit reload/write paths where CRC is
     // required.
-    size_t summary_length = 48 + (size_t)info->button_count * 4 + 2;
+    size_t summary_length = RGB_PROFILE_BASE_OFFSET +
+        RGB_PROFILE_RECORD_BYTES * RGB_PROFILE_RECORD_COUNT + 2;
     if (summary_length > info->sector_size) {
         summary_length = info->sector_size;
     }
@@ -825,6 +902,7 @@ static int load_profile_summary_with_headers(Device *device,
     profile->crc_checked = false;
     detect_button_layout(profile);
     detect_dpi_layout(profile, device);
+    detect_rgb_layout(profile);
     return 1;
 }
 

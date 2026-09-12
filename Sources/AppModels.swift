@@ -151,11 +151,18 @@ struct EditableBackup: Codable {
     }
 
     struct Profile: Codable {
+        struct RGB: Codable {
+            var zone: Int
+            var name: String
+            var color: String
+        }
+
         var number: Int
         var sector: String?
         var enabled: Bool
         var buttons: [Button]
         var dpi: DPI?
+        var rgb: [RGB]?
     }
 
     var formatVersion: Int

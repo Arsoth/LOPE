@@ -75,6 +75,60 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
         }
     }
 
+    /// The small, fixed RGB records used by the validated format-4/5 profile
+    /// layout. `index` is the zero-based record index in the profile sector;
+    /// the user-facing name is supplied by the device descriptor.
+    struct RGBProfile: Codable, Hashable, Sendable {
+        struct Zone: Codable, Hashable, Sendable {
+            var index: Int
+            var name: String
+        }
+
+        var supported: Bool
+        var profileFormats: [Int]
+        var baseOffset: Int
+        var recordBytes: Int
+        var colorOffset: Int
+        var zones: [Zone]
+        var deviceNameContains: [String]?
+        var productIDs: [String]?
+        var notes: [String]
+
+        func matches(deviceName: String, productID: String) -> Bool {
+            let name = deviceName.lowercased()
+            let product = productID.lowercased()
+            let nameHit = deviceNameContains?.contains { name.contains($0.lowercased()) } ?? false
+            let productHit = productIDs?.contains { product == $0.lowercased() } ?? false
+            let hasRestriction = !(deviceNameContains ?? []).isEmpty || !(productIDs ?? []).isEmpty
+            return !hasRestriction || nameHit || productHit
+        }
+
+        func supports(profileFormat: Int?) -> Bool {
+            guard supported else { return false }
+            guard let profileFormat else { return true }
+            return profileFormats.contains(profileFormat)
+        }
+
+        var canEdit: Bool {
+            supported && !zones.isEmpty &&
+                baseOffset >= 0 && recordBytes >= 4 &&
+                (0..<recordBytes).contains(colorOffset) && colorOffset + 3 <= recordBytes
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            supported = try values.decodeIfPresent(Bool.self, forKey: .supported) ?? false
+            profileFormats = try values.decodeIfPresent([Int].self, forKey: .profileFormats) ?? []
+            baseOffset = try values.decodeIfPresent(Int.self, forKey: .baseOffset) ?? 208
+            recordBytes = try values.decodeIfPresent(Int.self, forKey: .recordBytes) ?? 11
+            colorOffset = try values.decodeIfPresent(Int.self, forKey: .colorOffset) ?? 1
+            zones = try values.decodeIfPresent([Zone].self, forKey: .zones) ?? []
+            deviceNameContains = try values.decodeIfPresent([String].self, forKey: .deviceNameContains)
+            productIDs = try values.decodeIfPresent([String].self, forKey: .productIDs)
+            notes = try values.decodeIfPresent([String].self, forKey: .notes) ?? []
+        }
+    }
+
     var schemaVersion: Int
     var id: String
     var name: String
@@ -90,6 +144,7 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     var dpiRange: DPIRange?
     var refreshGuidance: OnboardProfileRefreshGuidance?
     var profileIO: ProfileIO
+    var rgbProfile: RGBProfile?
     var sources: [String]
 
     var initialDPICapabilities: DPICapabilities {
@@ -102,6 +157,14 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
 
     func scrollWheelButtonLabel(for number: Int) -> String? {
         scrollWheelButtonLabels?[String(number)]
+    }
+
+    func rgbCapabilities(deviceName: String, productID: String, profileFormat: Int? = nil) -> RGBProfile? {
+        guard let rgbProfile,
+              rgbProfile.canEdit,
+              rgbProfile.matches(deviceName: deviceName, productID: productID),
+              rgbProfile.supports(profileFormat: profileFormat) else { return nil }
+        return rgbProfile
     }
 
 }
@@ -203,6 +266,7 @@ struct MouseProfileCatalog: Sendable {
             layout: [:],
             notes: ["The engine must validate the profile layout before writing."]
         ),
+        rgbProfile: nil,
         sources: []
     )
 }

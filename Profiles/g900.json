@@ -97,6 +97,20 @@
 			"G900 shares the ambidextrous 11-record family with G903; installed side-button caps determine which controls are physically present."
 		]
 	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{ "index": 0, "name": "DPI indicator" },
+			{ "index": 1, "name": "Logo" }
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the DPI-indicator and Logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
 	"sources": [
 		"https://github.com/libratbag/libratbag/wiki/Devices",
 		"https://lightspeed.logitechg.com/moba/"

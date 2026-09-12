@@ -96,6 +96,20 @@
 			"This is the original G502/HERO/LIGHTSPEED order. Do not reuse it for G502 X: the X family moves the DPI and tilt records."
 		]
 	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{ "index": 0, "name": "Primary" },
+			{ "index": 1, "name": "Logo" }
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the Primary/DPI and Logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
 	"sources": [
 		"https://secure.logitech.com/assets/50955/g502-proteus-core-setup-guide.pdf",
 		"https://www.logitechg.com/en-us/shop/p/g502-lightspeed-wireless-gaming-mouse",

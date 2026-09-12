@@ -134,6 +134,112 @@ struct ProfileOutputParserSelfTest {
             }
         }
 
-        print("profile metadata self-test: capacity, selection, and DPI cases passed")
+        let fileManager = FileManager.default
+        let testRoot = fileManager.temporaryDirectory
+            .appendingPathComponent("lope-backup-storage-\(UUID().uuidString)", isDirectory: true)
+        do {
+            let g502Directory = BackupStorage.modelDirectory(root: testRoot, mouseIdentifier: "G502 X/PLUS")
+            let legacyDirectory = testRoot.appendingPathComponent("legacy", isDirectory: true)
+            let hiddenDirectory = testRoot.appendingPathComponent(".hidden", isDirectory: true)
+            try fileManager.createDirectory(at: g502Directory, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: legacyDirectory, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: hiddenDirectory, withIntermediateDirectories: true)
+
+            let first = BackupStorage.uniqueBackupURL(
+                root: testRoot,
+                mouseIdentifier: "G502 X/PLUS",
+                prefix: "profile-1-save",
+                fileExtension: "logiob",
+                timestamp: "20260912-120000"
+            )
+            guard first.path == testRoot
+                    .appendingPathComponent("G502-X-PLUS", isDirectory: true)
+                    .appendingPathComponent("G502-X-PLUS-profile-1-save-20260912-120000.logiob")
+                    .path,
+                  BackupStorage.mouseIdentifier(fromBackupFilename: first.lastPathComponent) == "G502-X-PLUS" else {
+                fatalError("model backup directory or filename sanity check failed")
+            }
+
+            try Data([0x01]).write(to: first)
+            let second = BackupStorage.uniqueBackupURL(
+                root: testRoot,
+                mouseIdentifier: "G502 X/PLUS",
+                prefix: "profile-1-save",
+                fileExtension: "logiob",
+                timestamp: "20260912-120000"
+            )
+            guard second.lastPathComponent == "G502-X-PLUS-profile-1-save-20260912-120000-2.logiob" else {
+                fatalError("model backup filename collision handling failed")
+            }
+
+            let legacy = legacyDirectory.appendingPathComponent("legacy.bin")
+            let json = g502Directory.appendingPathComponent("G502-X-PLUS-profile-1-export.json")
+            let hidden = hiddenDirectory.appendingPathComponent("hidden.logiob")
+            try Data([0x02]).write(to: legacy)
+            try Data([0x03]).write(to: json)
+            try Data([0x04]).write(to: hidden)
+            let discovered = Set(BackupStorage.backupURLs(in: testRoot).map { $0.standardizedFileURL })
+            let expectedBackups = Set([first, legacy, json].map { $0.standardizedFileURL })
+            guard discovered == expectedBackups,
+                  BackupStorage.mouseIdentifier(fromBackupFilename: "profile-1-save-20260912-120000.logiob") == nil,
+                  BackupStorage.restoreArguments(for: first) == ["restore", first.path, "--yes"] else {
+                fatalError("nested backup discovery or restore path handling failed")
+            }
+
+            let expectedDocuments = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
+            guard BackupStorage.documentsDirectory(fileManager: fileManager) == expectedDocuments else {
+                fatalError("JSON panel Documents default failed")
+            }
+        } catch {
+            fatalError("backup storage regression setup failed: \(error)")
+        }
+        try? fileManager.removeItem(at: testRoot)
+
+        guard let red = RGBColor(hex: "#ff002a"),
+              red == RGBColor(red: 255, green: 0, blue: 42),
+              red.hex == "0xFF002A",
+              RGBColor(hex: "0x123456") == RGBColor(red: 0x12, green: 0x34, blue: 0x56),
+              RGBColor(hex: "12345") == nil,
+              RGBColor(hex: "0xGG0000") == nil else {
+            fatalError("RGB hex conversion or validation failed")
+        }
+
+        let parsedRGBLine = ProfileOutputParser.rgbZone(
+            from: "  RGB zone 2: A1B2C3 (mode 0x01)"
+        )
+        guard parsedRGBLine?.index == 1,
+              parsedRGBLine?.color == RGBColor(red: 0xA1, green: 0xB2, blue: 0xC3),
+              ProfileOutputParser.profileFormat(from: "  format: 0x05, macro format: 0x01") == 5,
+              ProfileOutputParser.rgbZone(from: "RGB zone 0: AABBCC (mode 0x01)") == nil else {
+            fatalError("RGB profile-output parsing failed")
+        }
+
+        let rgbZones = [
+            RGBZoneState(id: 0, name: "Primary", current: RGBColor(red: 1, green: 2, blue: 3), draft: RGBColor(red: 1, green: 2, blue: 3)),
+            RGBZoneState(id: 1, name: "Logo", current: RGBColor(red: 4, green: 5, blue: 6), draft: RGBColor(red: 4, green: 5, blue: 6))
+        ]
+        let blue = RGBColor(red: 0, green: 64, blue: 255)
+        let oneZone = RGBEditorLogic.settingColor(in: rgbZones, zoneID: 1, color: blue, allZones: false)
+        guard oneZone[0].draft == rgbZones[0].draft, oneZone[1].draft == blue else {
+            fatalError("per-zone RGB editing changed the wrong zone")
+        }
+        let allZones = RGBEditorLogic.settingColor(in: rgbZones, zoneID: 0, color: blue, allZones: true)
+        guard allZones.allSatisfy({ $0.draft == blue }),
+              RGBEditorLogic.settingColor(in: rgbZones, zoneID: 9, color: blue, allZones: true) == rgbZones else {
+            fatalError("Shift-click all-zone RGB editing failed")
+        }
+
+        let g502 = MouseProfileCatalog.shared.profile(deviceName: "G502 HERO", productID: "0xC08B")
+        guard let g502RGB = g502.rgbCapabilities(deviceName: "G502 HERO", productID: "0xC08B", profileFormat: 5),
+              g502RGB.zones.map(\.name) == ["Primary", "Logo"],
+              g502.rgbCapabilities(deviceName: "G502 HERO", productID: "0xC08B", profileFormat: 7) == nil else {
+            fatalError("G502 RGB capability gating failed")
+        }
+        let unsupported = MouseProfileCatalog.shared.profile(deviceName: "G603 LIGHTSPEED", productID: "0xB01C")
+        guard unsupported.rgbCapabilities(deviceName: "G603 LIGHTSPEED", productID: "0xB01C", profileFormat: 5) == nil else {
+            fatalError("unsupported device incorrectly advertised RGB")
+        }
+
+        print("profile metadata self-test: capacity, selection, DPI, backup-storage, and RGB cases passed")
     }
 }

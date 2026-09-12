@@ -17,14 +17,9 @@ extension AppModel {
 
     func refreshBackups() {
         let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
-        let urls = (try? FileManager.default.contentsOfDirectory(
-            at: backupDirectory,
-            includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let urls = BackupStorage.backupURLs(in: backupDirectory)
 
         discoveredBackups = urls
-            .filter { [AppConstants.backupExtension, "bin", "json"].contains($0.pathExtension.lowercased()) }
             .compactMap { url in
                 guard let values = try? url.resourceValues(forKeys: keys),
                       let modifiedAt = values.contentModificationDate,
@@ -69,20 +64,9 @@ extension AppModel {
         guard vendorID == 0x046D else { return nil }
         let productID = UInt16(data[12]) << 8 | UInt16(data[13])
         return BackupDeviceMetadata(
-            name: backupMouseName(from: url.lastPathComponent),
+            name: BackupStorage.mouseIdentifier(fromBackupFilename: url.lastPathComponent),
             productID: String(format: "0x%04X", productID)
         )
-    }
-
-    private func backupMouseName(from filename: String) -> String? {
-        let stem = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
-        let pattern = try! NSRegularExpression(
-            pattern: #"^(.+)-profile-\d+-[^-]+-\d{8}-\d{6}(?:-\d+)?$"#
-        )
-        let range = NSRange(stem.startIndex..<stem.endIndex, in: stem)
-        guard let match = pattern.firstMatch(in: stem, range: range),
-              let nameRange = Range(match.range(at: 1), in: stem) else { return nil }
-        return String(stem[nameRange]).nilIfEmpty
     }
 
     private func backupDeviceMatch(metadata: BackupDeviceMetadata?) -> BackupEntry.DeviceMatch {
@@ -136,24 +120,7 @@ extension AppModel {
     }
 
     func sanitizedMouseIdentifier(_ value: String, fallback: String = "mouse") -> String {
-        let folded = value.folding(options: [.diacriticInsensitive, .widthInsensitive], locale: .current)
-        var result = ""
-        var needsSeparator = false
-        for scalar in folded.unicodeScalars {
-            let asciiAlphaNumeric = (scalar.value >= 48 && scalar.value <= 57) ||
-                (scalar.value >= 65 && scalar.value <= 90) ||
-                (scalar.value >= 97 && scalar.value <= 122)
-            if asciiAlphaNumeric {
-                if needsSeparator && !result.isEmpty { result.append("-") }
-                result.append(Character(String(scalar)))
-                needsSeparator = false
-            } else {
-                needsSeparator = true
-            }
-        }
-        let trimmed = result.trimmingCharacters(in: CharacterSet(charactersIn: "-_."))
-        let bounded = String(trimmed.prefix(32))
-        return bounded.isEmpty ? fallback : bounded
+        BackupStorage.sanitizedMouseIdentifier(value, fallback: fallback)
     }
 
     func backupTimestamp(_ date: Date = Date()) -> String {
@@ -170,7 +137,13 @@ extension AppModel {
     }
 
     func editableJSONExportName() -> String {
-        "\(uniqueBackupStem(prefix: "profile-\(profileNumber)-export", fileExtension: "json")).json"
+        BackupStorage.uniqueFilename(
+            in: defaultDocumentsDirectory,
+            mouseIdentifier: selectedMouseFileIdentifier(),
+            prefix: "profile-\(profileNumber)-export",
+            fileExtension: "json",
+            timestamp: backupTimestamp()
+        ) + ".json"
     }
 
     func uniqueBackupStem(
@@ -179,16 +152,13 @@ extension AppModel {
         mouseIdentifier: String? = nil
     ) -> String {
         let identifier = mouseIdentifier ?? selectedMouseFileIdentifier()
-        let base = "\(identifier)-\(prefix)-\(backupTimestamp())"
-        var candidate = base
-        var suffix = 2
-        while FileManager.default.fileExists(
-            atPath: backupDirectory.appendingPathComponent("\(candidate).\(fileExtension)").path
-        ) {
-            candidate = "\(base)-\(suffix)"
-            suffix += 1
-        }
-        return candidate
+        return BackupStorage.uniqueFilename(
+            in: BackupStorage.modelDirectory(root: backupDirectory, mouseIdentifier: identifier),
+            mouseIdentifier: identifier,
+            prefix: prefix,
+            fileExtension: fileExtension,
+            timestamp: backupTimestamp()
+        )
     }
 
     func uniqueBackupURL(
@@ -201,7 +171,20 @@ extension AppModel {
             fileExtension: fileExtension,
             mouseIdentifier: mouseIdentifier
         )
-        return backupDirectory.appendingPathComponent("\(stem).\(fileExtension)")
+        let identifier = mouseIdentifier ?? selectedMouseFileIdentifier()
+        return BackupStorage.modelDirectory(root: backupDirectory, mouseIdentifier: identifier)
+            .appendingPathComponent("\(stem).\(fileExtension)")
+    }
+
+    var defaultDocumentsDirectory: URL {
+        BackupStorage.documentsDirectory()
+    }
+
+    func mouseBackupDirectory(for mouseIdentifier: String? = nil) -> URL {
+        BackupStorage.modelDirectory(
+            root: backupDirectory,
+            mouseIdentifier: mouseIdentifier ?? selectedMouseFileIdentifier()
+        )
     }
 
     func scheduleInitialBackups(for device: DeviceChoice, profileNumbers: [Int]) {
@@ -212,6 +195,7 @@ extension AppModel {
 
         let directory = backupDirectory
         let mouseIdentifier = sanitizedMouseIdentifier(device.name)
+        let modelDirectory = mouseBackupDirectory(for: mouseIdentifier)
         let backupURLs = profileNumbers.map { profileNumber in
             uniqueBackupURL(
                 prefix: "profile-\(profileNumber)-initial",
@@ -224,7 +208,7 @@ extension AppModel {
 
         Task { @MainActor [weak self] in
             let result = await Task.detached(priority: .utility) {
-                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                try? FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
                 var saved = 0
                 var failed = 0
                 for (profileNumber, url) in zip(profileNumbers, backupURLs) {

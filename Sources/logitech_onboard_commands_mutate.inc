@@ -366,6 +366,46 @@ static bool parse_batch_button_change(const char *text, int *button, uint8_t spe
     return true;
 }
 
+static bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]) {
+    if (text == NULL) {
+        return false;
+    }
+    const char *separator = strchr(text, ':');
+    if (separator == NULL || separator == text || separator[1] == '\0') {
+        return false;
+    }
+    char number_text[16];
+    size_t number_length = (size_t)(separator - text);
+    if (number_length >= sizeof(number_text)) {
+        return false;
+    }
+    memcpy(number_text, text, number_length);
+    number_text[number_length] = '\0';
+    char *end = NULL;
+    errno = 0;
+    long number = strtol(number_text, &end, 10);
+    if (errno != 0 || end == number_text || *end != '\0' || number < 1 ||
+        number > RGB_PROFILE_RECORD_COUNT) {
+        return false;
+    }
+    const char *hex = separator + 1;
+    if (strlen(hex) != 6) {
+        return false;
+    }
+    for (size_t i = 0; i < 3; i++) {
+        char pair[3] = {hex[i * 2], hex[i * 2 + 1], '\0'};
+        char *byte_end = NULL;
+        errno = 0;
+        unsigned long byte_value = strtoul(pair, &byte_end, 16);
+        if (errno != 0 || byte_end == pair || *byte_end != '\0' || byte_value > 0xFF) {
+            return false;
+        }
+        color[i] = (uint8_t)byte_value;
+    }
+    *zone = (int)number;
+    return true;
+}
+
 static bool parse_batch_profile_state(const char *text, int *profile, bool *enabled) {
     if (text == NULL) {
         return false;
@@ -496,9 +536,10 @@ static int run_apply(const Options *options) {
         fprintf(stderr, "apply requires an explicit --profile N selection\n");
         return 1;
     }
-    if (options->button_change_count == 0 && options->dpi_values == NULL &&
+    if (options->button_change_count == 0 && options->rgb_change_count == 0 &&
+        options->dpi_values == NULL &&
         options->profile_state_change_count == 0) {
-        fprintf(stderr, "apply requires at least one button, DPI, or profile-state change\n");
+        fprintf(stderr, "apply requires at least one button, RGB, DPI, or profile-state change\n");
         return 1;
     }
     if (options->dpi_values == NULL && (options->dpi_default >= 0 || options->dpi_shift >= 0)) {
@@ -523,6 +564,23 @@ static int run_apply(const Options *options) {
         if (!spec_structurally_valid(requested_specs[i])) {
             fprintf(stderr, "invalid --button-change record for button %d\n", requested_buttons[i]);
             return 1;
+        }
+    }
+
+    int requested_rgb_zones[MAX_BATCH_RGB_CHANGES];
+    uint8_t requested_rgb_colors[MAX_BATCH_RGB_CHANGES][3];
+    for (size_t i = 0; i < options->rgb_change_count; i++) {
+        if (!parse_batch_rgb_change(options->rgb_changes[i], &requested_rgb_zones[i],
+                                    requested_rgb_colors[i])) {
+            fprintf(stderr, "invalid --rgb-change '%s'; use N:RRGGBB with a 1-based zone number\n",
+                    options->rgb_changes[i]);
+            return 1;
+        }
+        for (size_t previous = 0; previous < i; previous++) {
+            if (requested_rgb_zones[previous] == requested_rgb_zones[i]) {
+                fprintf(stderr, "duplicate --rgb-change for zone %d\n", requested_rgb_zones[i]);
+                return 1;
+            }
         }
     }
 
@@ -637,7 +695,8 @@ static int run_apply(const Options *options) {
         goto done;
     }
 
-    bool wants_profile_sector = options->button_change_count > 0 || options->dpi_values != NULL;
+    bool wants_profile_sector = options->button_change_count > 0 ||
+        options->rgb_change_count > 0 || options->dpi_values != NULL;
     if (wants_profile_sector) {
         if (!load_profile_with_headers(device, &info, headers, header_count, options->profile, &profile) ||
             !validate_profile_for_write(&profile)) {
@@ -660,6 +719,25 @@ static int run_apply(const Options *options) {
             }
             size_t offset = profile.button_offset + (size_t)(requested_buttons[i] - 1) * 4;
             memcpy(new_profile + offset, requested_specs[i], 4);
+        }
+
+        if (options->rgb_change_count > 0) {
+            uint8_t zones[MAX_BATCH_RGB_CHANGES];
+            for (size_t i = 0; i < options->rgb_change_count; i++) {
+                if (requested_rgb_zones[i] < 1 ||
+                    requested_rgb_zones[i] > (int)profile.rgb_zone_count) {
+                    fprintf(stderr, "refusing to apply: RGB zone %d is not advertised by the validated profile (1..%zu)\n",
+                            requested_rgb_zones[i], profile.rgb_zone_count);
+                    goto done;
+                }
+                zones[i] = (uint8_t)(requested_rgb_zones[i] - 1);
+            }
+            if (!profile.rgb_layout_supported ||
+                !write_rgb_zone_colors(new_profile, &profile, zones,
+                                       requested_rgb_colors, options->rgb_change_count)) {
+                fprintf(stderr, "refusing to apply: the selected profile's RGB layout was not validated\n");
+                goto done;
+            }
         }
 
         if (options->dpi_values != NULL) {
