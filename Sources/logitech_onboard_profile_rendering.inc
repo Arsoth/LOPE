@@ -170,9 +170,18 @@ static void print_profile_summary(const Profile *profile, bool show_buttons) {
         printf("  DPI stages: not recognized; stage editing is disabled\n");
     }
     if (profile->rgb_layout_supported) {
-        printf("  RGB zones: %zu (legacy 11-byte records at offset %zu)\n",
-               profile->rgb_zone_count, profile->rgb_offset);
+        size_t present_count = 0;
         for (size_t i = 0; i < profile->rgb_zone_count; i++) {
+            if (profile->rgb_zone_present[i]) {
+                present_count++;
+            }
+        }
+        printf("  RGB zones: %zu (legacy 11-byte records at offset %zu)\n",
+               present_count, profile->rgb_offset);
+        for (size_t i = 0; i < profile->rgb_zone_count; i++) {
+            if (!profile->rgb_zone_present[i]) {
+                continue;
+            }
             const uint8_t *record = profile->data + profile->rgb_offset +
                 i * RGB_PROFILE_RECORD_BYTES;
             printf("  RGB zone %zu: %02X%02X%02X (mode 0x%02X)\n", i + 1,

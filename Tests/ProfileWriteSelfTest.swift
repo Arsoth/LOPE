@@ -17,15 +17,19 @@ struct ProfileWriteSelfTest {
 
         let invalidMessage = ProfileWriteValidation.missingPrimaryClickMessage(
             profileNumber: 2,
-            profileName: "G502 X / X LIGHTSPEED / X PLUS",
+            profileName: "G502 X",
             buttonRaws: ["80010002", "FFFFFFFF"]
         )
-        guard invalidMessage == "Profile 2 on G502 X / X LIGHTSPEED / X PLUS has no primary click assigned. Choose “Left click” for one of its buttons, then save again." else {
+        guard invalidMessage == "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again." else {
             fatalError("primary-click validation message was not actionable or profile-specific")
         }
 
         let presetModel = AppModel(startInitialRefresh: false)
         configure(presetModel)
+        guard presetModel.primaryClickValidationMessage ==
+            "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again." else {
+            fatalError("primary-click validation did not prefer the runtime mouse name")
+        }
         guard let leftClick = presetModel.presets.first(where: { $0.label == "Left click" }) else {
             fatalError("Left click preset is missing")
         }
@@ -189,7 +193,7 @@ struct ProfileWriteSelfTest {
             deviceKey: "test-device"
         )]
         model.selectedDeviceIndex = 1
-        model.currentDeviceName = "G502 X"
+        model.currentDeviceName = "G502 X / X LIGHTSPEED / X PLUS"
         model.profileNumber = 2
         model.profiles = [ProfileChoice(
             id: 2,

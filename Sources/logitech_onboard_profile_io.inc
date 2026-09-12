@@ -628,6 +628,7 @@ static bool rgb_record_is_disabled(const uint8_t record[RGB_PROFILE_RECORD_BYTES
 static void detect_rgb_layout(Profile *profile) {
     profile->rgb_offset = 0;
     profile->rgb_zone_count = 0;
+    memset(profile->rgb_zone_present, 0, sizeof(profile->rgb_zone_present));
     profile->rgb_layout_supported = false;
 
     // The 208..251 RGB area is part of the validated format-4/5 layout.
@@ -638,25 +639,31 @@ static void detect_rgb_layout(Profile *profile) {
         return;
     }
 
-    size_t count = 0;
+    size_t last_present = 0;
+    bool found = false;
     for (size_t index = 0; index < RGB_PROFILE_RECORD_COUNT; index++) {
         const uint8_t *record = profile->data + RGB_PROFILE_BASE_OFFSET +
             index * RGB_PROFILE_RECORD_BYTES;
         if (rgb_record_is_disabled(record)) {
-            break;
+            continue;
         }
         if (!rgb_mode_is_known(record[0])) {
-            // Do not expose an earlier prefix when the record stream is not
+            // Do not expose a partial layout when any populated record is not
             // proven; a later firmware variant may use a different layout.
             return;
         }
-        count++;
+        profile->rgb_zone_present[index] = true;
+        last_present = index;
+        found = true;
     }
-    if (count == 0) {
+    if (!found) {
         return;
     }
     profile->rgb_offset = RGB_PROFILE_BASE_OFFSET;
-    profile->rgb_zone_count = count;
+    // G502 X PLUS stores its controllable LIGHTSYNC cluster in the second
+    // lighting slot, leaving the first slot disabled. Keep the record index
+    // stable so the UI and write path can address sparse layouts.
+    profile->rgb_zone_count = last_present + 1;
     profile->rgb_layout_supported = true;
 }
 
@@ -676,6 +683,9 @@ static bool write_rgb_zone_colors(uint8_t *data,
     for (size_t i = 0; i < count; i++) {
         size_t zone = zones[i];
         if (zone >= profile->rgb_zone_count || seen[zone]) {
+            return false;
+        }
+        if (!profile->rgb_zone_present[zone]) {
             return false;
         }
         seen[zone] = true;

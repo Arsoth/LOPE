@@ -210,6 +210,7 @@ typedef struct {
     bool dpi_layout_supported;
     size_t rgb_offset;
     size_t rgb_zone_count;
+    bool rgb_zone_present[RGB_PROFILE_RECORD_COUNT];
     bool rgb_layout_supported;
 } Profile;
 

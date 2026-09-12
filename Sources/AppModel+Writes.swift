@@ -123,9 +123,14 @@ extension AppModel {
     }
 
     var primaryClickValidationMessage: String? {
-        ProfileWriteValidation.missingPrimaryClickMessage(
+        let runtimeMouseName = devices.first(where: { $0.id == selectedDeviceIndex })?.name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let mouseName = runtimeMouseName?.isEmpty == false
+            ? runtimeMouseName!
+            : currentDeviceName
+        return ProfileWriteValidation.missingPrimaryClickMessage(
             profileNumber: profileNumber,
-            profileName: currentMouseProfile.name,
+            profileName: mouseName,
             buttonRaws: buttons.map(\.draftRaw)
         )
     }

@@ -6,3 +6,4 @@ lope
 *.bin
 rebuild-signed.sh
 agents.md
+.VSCodeCounter

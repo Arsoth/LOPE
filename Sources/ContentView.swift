@@ -188,6 +188,128 @@ private extension View {
     }
 }
 
+private struct CenteredAppModal<Actions: View>: View {
+    let title: String
+    let message: String
+    let symbol: String
+    let onDefaultAction: () -> Void
+    let onCancel: () -> Void
+    let actions: () -> Actions
+
+    init(
+        title: String,
+        message: String,
+        symbol: String = "info.circle",
+        onDefaultAction: @escaping () -> Void = {},
+        onCancel: @escaping () -> Void = {},
+        @ViewBuilder actions: @escaping () -> Actions
+    ) {
+        self.title = title
+        self.message = message
+        self.symbol = symbol
+        self.onDefaultAction = onDefaultAction
+        self.onCancel = onCancel
+        self.actions = actions
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.title2)
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.headline)
+                    Text(message)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+            }
+            HStack {
+                Spacer()
+                actions()
+            }
+        }
+        .padding(22)
+        .frame(width: 430)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.14), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.24), radius: 24, y: 10)
+        .background(
+            ModalKeyboardHandler(
+                onDefaultAction: onDefaultAction,
+                onCancel: onCancel
+            )
+        )
+    }
+}
+
+private struct ModalKeyboardHandler: NSViewRepresentable {
+    let onDefaultAction: () -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onDefaultAction: onDefaultAction, onCancel: onCancel)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        context.coordinator.install()
+        return NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onDefaultAction = onDefaultAction
+        context.coordinator.onCancel = onCancel
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class Coordinator {
+        var onDefaultAction: () -> Void
+        var onCancel: () -> Void
+        private var monitor: Any?
+
+        init(onDefaultAction: @escaping () -> Void, onCancel: @escaping () -> Void) {
+            self.onDefaultAction = onDefaultAction
+            self.onCancel = onCancel
+        }
+
+        func install() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                switch event.keyCode {
+                case 36, 76: // Return and Enter on the numeric keypad.
+                    self.onDefaultAction()
+                    return nil
+                case 53: // Escape.
+                    self.onCancel()
+                    return nil
+                default:
+                    return event
+                }
+            }
+        }
+
+        func uninstall() {
+            guard let monitor else { return }
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+
+        deinit {
+            uninstall()
+        }
+    }
+}
+
 private struct ScrollViewScrollerInset: NSViewRepresentable {
     let rightInset: CGFloat
 
@@ -1235,6 +1357,7 @@ struct ContentView: View {
     @State private var restoreURL: URL?
     @State private var confirmRecoveryRestore = false
     @State private var presentedRGBZoneID: Int?
+    @State private var primaryClickModalPresented = false
     @Environment(\.scenePhase) private var scenePhase
 
     private var preferredColorScheme: ColorScheme {
@@ -1322,6 +1445,31 @@ struct ContentView: View {
         .frame(minWidth: 960, minHeight: 520)
         .background(appBackground)
         .preferredColorScheme(preferredColorScheme)
+        .overlay {
+            if primaryClickModalPresented {
+                ZStack {
+                    Color.black.opacity(0.24)
+                        .ignoresSafeArea()
+                        .onTapGesture { primaryClickModalPresented = false }
+                    CenteredAppModal(
+                        title: "Primary click required",
+                        message: model.primaryClickValidationMessage ?? "Choose “Left click” for the primary-click button, then save again.",
+                        symbol: "exclamationmark.triangle",
+                        onDefaultAction: { primaryClickModalPresented = false },
+                        onCancel: { primaryClickModalPresented = false }
+                    ) {
+                        Button("Return to editor", role: .cancel) {
+                            primaryClickModalPresented = false
+                        }
+                        .keyboardShortcut(.defaultAction)
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .transition(.opacity)
+                .zIndex(10)
+            }
+        }
+        .animation(.easeInOut(duration: 0.16), value: primaryClickModalPresented)
         .onChange(of: model.profileNumber) { _ in
             model.reloadSelectedProfile()
         }
@@ -1380,7 +1528,7 @@ struct ContentView: View {
             if model.busy { ProgressView().controlSize(.small) }
             Spacer()
             Button("Revert edits") { model.reloadSelectedProfile() }
-            Button("Save to mouse", action: model.applyAll)
+            Button("Save to mouse", action: saveToMouse)
                 .buttonStyle(.borderedProminent)
                 .disabled(
                     !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave ||
@@ -1615,6 +1763,23 @@ struct ContentView: View {
         }
     }
 
+    private func saveToMouse() {
+        let canAttemptSave = model.hasPendingChanges &&
+            !model.busy &&
+            model.currentMouseProfile.profileIO.canSave &&
+            (!model.hasDPIChanges || model.canApplyDPI)
+        guard canAttemptSave else {
+            model.applyAll()
+            return
+        }
+
+        if model.primaryClickValidationMessage != nil {
+            primaryClickModalPresented = true
+        } else {
+            model.applyAll()
+        }
+    }
+
     private var profilesEditor: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 12) {
@@ -1635,7 +1800,7 @@ struct ContentView: View {
                     // Keep the profile picker aligned with the recorded-key
                     // column in each button row.
                     Spacer(minLength: 0)
-                        .frame(width: 24)
+                        .frame(width: 10)
                     Text("Enable:")
                         .font(.callout.weight(.medium))
                     ForEach(model.profiles) { profile in
