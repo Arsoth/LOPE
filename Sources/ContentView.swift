@@ -178,6 +178,56 @@ private extension View {
     }
 }
 
+private struct ScrollViewScrollerInset: NSViewRepresentable {
+    let rightInset: CGFloat
+
+    func makeNSView(context: Context) -> ProbeView {
+        ProbeView(rightInset: rightInset)
+    }
+
+    func updateNSView(_ nsView: ProbeView, context: Context) {
+        nsView.rightInset = rightInset
+        nsView.configureEnclosingScrollView()
+    }
+
+    final class ProbeView: NSView {
+        var rightInset: CGFloat
+
+        init(rightInset: CGFloat) {
+            self.rightInset = rightInset
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) {
+            rightInset = 0
+            super.init(coder: coder)
+        }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            configureEnclosingScrollView()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            configureEnclosingScrollView()
+        }
+
+        override func layout() {
+            super.layout()
+            configureEnclosingScrollView()
+        }
+
+        func configureEnclosingScrollView() {
+            guard let scrollView = enclosingScrollView else { return }
+            var insets = scrollView.scrollerInsets
+            guard insets.right != rightInset else { return }
+            insets.right = rightInset
+            scrollView.scrollerInsets = insets
+        }
+    }
+}
+
 private struct KeyboardInputMonitor: NSViewRepresentable {
     let isActive: Bool
     let onKeyDown: (NSEvent) -> Void
@@ -1171,7 +1221,9 @@ struct ContentView: View {
         ZStack {
             VStack(alignment: .leading, spacing: 14) {
                 header
+                    .padding(.horizontal, 20)
                 Divider()
+                    .padding(.horizontal, 20)
                 TabView {
                     ZStack {
                         if model.loadingProfile && model.buttons.isEmpty {
@@ -1196,6 +1248,7 @@ struct ContentView: View {
                         .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
                 Divider()
+                    .padding(.horizontal, 20)
                 HStack(alignment: .top) {
                     Image(systemName: "info.circle")
                     Text(model.status)
@@ -1204,6 +1257,7 @@ struct ContentView: View {
                         .textSelection(.enabled)
                     Spacer()
                 }
+                .padding(.horizontal, 20)
 
                 // Future expansion: restore the button-press highlighting control
                 // here, below the footer/status line, after a reliable Logitech
@@ -1218,7 +1272,7 @@ struct ContentView: View {
                 // }
             }
         }
-        .padding(20)
+        .padding(.vertical, 20)
         .frame(minWidth: 960, minHeight: 520)
         .background(appBackground)
         .preferredColorScheme(preferredColorScheme)
@@ -1397,6 +1451,7 @@ struct ContentView: View {
                         (model.hasDPIChanges && !model.canApplyDPI)
                     )
             }
+            .padding(.horizontal, 20)
             if !model.recoveryBackups.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -1411,11 +1466,13 @@ struct ContentView: View {
                 }
                 .padding(8)
                 .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 20)
             }
             if !model.currentMouseProfile.profileIO.canSave {
                 Text("This device is cataloged for read-only inspection until its profile-specific save format is validated.")
                     .font(.caption)
                     .foregroundStyle(.orange)
+                    .padding(.horizontal, 20)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -1429,8 +1486,11 @@ struct ContentView: View {
                     Divider()
                     dpiEditor
                 }
+                .padding(.horizontal, 20)
                 .padding(.vertical, 4)
+                .background(ScrollViewScrollerInset(rightInset: 3))
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .id(model.selectedDeviceIndex)
 
         }
@@ -1909,6 +1969,7 @@ struct ContentView: View {
             Spacer()
         }
         .padding(.top, 4)
+        .padding(.horizontal, 20)
     }
 
     private var settingsPane: some View {
@@ -1980,5 +2041,6 @@ struct ContentView: View {
             Spacer()
         }
         .padding(.top, 4)
+        .padding(.horizontal, 20)
     }
 }
