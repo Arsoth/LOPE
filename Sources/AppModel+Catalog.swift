@@ -5,7 +5,7 @@ extension AppModel {
     func loadingButtonRows() -> [ButtonRow] {
         currentMouseProfile.buttons.map { button in
             let raw = stockRawAssignment(for: button)
-            let choice = presets.contains { normalize($0.raw) == raw } ? raw : "custom"
+            let choice = presets.contains { normalize($0.raw) == raw } ? raw : "keystroke"
             return ButtonRow(
                 id: button.number,
                 label: button.label,

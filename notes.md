@@ -27,19 +27,19 @@ firmware’s logical profile-record number.
 highlighted correctly; unsupported or ambiguous controls are reported clearly
 and never mapped by guesswork.
 
-### [x] 9. Rework keyboard-output selection and custom key recording
+### [x] 9. Rework keyboard-output selection and keyboard-key recording
 
 - [x] Combine function keys and special keys into one keyboard-output dropdown.
 - [x] List modifiers before the key choices so the resulting selection reads
       logically.
-- [x] Order the top-level choices as Disabled, Custom, then the remaining standard
+- [x] Order the top-level choices as Disabled, Keystroke, then the remaining standard
       keys.
-- [x] Make Custom expose only the record-input option instead of treating it as a
+- [x] Make Keystroke expose only the record-input option instead of treating it as a
       normal key choice.
 - [x] Add a Settings checkbox that enables non-standard keys in the override
       dropdown; include keys such as F13 and above when enabled.
 
-**Done when:** the default dropdown is ordered and understandable, custom output uses
+**Done when:** the default dropdown is ordered and understandable, Keystroke uses
 the recording flow, and non-standard keys are opt-in through Settings.
 
 ### [x] 10. Determine and surface keyboard-output limits

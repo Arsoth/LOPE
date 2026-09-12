@@ -176,7 +176,7 @@ extension AppModel {
                 label: label,
                 currentRaw: raw,
                 draftRaw: raw,
-                draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "custom"
+                draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke"
             ))
         }
         return (choices, rows)

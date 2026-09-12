@@ -1464,7 +1464,7 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .lineLimit(1)
-                        if button.draftChoice == "custom" {
+                        if button.draftChoice == "keystroke" {
                             if model.showNonStandardKeyboardKeys {
                                 let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
                                 if model.keyboardKeyChoice(buttonIndex: buttonIndex) != 0 {
@@ -1478,7 +1478,7 @@ struct ContentView: View {
                             }
                         }
                         Picker("", selection: Binding(
-                            get: { model.buttons.first(where: { $0.id == buttonID })?.draftChoice ?? "custom" },
+                            get: { model.buttons.first(where: { $0.id == buttonID })?.draftChoice ?? "keystroke" },
                             set: { choice in
                                 guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
                                 model.selectOutput(buttonIndex: index, choice: choice)
@@ -1486,7 +1486,7 @@ struct ContentView: View {
                             ForEach(model.presets.prefix(1)) { preset in
                                 Text(preset.label).tag(preset.raw)
                             }
-                            Text("Custom").tag("custom")
+                            Text("Keystroke").tag("keystroke")
                             ForEach(model.presets.dropFirst()) { preset in
                                 Text(preset.label).tag(preset.raw)
                             }
@@ -1905,7 +1905,7 @@ struct ContentView: View {
                     .frame(minHeight: 120, maxHeight: 250)
                 }
             }
-            Text("Quit G HUB and other mouse remappers while saving. Don't bother re-enabling them after ;).")
+            Text("Quit G HUB and other mouse remappers while saving. Don't bother re-enabling them after ;)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()

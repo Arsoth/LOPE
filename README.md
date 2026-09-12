@@ -25,8 +25,8 @@ will change. Use **Backups → Open in Finder** to inspect the backup folder.
 
 ### Keyboard outputs
 
-The button output menu starts with **Disabled**, **Custom**, and then the
-standard mouse and keyboard outputs. Custom opens the record-input workflow:
+The button output menu starts with **Disabled**, **Keystroke**, and then the
+standard mouse and keyboard outputs. Keystroke opens the record-input workflow:
 click the recorded input box and press one key, with any held Ctrl, Shift, Alt,
 and Command modifiers captured automatically. The box displays the complete
 chord, highlights while recording, and provides an X to cancel without

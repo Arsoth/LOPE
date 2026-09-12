@@ -12,8 +12,8 @@ extension AppModel {
 
     func selectOutput(buttonIndex: Int, choice: String) {
         guard buttons.indices.contains(buttonIndex) else { return }
-        if choice == "custom" {
-            buttons[buttonIndex].draftChoice = "custom"
+        if choice == "keystroke" {
+            buttons[buttonIndex].draftChoice = "keystroke"
             if !isKeyboardRecord(buttonIndex: buttonIndex) {
                 setKeyboardChord(buttonIndex: buttonIndex, modifier: 0, key: 0)
             }
@@ -40,7 +40,7 @@ extension AppModel {
         guard buttons.indices.contains(buttonIndex) else { return }
         let normalized = normalize(raw)
         buttons[buttonIndex].draftRaw = normalized
-        buttons[buttonIndex].draftChoice = presets.contains(where: { normalize($0.raw) == normalized }) ? normalized : "custom"
+        buttons[buttonIndex].draftChoice = presets.contains(where: { normalize($0.raw) == normalized }) ? normalized : "keystroke"
         if let bytes = rawBytes(normalized), bytes[0] == 0x80, bytes[1] == 0x02, bytes[3] != 0 {
             keyInputDrafts[buttonIndex] = keyboardKeyLabel(bytes[3])
         } else {

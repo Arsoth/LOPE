@@ -94,10 +94,10 @@ non-programmable records are defined in the matching JSON descriptor.
 The top-level output menu is ordered as:
 
 1. Disabled
-2. Keyboard
+2. Keystroke
 3. Standard mouse and keyboard outputs
 
-Function keys and special keys are one keyboard-key list. Keyboard is a keyboard
+Function keys and special keys are one keyboard-key list. Keystroke is a keyboard
 record workflow: clicking the recorded-input box captures one macOS key event
 plus its Ctrl, Shift, Alt, and Command flags. The highlighted box displays the
 complete chord and exposes an X that cancels without changing the existing
