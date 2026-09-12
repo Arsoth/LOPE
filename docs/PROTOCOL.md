@@ -70,8 +70,11 @@ Known profile layouts place the normal button array at offset 32 for older forma
 
 When the descriptor’s lower shift-layout bits are `0x02`, the validated modern
 layout places a same-sized G-Shift button array 64 bytes after the normal
-array (offset 96 or 112). LOPE validates that second bank independently,
-prints it as `G-Shift button N`, and writes it only when that validation passes.
+array (offset 96 or 112). G603 format-3 onboard profiles are a known
+exception: the mouse can expose and save that bank without setting those bits
+in `getInfo`. LOPE applies that narrow device-specific fallback, validates the
+second bank independently, prints it as `G-Shift button N`, and writes it only
+when that validation passes.
 
 The G600 is a separate legacy read-only path. Product ID `0xC24A` exposes three
 154-byte feature reports (`0xF3`..`0xF5`), one per profile. Each report includes

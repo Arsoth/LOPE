@@ -42,17 +42,30 @@ one key.
 ### Backups and settings
 
 The Backups tab can load editable JSON, restore an exact binary backup, export
-the current editor state, filter by mouse, refresh the list, and open the
-configured folder in Finder. **Save to mouse** is the only action that writes to
-the mouse.
+the current editor state, filter by mouse, refresh the list, and open the active
+backup folder in Finder. **Save to mouse** is the only action that writes to the
+mouse.
 
-Settings controls the backup folder, advanced raw HID++ fields, non-standard
-keyboard keys, and the color mode. Color mode defaults to **System**; Light is a
-soft off-white theme and Dark keeps the colorblind-safe DPI palette.
+Settings controls the configuration directory, which contains separate
+`Backups` and `Custom Profiles` folders, along with advanced raw HID++ fields,
+non-standard keyboard keys, and the color mode. Color mode defaults to
+**System**; Light is a soft off-white theme and Dark keeps the colorblind-safe
+DPI palette. Settings also shows how many mice are built in and can open the
+custom profiles folder, which starts with an example file showing the format.
 
-MX mice are detected but do not show the generic button-editor fallback. Catalog
-entries whose onboard format is not validated remain read-only. Unknown
-non-MX mice can be displayed with neutral runtime button labels.
+MX mice are detected but do not show the generic button-editor fallback, and
+catalog entries whose onboard format is not validated remain read-only. Their
+button and gesture behavior is normally managed by Logi Options+ on the host
+rather than verified onboard flash, so LOPE will not guess at it even when a
+device answers an onboard-profile read.
+
+Unknown non-MX mice can be displayed with neutral runtime button labels
+immediately, with no descriptor required. A **Create profile** button lets
+LOPE write what it already read — the real button records, under generic
+names — into the custom profiles folder, so that mouse is recognized on every
+later launch. Rename the generated controls in the custom profiles folder
+whenever you like; a built-in or hand-authored profile for the same mouse
+always takes priority over a generated one.
 
 Quit G HUB and other mouse remappers while saving so they cannot race LOPE.
 

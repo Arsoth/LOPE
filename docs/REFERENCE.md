@@ -18,8 +18,20 @@ The app has three layers:
 
 Mouse-specific physical layouts and capability metadata are JSON descriptors in
 `Profiles/`. `MouseProfileCatalog` loads them from the app bundle and, during
-development, from the repository's `Profiles/` directory. The descriptor keeps
-physical button labels separate from the current output assignment.
+development, from the repository's `Profiles/` directory, then overlays any
+descriptors the user has placed in the `Custom Profiles` folder inside the
+selected configuration directory (see
+`MouseProfileCatalog.shared.customProfilesDirectory`); a custom `id` that matches a
+bundled one replaces it, and there is no index file to keep in sync. The
+descriptor keeps physical button labels separate from the current output
+assignment.
+
+A descriptor can also be `generated`: written by LOPE itself, for a device
+neither the bundle nor the user recognized, with real button records under
+placeholder `"Button N"` names (see "Unrecognized mice" below). Catalog
+matching (`MouseProfileCatalog.matchingProfile`) only uses a `generated`
+descriptor when no built-in or hand-authored one matches the same device, so a
+better descriptor added later always takes over automatically.
 
 The engine enumerates Logitech HID interfaces, discovers HID++ features, reads
 the onboard profile descriptor, and validates the selected profile before
@@ -80,12 +92,36 @@ write: its profile layout and save path must be validated first.
 MX-series devices are classified by name and known product ID before the
 fallback editor is rendered. They can remain visible in discovery, but LOPE
 does not invent a G-series physical layout for them and does not show the MX
-fallback warning as an apparent missing profile.
+fallback warning as an apparent missing profile; the button editor stays
+hidden regardless of what a raw onboard-profile read returns. MX button and
+gesture behavior is normally managed by Logi Options+ on the host rather than
+verified onboard flash, so a device answering the feature 0x8100 query is not
+evidence that editing or writing back would be safe or meaningful — only a
+human-authored, hardware-validated descriptor may enable the editor for this
+device class (`AppModel.createGeneratedProfile()` refuses outright for a
+device classified as MX; see "Unrecognized mice" below).
 
 An unknown non-MX device uses neutral runtime labels such as Primary click,
-Back, and Button 6. The output column always describes the assignment stored in
-the selected profile. Device-specific controls, scroll-wheel records, and
+Back, and Button 6, and the button editor is already usable without any
+descriptor. The output column always describes the assignment stored in the
+selected profile. Device-specific controls, scroll-wheel records, and
 non-programmable records are defined in the matching JSON descriptor.
+
+### Unrecognized mice
+
+`AppModel.createGeneratedProfile()` turns that blind session into a real,
+persisted descriptor: it reads the button-record numbers already visible in
+`normalButtonRows`/`gShiftButtonRows`, the current DPI range, and the
+connected device's name and product ID, then writes a `generated: true`
+descriptor to the custom profiles folder under an `auto-<device>` id and
+reloads the catalog (`MouseProfileCatalog.reload`) so the device is recognized
+immediately, without an app restart. Buttons keep their placeholder
+`"Button N"` names until a person edits the file — the device is only
+readable well enough to enumerate its records, not to know what a person calls
+each one. The UI offers this as a **Create profile** button in the read-only
+banner above the button list for an unmatched non-MX device. It is a no-op
+while `hasSpecificMouseProfile` is already true, before any button records
+have been read, or for a device classified as MX-series (see above).
 
 ## Editor behavior
 
@@ -130,16 +166,23 @@ feature-report reader. It keeps the normal and G-Shift assignments as separate
 profile saves remain disabled until DPI, RGB, and profile-state support are
 implemented as well.
 
-## Backup lifecycle
+## Backup and profile storage lifecycle
 
-The default folder is:
+The default configuration directory is:
 
 ```text
-~/Library/Application Support/LOPE/Backups
+~/Library/Application Support/LOPE
 ```
 
-The user can choose another folder from Settings; existing files are not moved.
-The Backups tab can open the active folder in Finder.
+The configuration directory contains separate `Backups` and `Custom Profiles`
+subdirectories. The user can choose another configuration directory from
+Settings; existing files are not moved. The Backups tab can open the active
+backup folder in Finder, and Settings can open the active custom profiles folder.
+
+The custom profiles folder is seeded on first creation with `_example-mouse.json`
+(a valid, fully-formatted descriptor excluded from loading by its leading
+underscore) and a `README.md` explaining the override rule, so a contributor
+never has to leave the app to see the expected format.
 
 On the first successful profile read for a mouse, LOPE schedules an exact
 binary dump for every readable onboard profile if no matching binary backup is
@@ -165,7 +208,8 @@ operations require the selected device to match the backup metadata.
   and click **Refresh**.
 - Quit G HUB and other remappers while reading or saving.
 - A connected MX mouse without a descriptor is intentionally not shown in the
-  generic button editor. A cataloged read-only model is likewise intentional.
+  generic button editor, and **Create profile** intentionally refuses to
+  generate one for it. A cataloged read-only model is likewise intentional.
 
 ### Save or restore problems
 
@@ -205,6 +249,5 @@ make test
 Swift test also validates profile metadata, device classification, appearance
 choices, sleep guidance, and the wired-access helper behavior.
 
-For descriptor additions, follow [Profiles/README.md](../Profiles/README.md),
-update `Profiles/index.json` when appropriate, and add a focused test before
-enabling a new write path.
+For descriptor additions, follow [Profiles/README.md](../Profiles/README.md)
+and add a focused test before enabling a new write path.

@@ -52,7 +52,7 @@
 	},
 	"profileIO": {
 		"supported": true,
-		"capability": "HID++ 2.0 ONBOARD_PROFILES · format-3 DPI variant",
+		"capability": "HID++ 2.0 ONBOARD_PROFILES · format-3 DPI variant · onboard G-Shift",
 		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
@@ -73,8 +73,9 @@
 		},
 		"layout": {
 			"buttonRecord": "4 bytes per control",
-			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"buttonOffsetByFormat": "format 3/4/5 -> 32; format 6/7 -> 48",
 			"dpiUnusedStage": "0x0000 on known format-3 firmware",
+			"gShift": "Six-record bank at normal button offset +64; enable after validated G603 format-3 fallback detection",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [

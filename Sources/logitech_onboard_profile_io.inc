@@ -535,16 +535,39 @@ static void detect_button_layout(Profile *profile) {
     }
 }
 
+static bool is_g603_device(const Device *device) {
+    if (device == NULL) {
+        return false;
+    }
+    if (device->iface != NULL && device->iface->product_id == 0xB01C) {
+        return true;
+    }
+    return text_contains_case_insensitive(device_label(device), "G603");
+}
+
+static bool profile_reports_gshift(const Profile *profile, const Device *device) {
+    if ((profile->info.shift_flags & 0x03) == 0x02) {
+        return true;
+    }
+
+    // G603 onboard profiles expose a real G-Shift bank on format-3 firmware,
+    // but some firmware revisions do not advertise it in getInfo.shift_flags.
+    // Keep this exception device- and format-specific; the bank is still
+    // validated below before it can be shown or written.
+    return is_g603_device(device) &&
+           profile->info.profile_format == 3 &&
+           profile->info.button_count == 6;
+}
+
 // Modern HID++ 0x8100 profiles place the G-Shift bank 64 bytes after the
-// normal button bank. The shift flag is still required: a plausible-looking
-// second bank on an unrelated profile must never authorize a write.
-static void detect_gshift_button_layout(Profile *profile) {
+// normal button bank. The device hint is only a candidate selector: a
+// plausible-looking second bank must still pass the same record validation.
+static void detect_gshift_button_layout(Profile *profile, const Device *device) {
     profile->gshift_button_offset = 0;
     profile->gshift_valid_specs = 0;
     profile->gshift_known_specs = 0;
     profile->gshift_layout_supported = false;
-    if (!profile->layout_supported ||
-        (profile->info.shift_flags & 0x03) != 0x02) {
+    if (!profile->layout_supported || !profile_reports_gshift(profile, device)) {
         return;
     }
     size_t count = profile->info.button_count;
@@ -881,7 +904,7 @@ static int load_profile_with_headers(Device *device,
     profile->crc_ok = sector_crc_ok(profile->data, profile->data_length);
     profile->crc_checked = true;
     detect_button_layout(profile);
-    detect_gshift_button_layout(profile);
+    detect_gshift_button_layout(profile, device);
     detect_dpi_layout(profile, device);
     detect_rgb_layout(profile);
     return 1;
@@ -944,7 +967,7 @@ static int load_profile_summary_with_headers(Device *device,
     profile->crc_ok = false;
     profile->crc_checked = false;
     detect_button_layout(profile);
-    detect_gshift_button_layout(profile);
+    detect_gshift_button_layout(profile, device);
     detect_dpi_layout(profile, device);
     detect_rgb_layout(profile);
     return 1;

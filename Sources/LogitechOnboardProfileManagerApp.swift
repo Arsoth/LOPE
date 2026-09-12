@@ -35,6 +35,7 @@ final class AppModel: ObservableObject {
     @Published var backups: [BackupEntry] = []
     @Published var showAllBackups = false
     @Published var recoveryBackups: [URL] = []
+    @Published var configurationDirectoryPath = ""
     @Published var backupDirectoryPath = ""
     @Published var showAdvancedFields = false
     @Published var showNonStandardKeyboardKeys = false
@@ -86,6 +87,14 @@ final class AppModel: ObservableObject {
 
     var hasSpecificMouseProfile: Bool {
         currentCatalogProfile != nil
+    }
+
+    var builtInMouseProfileCount: Int {
+        MouseProfileCatalog.shared.builtInProfileCount
+    }
+
+    var customMouseProfileCount: Int {
+        MouseProfileCatalog.shared.customProfileCount
     }
 
     var knownDeviceRefreshGuidance: OnboardProfileRefreshGuidance? {
@@ -151,20 +160,30 @@ final class AppModel: ObservableObject {
         return candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) })
     }
 
-    var backupDirectory: URL
-    let defaultBackupDirectory: URL
+    var configurationDirectory: URL
+    let defaultConfigurationDirectory: URL
+
+    var backupDirectory: URL {
+        configurationDirectory.appendingPathComponent("Backups", isDirectory: true)
+    }
+
+    var customProfilesDirectory: URL {
+        configurationDirectory.appendingPathComponent("Custom Profiles", isDirectory: true)
+    }
 
     init(startInitialRefresh: Bool = true) {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(AppConstants.appSupportDirectory, isDirectory: true)
-            .appendingPathComponent("Backups", isDirectory: true)
-        defaultBackupDirectory = base
+        defaultConfigurationDirectory = base
         let defaults = UserDefaults.standard
-        let backupDirectoryKey = "\(AppConstants.defaultsPrefix).backupDirectory"
-        let selectedPath = defaults.string(forKey: backupDirectoryKey)
+        let configurationDirectoryKey = "\(AppConstants.defaultsPrefix).configurationDirectory"
+        let selectedPath = defaults.string(forKey: configurationDirectoryKey)
         let selectedDirectory = selectedPath.map { URL(fileURLWithPath: $0) } ?? base
-        backupDirectory = selectedDirectory
-        backupDirectoryPath = selectedDirectory.path
+        configurationDirectory = selectedDirectory
+        configurationDirectoryPath = selectedDirectory.path
+        backupDirectoryPath = selectedDirectory
+            .appendingPathComponent("Backups", isDirectory: true)
+            .path
         let advancedFieldsKey = "\(AppConstants.defaultsPrefix).showAdvancedFields"
         showAdvancedFields = defaults.bool(forKey: advancedFieldsKey)
         let nonStandardKeysKey = "\(AppConstants.defaultsPrefix).showNonStandardKeyboardKeys"
@@ -173,6 +192,8 @@ final class AppModel: ObservableObject {
         appearancePreference = AppearancePreference(rawValue: defaults.string(forKey: appearanceKey) ?? "") ?? .system
         inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+        MouseProfileCatalog.reload(customProfilesDirectory: customProfilesDirectory)
         refreshBackups()
         if startInitialRefresh {
             applyWindowAppearance(appearancePreference)
@@ -184,7 +205,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var defaultBackupDirectoryPath: String { defaultBackupDirectory.path }
+    var defaultConfigurationDirectoryPath: String { defaultConfigurationDirectory.path }
 
     func setAppearancePreference(_ preference: AppearancePreference) {
         appearancePreference = preference

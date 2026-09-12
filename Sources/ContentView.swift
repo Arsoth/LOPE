@@ -1708,6 +1708,21 @@ struct ContentView: View {
                     .foregroundStyle(.orange)
                     .padding(.horizontal, 20)
             }
+            if !model.hasSpecificMouseProfile {
+                HStack(spacing: 8) {
+                    Image(systemName: "questionmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                    Text("LOPE doesn't recognize this mouse, so buttons below are shown by number only.")
+                        .font(.callout)
+                    Spacer()
+                    Button("Create profile") { model.createGeneratedProfile() }
+                        .buttonStyle(.bordered)
+                        .pointerCursor()
+                }
+                .padding(8)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+                .padding(.horizontal, 20)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     profilesEditor
@@ -1807,6 +1822,10 @@ struct ContentView: View {
                                 .frame(width: 122)
                         }
                     }
+                    // Keep preset rows the same height as keystroke rows. The
+                    // keystroke controls are 26 pt tall, while a native
+                    // Picker can otherwise make preset rows a little shorter.
+                    .frame(height: 26)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
@@ -1867,20 +1886,6 @@ struct ContentView: View {
                     .frame(width: 150)
                     .disabled(model.busy)
                     .pointerCursor(enabled: !model.busy)
-                    if model.hasGShiftLayer {
-                        Picker("Button layer", selection: Binding(
-                            get: { model.buttonLayer },
-                            set: { model.selectButtonLayer($0) }
-                        )) {
-                            ForEach(ButtonLayer.allCases, id: \.self) { layer in
-                                Text(layer.label).tag(layer)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 150)
-                        .pointerCursor()
-                    }
                     Spacer(minLength: 0)
                         .frame(width: 6)
                     Text("Enable:")
@@ -1888,6 +1893,20 @@ struct ContentView: View {
                     ForEach(model.profiles) { profile in
                         profileEnableControl(profile)
                     }
+                }
+                if model.hasGShiftLayer {
+                    Picker("Button layer", selection: Binding(
+                        get: { model.buttonLayer },
+                        set: { model.selectButtonLayer($0) }
+                    )) {
+                        ForEach(ButtonLayer.allCases, id: \.self) { layer in
+                            Text(layer.label).tag(layer)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                    .pointerCursor()
                 }
             }
             if model.showAdvancedFields {
@@ -2401,26 +2420,43 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Settings")
                 .font(.headline)
-            GroupBox("Backups") {
+            GroupBox("Storage") {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Backup folder")
+                    Text("Configuration directory")
                         .font(.callout.weight(.medium))
-                    Text(model.backupDirectoryPath)
+                    Text(model.configurationDirectoryPath)
                         .font(.system(.callout, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                         .textSelection(.enabled)
+                    Text("Backups and custom mouse profiles are stored in separate subfolders here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     HStack {
-                        Button("Choose folder…") {
-                            if let folder = model.chooseBackupDirectory() {
-                                model.setBackupDirectory(folder)
+                        Button("Choose directory…") {
+                            if let directory = model.chooseConfigurationDirectory() {
+                                model.setConfigurationDirectory(directory)
                             }
                         }
                         .pointerCursor()
-                        Button("Use default") { model.resetBackupDirectory() }
-                            .disabled(model.backupDirectoryPath == model.defaultBackupDirectoryPath)
-                            .pointerCursor(enabled: model.backupDirectoryPath != model.defaultBackupDirectoryPath)
+                        Button("Use default") { model.resetConfigurationDirectory() }
+                            .disabled(model.configurationDirectoryPath == model.defaultConfigurationDirectoryPath)
+                            .pointerCursor(enabled: model.configurationDirectoryPath != model.defaultConfigurationDirectoryPath)
                     }
+                }
+                .padding(4)
+            }
+            GroupBox("Mouse profiles") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(model.customMouseProfileCount > 0
+                         ? "\(model.builtInMouseProfileCount) built-in mice, plus \(model.customMouseProfileCount) custom."
+                         : "\(model.builtInMouseProfileCount) built-in mice supported.")
+                        .font(.callout)
+                    Text("Add your own or override a bundled one by dropping a JSON descriptor into the custom profiles folder. It starts with an example file that shows the format.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Open custom profiles folder", action: model.openCustomProfilesDirectoryInFinder)
+                        .pointerCursor()
                 }
                 .padding(4)
             }

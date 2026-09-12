@@ -167,7 +167,7 @@ static int run_self_test(void) {
     sector_put_crc(profile.data, profile.data_length);
     profile.crc_ok = sector_crc_ok(profile.data, profile.data_length);
     detect_button_layout(&profile);
-    detect_gshift_button_layout(&profile);
+    detect_gshift_button_layout(&profile, NULL);
     HidInterface g203_interface = {0};
     Device g203_device = {0};
     g203_interface.product_id = 0xC092;
@@ -248,6 +248,39 @@ static int run_self_test(void) {
         return 1;
     }
 
+    Profile g603_profile;
+    memset(&g603_profile, 0, sizeof(g603_profile));
+    g603_profile.info.profile_format = 3;
+    g603_profile.info.button_count = 6;
+    g603_profile.info.shift_flags = 0;
+    g603_profile.data_length = 255;
+    g603_profile.data = (uint8_t *)calloc(g603_profile.data_length, 1);
+    if (g603_profile.data == NULL) {
+        return 1;
+    }
+    for (size_t i = 0; i < 5; i++) {
+        memcpy(g603_profile.data + 32 + i * 4, specs[i], 4);
+        memcpy(g603_profile.data + 96 + i * 4, gshift_specs[i], 4);
+    }
+    memcpy(g603_profile.data + 32 + 5 * 4, specs[0], 4);
+    memcpy(g603_profile.data + 96 + 5 * 4, gshift_specs[0], 4);
+    HidInterface g603_interface = {0};
+    Device g603_device = {0};
+    g603_interface.product_id = 0xB01C;
+    snprintf(g603_device.name, sizeof(g603_device.name), "G603 LIGHTSPEED");
+    g603_device.iface = &g603_interface;
+    detect_button_layout(&g603_profile);
+    detect_gshift_button_layout(&g603_profile, &g603_device);
+    bool g603_ok = g603_profile.layout_supported &&
+                   g603_profile.button_offset == 32 &&
+                   g603_profile.gshift_layout_supported &&
+                   g603_profile.gshift_button_offset == 96;
+    free(g603_profile.data);
+    if (!g603_ok) {
+        fprintf(stderr, "G603 G-Shift layout self-test failed\n");
+        return 1;
+    }
+
     Profile newer;
     memset(&newer, 0, sizeof(newer));
     newer.info.profile_format = 7;
@@ -265,7 +298,7 @@ static int run_self_test(void) {
     sector_put_crc(newer.data, newer.data_length);
     newer.crc_ok = sector_crc_ok(newer.data, newer.data_length);
     detect_button_layout(&newer);
-    detect_gshift_button_layout(&newer);
+    detect_gshift_button_layout(&newer, NULL);
     bool newer_ok = newer.crc_ok && newer.layout_supported && newer.button_offset == 48 &&
                     newer.gshift_layout_supported && newer.gshift_button_offset == 112 &&
                     find_rear_thumb_button(&newer) == 4;
