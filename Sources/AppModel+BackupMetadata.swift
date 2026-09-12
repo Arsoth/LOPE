@@ -75,10 +75,10 @@ extension AppModel {
     }
 
     private func backupMouseName(from filename: String) -> String? {
-        let pattern = try! NSRegularExpression(
-            pattern: #"^(.+)-\d{8}-\d{6}-[0-9a-fA-F]{8}$"#
-        )
         let stem = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
+        let pattern = try! NSRegularExpression(
+            pattern: #"^(.+)-profile-\d+-[^-]+-\d{8}-\d{6}(?:-\d+)?$"#
+        )
         let range = NSRange(stem.startIndex..<stem.endIndex, in: stem)
         guard let match = pattern.firstMatch(in: stem, range: range),
               let nameRange = Range(match.range(at: 1), in: stem) else { return nil }
@@ -170,14 +170,38 @@ extension AppModel {
     }
 
     func editableJSONExportName() -> String {
-        let base = "\(selectedMouseFileIdentifier())-\(backupTimestamp())"
-        var candidate = "\(base).json"
+        "\(uniqueBackupStem(prefix: "profile-\(profileNumber)-export", fileExtension: "json")).json"
+    }
+
+    func uniqueBackupStem(
+        prefix: String,
+        fileExtension: String = AppConstants.backupExtension,
+        mouseIdentifier: String? = nil
+    ) -> String {
+        let identifier = mouseIdentifier ?? selectedMouseFileIdentifier()
+        let base = "\(identifier)-\(prefix)-\(backupTimestamp())"
+        var candidate = base
         var suffix = 2
-        while FileManager.default.fileExists(atPath: backupDirectory.appendingPathComponent(candidate).path) {
-            candidate = "\(base)-\(suffix).json"
+        while FileManager.default.fileExists(
+            atPath: backupDirectory.appendingPathComponent("\(candidate).\(fileExtension)").path
+        ) {
+            candidate = "\(base)-\(suffix)"
             suffix += 1
         }
         return candidate
+    }
+
+    func uniqueBackupURL(
+        prefix: String,
+        fileExtension: String = AppConstants.backupExtension,
+        mouseIdentifier: String? = nil
+    ) -> URL {
+        let stem = uniqueBackupStem(
+            prefix: prefix,
+            fileExtension: fileExtension,
+            mouseIdentifier: mouseIdentifier
+        )
+        return backupDirectory.appendingPathComponent("\(stem).\(fileExtension)")
     }
 
     func scheduleInitialBackups(for device: DeviceChoice, profileNumbers: [Int]) {
@@ -188,10 +212,11 @@ extension AppModel {
 
         let directory = backupDirectory
         let mouseIdentifier = sanitizedMouseIdentifier(device.name)
-        let backupURLs = profileNumbers.map { _ in
-            let suffix = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
-            let filename = "\(mouseIdentifier)-\(backupTimestamp())-\(suffix).\(AppConstants.backupExtension)"
-            return directory.appendingPathComponent(filename)
+        let backupURLs = profileNumbers.map { profileNumber in
+            uniqueBackupURL(
+                prefix: "profile-\(profileNumber)-initial",
+                mouseIdentifier: mouseIdentifier
+            )
         }
         let selector = device.deviceKey.isEmpty
             ? ["--device", String(device.id)]

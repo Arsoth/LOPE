@@ -1276,15 +1276,6 @@ struct ContentView: View {
                 .frame(width: 310)
                 .disabled(model.devices.isEmpty)
             }
-            if model.profiles.count > 1 {
-                Picker("Profile", selection: $model.profileNumber) {
-                    ForEach(model.profiles) { profile in
-                        Text(profile.title).tag(profile.id)
-                    }
-                }
-                .frame(width: 180)
-                .disabled(model.busy)
-            }
             Button("Refresh", action: model.refresh)
                 .keyboardShortcut("r", modifiers: [.command])
                 .disabled(model.busy)
@@ -1397,8 +1388,6 @@ struct ContentView: View {
     private var buttonsPane: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Button assignments")
-                    .font(.headline)
                 Spacer()
                 Button("Revert edits") { model.reloadSelectedProfile() }
                 Button("Save to mouse", action: model.applyAll)
@@ -1408,9 +1397,6 @@ struct ContentView: View {
                         (model.hasDPIChanges && !model.canApplyDPI)
                     )
             }
-            Text("Change button outputs and DPI together, then save once. The original data is backed up automatically.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
             if !model.recoveryBackups.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -1530,39 +1516,51 @@ struct ContentView: View {
     }
 
     private var profilesEditor: some View {
-        GroupBox(model.onboardProfileSummary) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Text(model.onboardProfileSummary)
+                    .font(.callout.weight(.medium))
+                Spacer(minLength: 12)
                 if model.profiles.count > 1 {
-                    Text("Disable a profile to keep it out of the mouse’s profile cycle. At least one profile must remain enabled.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 12) {
-                        Text("Enable Profile(s):")
-                            .font(.callout.weight(.medium))
+                    Text("Profile:")
+                        .font(.callout.weight(.medium))
+                    Picker("Profile", selection: $model.profileNumber) {
                         ForEach(model.profiles) { profile in
-                            profileEnableControl(profile)
+                            Text(profile.title).tag(profile.id)
                         }
-                        Spacer()
                     }
-                } else {
-                    Text("This mouse has one readable onboard profile; profile cycling and disabling are unavailable.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if model.showAdvancedFields {
-                    HStack(spacing: 12) {
-                        Text("Sectors:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        ForEach(model.profiles) { profile in
-                            Text("Profile \(profile.id): \(profile.sector)")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                        }
+                    .labelsHidden()
+                    .frame(width: 150)
+                    .disabled(model.busy)
+                    Text("Enable:")
+                        .font(.callout.weight(.medium))
+                    ForEach(model.profiles) { profile in
+                        profileEnableControl(profile)
                     }
                 }
             }
-            .padding(4)
+            if model.showAdvancedFields {
+                HStack(spacing: 12) {
+                    Text("Sectors:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ForEach(model.profiles) { profile in
+                        Text("Profile \(profile.id): \(profile.sector)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
         }
     }
 

@@ -57,12 +57,7 @@ extension AppModel {
     }
 
     func backupURL(prefix: String) -> URL {
-        // The operation kind is intentionally not part of the public name:
-        // all exact binary snapshots use the same mouse-date-time shape.
-        _ = prefix
-        let suffix = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
-        let filename = "\(selectedMouseFileIdentifier())-\(backupTimestamp())-\(suffix).\(AppConstants.backupExtension)"
-        return backupDirectory.appendingPathComponent(filename)
+        uniqueBackupURL(prefix: prefix)
     }
 
     func normalize(_ raw: String) -> String {

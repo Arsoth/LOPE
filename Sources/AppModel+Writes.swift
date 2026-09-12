@@ -144,8 +144,7 @@ extension AppModel {
     }
 
     private func saveOperationID() -> String {
-        let suffix = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
-        return "\(selectedMouseFileIdentifier())-\(backupTimestamp())-\(suffix)"
+        uniqueBackupStem(prefix: "profile-\(profileNumber)-save")
     }
 
     private func batchRecoveryBackups(from message: String) -> [URL] {
@@ -175,7 +174,7 @@ extension AppModel {
         busy = true
         defer { busy = false }
         do {
-            let backup = backupURL(prefix: "profile\(profileNumber)-manual")
+            let backup = backupURL(prefix: "profile-\(profileNumber)-manual")
             _ = try runEngine(["--profile", String(profileNumber), "dump", backup.path])
             refreshBackups()
             status = "Saved a read-only profile backup at \(backup.path)."
