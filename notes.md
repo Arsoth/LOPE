@@ -62,7 +62,7 @@ shows the user how much of that limit the current output uses.
 - [ ] Avoid reporting that no onboard profile exists before this refresh flow has had
       a chance to complete.
 
-**Done when:** G603 users receive the device-specific sleep and refresh instructions
+**Done when:** G603 and G604 users receive the device-specific sleep and refresh instructions
 instead of a premature "no onboard profile" message.
 
 ### [ ] 12. Remove fallback UI for MX mice
