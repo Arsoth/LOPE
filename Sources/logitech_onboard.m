@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     if (strcmp(options.command, "info") == 0) return run_info(&options);
     if (strcmp(options.command, "profiles") == 0) return run_profiles(&options);
     if (strcmp(options.command, "dpi") == 0) return run_dpi(&options);
+    if (strcmp(options.command, "current-dpi") == 0) return run_current_dpi(&options);
     if (strcmp(options.command, "dump") == 0) return run_dump(&options);
     if (strcmp(options.command, "watch") == 0) return run_watch(&options);
     if (strcmp(options.command, "bind") == 0) return run_bind(&options);

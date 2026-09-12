@@ -27,9 +27,13 @@ will change. Use **Backups → Open in Finder** to inspect the backup folder.
 
 The button output menu starts with **Disabled**, **Custom**, and then the
 standard mouse and keyboard outputs. Custom opens the record-input workflow:
-choose modifiers, press **Record input**, and press one key. The standard
-keyboard key override list is in the same editor. Enable **Show non-standard
-keyboard keys** in Settings to include F13 and higher. The editor displays the
+click the recorded input box and press one key, with any held Ctrl, Shift, Alt,
+and Command modifiers captured automatically. The box displays the complete
+chord, highlights while recording, and provides an X to cancel without
+changing the existing output. The optional extended-key override is available
+only when enabled in Settings.
+Enable **Show non-standard keyboard keys** in Settings to add hidden keys such
+as Insert, F13–F24, and Sleep. The editor displays the
 current keyboard-output usage as `X/Y`; the current HID++ keyboard record stores
 one key.
 

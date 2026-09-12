@@ -53,13 +53,45 @@ extension AppModel {
         ]
     }
 
-    var keyboardKeys: [KeyboardKeyChoice] {
+    /// Every keyboard-page usage the editor can name. This is intentionally
+    /// separate from `keyboardOutputKeys`: the recorder needs to understand
+    /// keys that should not clutter the normal override picker.
+    private static let keyboardKeyCatalog: [KeyboardKeyChoice] = {
         var choices = [
-            KeyboardKeyChoice(id: 0x2A, label: "Backspace"),
-            KeyboardKeyChoice(id: 0x2B, label: "Tab"),
+            KeyboardKeyChoice(id: 0x04, label: "A"), KeyboardKeyChoice(id: 0x05, label: "B"),
+            KeyboardKeyChoice(id: 0x06, label: "C"), KeyboardKeyChoice(id: 0x07, label: "D"),
+            KeyboardKeyChoice(id: 0x08, label: "E"), KeyboardKeyChoice(id: 0x09, label: "F"),
+            KeyboardKeyChoice(id: 0x0A, label: "G"), KeyboardKeyChoice(id: 0x0B, label: "H"),
+            KeyboardKeyChoice(id: 0x0C, label: "I"), KeyboardKeyChoice(id: 0x0D, label: "J"),
+            KeyboardKeyChoice(id: 0x0E, label: "K"), KeyboardKeyChoice(id: 0x0F, label: "L"),
+            KeyboardKeyChoice(id: 0x10, label: "M"), KeyboardKeyChoice(id: 0x11, label: "N"),
+            KeyboardKeyChoice(id: 0x12, label: "O"), KeyboardKeyChoice(id: 0x13, label: "P"),
+            KeyboardKeyChoice(id: 0x14, label: "Q"), KeyboardKeyChoice(id: 0x15, label: "R"),
+            KeyboardKeyChoice(id: 0x16, label: "S"), KeyboardKeyChoice(id: 0x17, label: "T"),
+            KeyboardKeyChoice(id: 0x18, label: "U"), KeyboardKeyChoice(id: 0x19, label: "V"),
+            KeyboardKeyChoice(id: 0x1A, label: "W"), KeyboardKeyChoice(id: 0x1B, label: "X"),
+            KeyboardKeyChoice(id: 0x1C, label: "Y"), KeyboardKeyChoice(id: 0x1D, label: "Z"),
             KeyboardKeyChoice(id: 0x28, label: "Enter"),
             KeyboardKeyChoice(id: 0x29, label: "Escape"),
+            KeyboardKeyChoice(id: 0x2A, label: "Backspace"),
+            KeyboardKeyChoice(id: 0x2B, label: "Tab"),
             KeyboardKeyChoice(id: 0x2C, label: "Space"),
+            KeyboardKeyChoice(id: 0x2D, label: "-"),
+            KeyboardKeyChoice(id: 0x2E, label: "="),
+            KeyboardKeyChoice(id: 0x2F, label: "["),
+            KeyboardKeyChoice(id: 0x30, label: "]"),
+            KeyboardKeyChoice(id: 0x31, label: "\\"),
+            KeyboardKeyChoice(id: 0x32, label: "Non-US #"),
+            KeyboardKeyChoice(id: 0x33, label: ";"),
+            KeyboardKeyChoice(id: 0x34, label: "'"),
+            KeyboardKeyChoice(id: 0x35, label: "`"),
+            KeyboardKeyChoice(id: 0x36, label: ","),
+            KeyboardKeyChoice(id: 0x37, label: "."),
+            KeyboardKeyChoice(id: 0x38, label: "/"),
+            KeyboardKeyChoice(id: 0x39, label: "Caps Lock"),
+            KeyboardKeyChoice(id: 0x46, label: "Print Screen"),
+            KeyboardKeyChoice(id: 0x47, label: "Scroll Lock"),
+            KeyboardKeyChoice(id: 0x48, label: "Pause"),
             KeyboardKeyChoice(id: 0x49, label: "Insert"),
             KeyboardKeyChoice(id: 0x4A, label: "Home"),
             KeyboardKeyChoice(id: 0x4B, label: "Page Up"),
@@ -69,30 +101,124 @@ extension AppModel {
             KeyboardKeyChoice(id: 0x4F, label: "Right Arrow"),
             KeyboardKeyChoice(id: 0x50, label: "Left Arrow"),
             KeyboardKeyChoice(id: 0x51, label: "Down Arrow"),
-            KeyboardKeyChoice(id: 0x52, label: "Up Arrow")
+            KeyboardKeyChoice(id: 0x52, label: "Up Arrow"),
+            KeyboardKeyChoice(id: 0x53, label: "Num Lock"),
+            KeyboardKeyChoice(id: 0x54, label: "Keypad /"),
+            KeyboardKeyChoice(id: 0x55, label: "Keypad *"),
+            KeyboardKeyChoice(id: 0x56, label: "Keypad -"),
+            KeyboardKeyChoice(id: 0x57, label: "Keypad +"),
+            KeyboardKeyChoice(id: 0x58, label: "Keypad Enter"),
+            KeyboardKeyChoice(id: 0x59, label: "Keypad 1 / End"),
+            KeyboardKeyChoice(id: 0x5A, label: "Keypad 2 / Down Arrow"),
+            KeyboardKeyChoice(id: 0x5B, label: "Keypad 3 / Page Down"),
+            KeyboardKeyChoice(id: 0x5C, label: "Keypad 4 / Left Arrow"),
+            KeyboardKeyChoice(id: 0x5D, label: "Keypad 5"),
+            KeyboardKeyChoice(id: 0x5E, label: "Keypad 6 / Right Arrow"),
+            KeyboardKeyChoice(id: 0x5F, label: "Keypad 7 / Home"),
+            KeyboardKeyChoice(id: 0x60, label: "Keypad 8 / Up Arrow"),
+            KeyboardKeyChoice(id: 0x61, label: "Keypad 9 / Page Up"),
+            KeyboardKeyChoice(id: 0x62, label: "Keypad 0 / Insert"),
+            KeyboardKeyChoice(id: 0x63, label: "Keypad . / Delete"),
+            KeyboardKeyChoice(id: 0x64, label: "Non-US \\"),
+            KeyboardKeyChoice(id: 0x65, label: "Application"),
+            KeyboardKeyChoice(id: 0x66, label: "Power"),
+            KeyboardKeyChoice(id: 0x67, label: "Keypad ="),
+            KeyboardKeyChoice(id: 0x74, label: "Execute"),
+            KeyboardKeyChoice(id: 0x75, label: "Help"),
+            KeyboardKeyChoice(id: 0x76, label: "Menu"),
+            KeyboardKeyChoice(id: 0x77, label: "Select"),
+            KeyboardKeyChoice(id: 0x78, label: "Stop"),
+            KeyboardKeyChoice(id: 0x79, label: "Again"),
+            KeyboardKeyChoice(id: 0x7A, label: "Undo"),
+            KeyboardKeyChoice(id: 0x7B, label: "Cut"),
+            KeyboardKeyChoice(id: 0x7C, label: "Copy"),
+            KeyboardKeyChoice(id: 0x7D, label: "Paste"),
+            KeyboardKeyChoice(id: 0x7E, label: "Find"),
+            KeyboardKeyChoice(id: 0x7F, label: "Mute"),
+            KeyboardKeyChoice(id: 0x80, label: "Volume Up"),
+            KeyboardKeyChoice(id: 0x81, label: "Volume Down"),
+            KeyboardKeyChoice(id: 0x82, label: "Locking Caps Lock"),
+            KeyboardKeyChoice(id: 0x83, label: "Locking Num Lock"),
+            KeyboardKeyChoice(id: 0x84, label: "Locking Scroll Lock"),
+            KeyboardKeyChoice(id: 0x85, label: "Keypad Comma"),
+            KeyboardKeyChoice(id: 0x86, label: "Keypad Equal Sign"),
+            KeyboardKeyChoice(id: 0x87, label: "International 1"),
+            KeyboardKeyChoice(id: 0x88, label: "International 2"),
+            KeyboardKeyChoice(id: 0x89, label: "International 3"),
+            KeyboardKeyChoice(id: 0x8A, label: "International 4"),
+            KeyboardKeyChoice(id: 0x8B, label: "International 5"),
+            KeyboardKeyChoice(id: 0x8C, label: "International 6"),
+            KeyboardKeyChoice(id: 0x8D, label: "International 7"),
+            KeyboardKeyChoice(id: 0x8E, label: "International 8"),
+            KeyboardKeyChoice(id: 0x8F, label: "International 9"),
+            KeyboardKeyChoice(id: 0x90, label: "LANG 1"),
+            KeyboardKeyChoice(id: 0x91, label: "LANG 2"),
+            KeyboardKeyChoice(id: 0x92, label: "LANG 3"),
+            KeyboardKeyChoice(id: 0x93, label: "LANG 4"),
+            KeyboardKeyChoice(id: 0x94, label: "LANG 5"),
+            KeyboardKeyChoice(id: 0x95, label: "LANG 6"),
+            KeyboardKeyChoice(id: 0x96, label: "LANG 7"),
+            KeyboardKeyChoice(id: 0x97, label: "LANG 8"),
+            KeyboardKeyChoice(id: 0x98, label: "LANG 9"),
+            KeyboardKeyChoice(id: 0x99, label: "LANG 10"),
+            KeyboardKeyChoice(id: 0x9A, label: "Alternate Erase"),
+            KeyboardKeyChoice(id: 0x9B, label: "SysReq / Attention"),
+            KeyboardKeyChoice(id: 0x9C, label: "Cancel"),
+            KeyboardKeyChoice(id: 0x9D, label: "Clear"),
+            KeyboardKeyChoice(id: 0x9E, label: "Prior"),
+            KeyboardKeyChoice(id: 0x9F, label: "Return"),
+            KeyboardKeyChoice(id: 0xA0, label: "Separator"),
+            KeyboardKeyChoice(id: 0xA1, label: "Out"),
+            KeyboardKeyChoice(id: 0xA2, label: "Oper"),
+            KeyboardKeyChoice(id: 0xA3, label: "Clear / Again"),
+            KeyboardKeyChoice(id: 0xA4, label: "CrSel / Props"),
+            KeyboardKeyChoice(id: 0xA5, label: "ExSel"),
+            // HID usage extensions commonly used by programmable keyboards.
+            KeyboardKeyChoice(id: 0xF8, label: "Sleep"),
+            KeyboardKeyChoice(id: 0xF9, label: "Wake"),
+            KeyboardKeyChoice(id: 0xFA, label: "Refresh")
         ]
+        for code in 0x1E...0x27 {
+            choices.append(KeyboardKeyChoice(id: UInt8(code), label: code == 0x27 ? "0" : "\(code - 0x1D)"))
+        }
         for code in 0x3A...0x45 {
             choices.append(KeyboardKeyChoice(id: UInt8(code), label: "F\(code - 0x39)"))
         }
         for code in 0x68...0x73 {
             choices.append(KeyboardKeyChoice(id: UInt8(code), label: "F\(code - 0x5B)"))
         }
-        for (offset, letter) in Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").enumerated() {
-            choices.append(KeyboardKeyChoice(id: UInt8(0x04 + offset), label: String(letter)))
-        }
         return choices
+    }()
+
+    var keyboardKeys: [KeyboardKeyChoice] {
+        Self.keyboardKeyCatalog
     }
 
-    var specialKeyboardKeys: [KeyboardKeyChoice] {
-        keyboardKeys.filter { !isNonStandardKeyboardKey($0) }
+    /// Keys that are useful as explicit HID++ overrides but should stay out
+    /// of the normal recorder UI. Character keys, F1–F12, Tab, Enter, and
+    /// similar everyday keys are captured by recording instead.
+    var extendedKeyboardKeys: [KeyboardKeyChoice] {
+        keyboardKeys.filter { isExtendedKeyboardKey($0) }
     }
 
     var keyboardOutputKeys: [KeyboardKeyChoice] {
-        showNonStandardKeyboardKeys ? keyboardKeys : specialKeyboardKeys
+        showNonStandardKeyboardKeys ? extendedKeyboardKeys : []
     }
 
     func isNonStandardKeyboardKey(_ key: KeyboardKeyChoice) -> Bool {
-        (0x68...0x73).contains(key.id)
+        isExtendedKeyboardKey(key)
+    }
+
+    func isExtendedKeyboardKey(_ key: KeyboardKeyChoice) -> Bool {
+        switch key.id {
+        case 0x46...0x52, // Print Screen through arrow keys
+             0x68...0x73, // F13–F24
+             0x74...0xA5, // extended keyboard/page usages
+             0xF8...0xFA: // Sleep, Wake, Refresh extensions
+            return true
+        default:
+            return false
+        }
     }
 
     private var keyboardOutputPresets: [OutputPreset] {

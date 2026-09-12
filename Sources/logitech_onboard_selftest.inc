@@ -114,7 +114,12 @@ static int run_self_test(void) {
     sector_put_crc(profile.data, profile.data_length);
     profile.crc_ok = sector_crc_ok(profile.data, profile.data_length);
     detect_button_layout(&profile);
-    detect_dpi_layout(&profile);
+    HidInterface g203_interface = {0};
+    Device g203_device = {0};
+    g203_interface.product_id = 0xC092;
+    snprintf(g203_device.name, sizeof(g203_device.name), "G203 LIGHTSYNC Gaming Mouse");
+    g203_device.iface = &g203_interface;
+    detect_dpi_layout(&profile, &g203_device);
     uint8_t alt_tab[4];
     bool target_ok = parse_target("alt-tab", alt_tab) && alt_tab[0] == 0x80 && alt_tab[1] == 0x02 &&
                      alt_tab[2] == 0x04 && alt_tab[3] == 0x2B;
@@ -123,12 +128,22 @@ static int run_self_test(void) {
                   profile.dpi_layout_supported && profile.dpi_offset == 3 &&
                   read_le16(profile.data + profile.dpi_offset + 2 * 2) == 1600 &&
                   rear == 4 && target_ok;
+    uint16_t compacted_dpi[4] = {800, 1200, 2400, 3200};
+    bool compacted_write_ok = write_dpi_stage_table(profile.data, &profile,
+                                                     compacted_dpi, 4);
+    bool compacted_table_ok = compacted_write_ok && profile.dpi_unused_value == 0;
+    for (size_t i = 0; compacted_table_ok && i < 4; i++) {
+        compacted_table_ok = read_le16(profile.data + 3 + i * 2) == compacted_dpi[i];
+    }
+    compacted_table_ok = compacted_table_ok &&
+                         read_le16(profile.data + 3 + 4 * 2) == 0;
+    passed = passed && compacted_table_ok;
     write_le16(profile.data + 3 + 2 * 2, UINT16_MAX);
     write_le16(profile.data + 3 + 3 * 2, UINT16_MAX);
     write_le16(profile.data + 3 + 4 * 2, UINT16_MAX);
     profile.data[1] = 0;
     profile.data[2] = 1;
-    detect_dpi_layout(&profile);
+    detect_dpi_layout(&profile, NULL);
     passed = passed && profile.dpi_layout_supported && profile.dpi_count == 2 &&
              profile.dpi_default_index == 0 && profile.dpi_shift_index == 1;
     write_le16(profile.data + 3 + 2 * 2, 1600);
@@ -136,7 +151,7 @@ static int run_self_test(void) {
     write_le16(profile.data + 3 + 4 * 2, 0);
     profile.data[1] = 1;
     profile.data[2] = 0;
-    detect_dpi_layout(&profile);
+    detect_dpi_layout(&profile, NULL);
     passed = passed && profile.dpi_layout_supported && profile.dpi_count == 4 &&
              profile.dpi_default_index == 1 && profile.dpi_shift_index == 0;
     free(profile.data);
@@ -286,6 +301,6 @@ static int run_self_test(void) {
         fprintf(stderr, "batch failure-path self-test failed\n");
         return 1;
     }
-    printf("self-test: receiver model-name fallback, connection types, CRC-16, format/layout detection, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
+    printf("self-test: receiver model-name fallback, connection types, CRC-16, DPI sentinel/compaction, format/layout detection, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
     return 0;
 }

@@ -126,11 +126,12 @@ static int run_set_dpi(const Options *options) {
         return 1;
     }
     memcpy(new_data, profile.data, profile.data_length);
-    for (size_t i = 0; i < requested_count; i++) {
-        write_le16(new_data + profile.dpi_offset + i * 2, requested[i]);
-    }
-    for (size_t i = requested_count; i < 5; i++) {
-        write_le16(new_data + profile.dpi_offset + i * 2, UINT16_MAX);
+    if (!write_dpi_stage_table(new_data, &profile, requested, requested_count)) {
+        fprintf(stderr, "refusing to write: could not prepare the validated DPI table\n");
+        free(new_data);
+        free(profile.data);
+        hid_context_release(&context);
+        return 1;
     }
     new_data[1] = (uint8_t)(default_index - 1);
     new_data[2] = (uint8_t)(shift_index - 1);
@@ -695,11 +696,10 @@ static int run_apply(const Options *options) {
                         requested_dpi_count);
                 goto done;
             }
-            for (size_t i = 0; i < requested_dpi_count; i++) {
-                write_le16(new_profile + profile.dpi_offset + i * 2, requested_dpi[i]);
-            }
-            for (size_t i = requested_dpi_count; i < 5; i++) {
-                write_le16(new_profile + profile.dpi_offset + i * 2, UINT16_MAX);
+            if (!write_dpi_stage_table(new_profile, &profile,
+                                        requested_dpi, requested_dpi_count)) {
+                fprintf(stderr, "refusing to apply: could not prepare the validated DPI table\n");
+                goto done;
             }
             new_profile[1] = (uint8_t)(default_index - 1);
             new_profile[2] = (uint8_t)(shift_index - 1);

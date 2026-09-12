@@ -65,6 +65,11 @@ struct ProfileOutputParserSelfTest {
             fatalError("known-device refresh guidance or retry policy failed")
         }
 
+        let g203Profile = MouseProfileCatalog.shared.profile(deviceName: "", productID: "0xC092")
+        guard g203Profile.id == "g102-g203", g203Profile.profileIO.canSave else {
+            fatalError("G203 LIGHTSYNC product-ID catalog match failed")
+        }
+
         let selectionCases: [(Int?, [Int], Int, Int?)] = [
             (nil, [1], 2, 1),       // multi-profile mouse -> one-profile mouse
             (nil, [1, 2], 1, 1),    // one-profile mouse -> multi-profile mouse

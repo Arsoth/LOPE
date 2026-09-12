@@ -118,6 +118,7 @@ static void print_usage(const char *program) {
     printf("  info                                  show capabilities and a selected profile\n");
     printf("  profiles                             inspect profile headers and button records\n");
     printf("  dpi                                  show supported/current and onboard DPI stages\n");
+    printf("  current-dpi                          read only the current sensor 1 DPI\n");
     printf("  dump FILE                            save active profile as a backup package\n");
     printf("  watch                                identify physical mouse button reports\n");
     printf("  self-test                            run local CRC/layout tests\n\n");

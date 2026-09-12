@@ -347,6 +347,35 @@ static int run_dpi(const Options *options) {
     return 0;
 }
 
+static int run_current_dpi(const Options *options) {
+    HidContext context;
+    if (!hid_context_create(&context)) {
+        return 1;
+    }
+    Device devices[MAX_DEVICES];
+    size_t count = 0;
+    discover_devices_for_options(&context, options, devices, &count);
+    Device *device = NULL;
+    if (!select_device(devices, count, options, &device)) {
+        hid_context_release(&context);
+        return 1;
+    }
+    if (!device_feature_index(device, FEATURE_ADJUSTABLE_DPI, &(uint8_t){0})) {
+        fprintf(stderr, "adjustable DPI feature 0x2201 is unavailable or unreadable\n");
+        hid_context_release(&context);
+        return 1;
+    }
+    uint16_t current = 0;
+    if (!get_current_sensor_dpi(device, 0, &current)) {
+        fprintf(stderr, "could not read current sensor 1 DPI\n");
+        hid_context_release(&context);
+        return 1;
+    }
+    printf("Current sensor 1 DPI: %u\n", current);
+    hid_context_release(&context);
+    return 0;
+}
+
 static int parse_dpi_values(const char *text, uint16_t values[5], size_t *count_out) {
     if (text == NULL) {
         return 0;

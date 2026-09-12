@@ -196,6 +196,9 @@ typedef struct {
     size_t dpi_count;
     uint8_t dpi_default_index;
     uint8_t dpi_shift_index;
+    // Value used to terminate the on-device DPI table. This is firmware
+    // family-specific: some mice use 0 while others use 0xFFFF.
+    uint16_t dpi_unused_value;
     bool dpi_layout_supported;
 } Profile;
 

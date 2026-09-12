@@ -2,7 +2,9 @@
 // Copyright (C) 2026
 
 import AppKit
+import ApplicationServices
 import CoreVideo
+import CoreGraphics
 import SwiftUI
 
 private struct DPIStageTriangle: Shape {
@@ -183,25 +185,110 @@ private struct KeyboardInputMonitor: NSViewRepresentable {
     final class Coordinator {
         var isActive = false
         var onKeyDown: (NSEvent) -> Void = { _ in }
-        var monitor: Any?
+        var localMonitor: Any?
+        var eventTap: CFMachPort?
+        var eventTapSource: CFRunLoopSource?
 
         func update(isActive: Bool, onKeyDown: @escaping (NSEvent) -> Void) {
             self.isActive = isActive
             self.onKeyDown = onKeyDown
-            if isActive, monitor == nil {
-                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                    guard let self, self.isActive else { return event }
+            if isActive {
+                installLocalMonitor()
+                installEventTap()
+            } else {
+                removeLocalMonitor()
+                removeEventTap()
+            }
+        }
+
+        private func installLocalMonitor() {
+            guard localMonitor == nil else { return }
+            localMonitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.keyDown, .keyUp, .flagsChanged]
+            ) { [weak self] event in
+                guard let self, self.isActive else { return event }
+                if event.type == .keyDown {
                     self.onKeyDown(event)
-                    return nil
                 }
-            } else if !isActive, let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
+                // Modifier transitions and key-up events are swallowed too,
+                // so recording cannot leak a chord into the app.
+                return nil
+            }
+        }
+
+        private func installEventTap() {
+            guard eventTap == nil else { return }
+            if !AXIsProcessTrusted() {
+                let options = [
+                    kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+                ] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(options)
+            }
+            let eventMask = (CGEventMask(1) << CGEventType.keyDown.rawValue) |
+                (CGEventMask(1) << CGEventType.keyUp.rawValue) |
+                (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
+            let coordinatorPointer = Unmanaged.passUnretained(self).toOpaque()
+            guard let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: eventMask,
+                callback: { _, type, event, refcon in
+                    guard let refcon else { return Unmanaged.passUnretained(event) }
+                    let coordinator = Unmanaged<Coordinator>
+                        .fromOpaque(refcon)
+                        .takeUnretainedValue()
+                    guard coordinator.isActive else {
+                        return Unmanaged.passUnretained(event)
+                    }
+                    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                        if let eventTap = coordinator.eventTap {
+                            CGEvent.tapEnable(tap: eventTap, enable: true)
+                        }
+                        return Unmanaged.passUnretained(event)
+                    }
+                    if type == .keyDown, let nsEvent = NSEvent(cgEvent: event) {
+                        coordinator.onKeyDown(nsEvent)
+                    }
+                    // The event tap is what stops global shortcuts such as
+                    // Cmd+Shift+4 from reaching other apps.
+                    return nil
+                },
+                userInfo: coordinatorPointer
+            ) else {
+                return
+            }
+
+            eventTap = tap
+            if let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) {
+                eventTapSource = source
+                CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+            }
+            CGEvent.tapEnable(tap: tap, enable: true)
+        }
+
+        private func removeLocalMonitor() {
+            if let localMonitor {
+                NSEvent.removeMonitor(localMonitor)
+                self.localMonitor = nil
+            }
+        }
+
+        private func removeEventTap() {
+            if let source = eventTapSource {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+                eventTapSource = nil
+            }
+            if let eventTap {
+                CGEvent.tapEnable(tap: eventTap, enable: false)
+                CFMachPortInvalidate(eventTap)
+                self.eventTap = nil
             }
         }
 
         deinit {
-            if let monitor { NSEvent.removeMonitor(monitor) }
+            removeLocalMonitor()
+            removeEventTap()
         }
     }
 
@@ -1060,20 +1147,17 @@ struct ContentView: View {
     @State private var restoreURL: URL?
     @State private var confirmRecoveryRestore = false
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.colorScheme) private var colorScheme
 
-    private var preferredColorScheme: ColorScheme? {
-        switch model.appearancePreference {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
-        }
+    private var preferredColorScheme: ColorScheme {
+        model.isDarkAppearance ? .dark : .light
     }
 
+    private static let darkAppBackground = Color(nsColor: .windowBackgroundColor)
+
     private var appBackground: Color {
-        colorScheme == .light
-            ? Color(red: 0.965, green: 0.965, blue: 0.95)
-            : Color(nsColor: .windowBackgroundColor)
+        model.isDarkAppearance
+            ? Self.darkAppBackground
+            : Color(red: 0.965, green: 0.965, blue: 0.95)
     }
 
     var body: some View {
@@ -1389,6 +1473,12 @@ struct ContentView: View {
                         }
                         .labelsHidden()
                         .frame(width: 190)
+                        if button.draftChoice == "custom" {
+                            keyboardRecordingControl(buttonID)
+                            if model.showNonStandardKeyboardKeys {
+                                keyboardChoiceCard(buttonID: buttonID)
+                            }
+                        }
                         if model.showAdvancedFields {
                             TextField("8 hex digits", text: Binding(
                                 get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
@@ -1400,9 +1490,6 @@ struct ContentView: View {
                                 .frame(width: 122)
                         }
                         Spacer()
-                    }
-                    if model.buttons.first(where: { $0.id == buttonID })?.draftChoice == "custom" {
-                        keyboardChordEditor(buttonID)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -1509,13 +1596,13 @@ struct ContentView: View {
         .help(helpText)
     }
 
-    private func keyboardChordEditor(_ buttonID: Int) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func keyboardRecordingControl(_ buttonID: Int) -> some View {
+        HStack(spacing: 4) {
             KeyboardInputMonitor(
                 isActive: model.recordingKeyboardButtonID == buttonID,
                 onKeyDown: { event in
                     guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }),
-                          let usage = model.keyboardUsage(forMacKeyCode: event.keyCode) else { return }
+                          let usage = model.keyboardUsage(for: event) else { return }
                     var modifier: UInt8 = 0
                     if event.modifierFlags.contains(.control) { modifier |= 0x01 }
                     if event.modifierFlags.contains(.shift) { modifier |= 0x02 }
@@ -1524,92 +1611,83 @@ struct ContentView: View {
                     model.recordKeyboardEvent(buttonIndex: index, keyCode: usage, modifier: modifier)
                 })
                 .frame(width: 0, height: 0)
-            HStack(spacing: 8) {
-                Label("Custom keyboard output", systemImage: "keyboard")
-                    .font(.caption.weight(.medium))
-                Spacer()
-                Text("Modifiers")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(model.modifierChoices) { modifier in
-                    Toggle(modifier.label, isOn: Binding(
-                        get: {
-                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return false }
-                            return model.isModifierEnabled(buttonIndex: index, bit: modifier.id)
-                        },
-                        set: { enabled in
-                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                            model.setModifier(buttonIndex: index, bit: modifier.id, enabled: enabled)
-                        }))
-                        .toggleStyle(.checkbox)
-                        .controlSize(.small)
-                        .disabled({
-                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return true }
-                            return !model.isKeyboardRecord(buttonIndex: index)
-                        }())
-                }
+            keyboardRecordingBox(buttonID)
+            Text(model.keyboardOutputLengthLabel(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        .help("Click the input box to capture a key and its modifiers. The X cancels recording.")
+    }
+
+    private func keyboardRecordingBox(_ buttonID: Int) -> some View {
+        let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
+        let isRecording = model.recordingKeyboardButtonID == buttonID
+        let chord = model.keyboardChordText(buttonIndex: buttonIndex)
+
+        return ZStack(alignment: .trailing) {
+            Button {
+                guard !isRecording else { return }
+                model.beginKeyboardRecording(buttonIndex: buttonIndex)
+            } label: {
+                Text(isRecording ? "Recording..." : (chord.isEmpty ? "Click to record" : chord))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(width: 190, alignment: .leading)
+                    .padding(.leading, 8)
+                    .padding(.trailing, isRecording ? 30 : 8)
+                    .padding(.vertical, 5)
             }
+            .buttonStyle(.plain)
 
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Recorded input")
-                        .font(.caption)
+            if isRecording {
+                Button {
+                    model.cancelKeyboardRecording()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                    HStack(spacing: 4) {
-                        Text(model.keyboardKeyText(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0).isEmpty
-                             ? "No key recorded"
-                             : model.keyboardKeyText(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0))
-                            .frame(width: 150, alignment: .leading)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 4)
-                            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 5))
-                        Text(model.keyboardOutputLengthLabel(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    Button(model.recordingKeyboardButtonID == buttonID ? "Cancel recording" : "Record input") {
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                        if model.recordingKeyboardButtonID == buttonID {
-                            model.cancelKeyboardRecording()
-                        } else {
-                            model.beginKeyboardRecording(buttonIndex: index)
-                        }
-                    }
-                    .controlSize(.small)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
                 }
-
-                keyboardChoiceCard(buttonID: buttonID)
-                Spacer()
+                .buttonStyle(.plain)
+                .help("Cancel recording")
             }
         }
-        .padding(.leading, 76)
-        .padding(.top, 2)
-        .help("Choose a keyboard key override or use Record input to capture one key and its modifiers.")
+        .frame(width: 190, alignment: .leading)
+        .background(
+            isRecording
+                ? Color.accentColor.opacity(0.18)
+                : Color.primary.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 5)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(
+                    isRecording ? Color.accentColor : Color.primary.opacity(0.14),
+                    lineWidth: isRecording ? 1.5 : 0.75
+                )
+        }
+        .animation(.easeInOut(duration: 0.12), value: isRecording)
     }
 
     private func keyboardChoiceCard(buttonID: Int) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label("Keyboard key override", systemImage: "command.square")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Picker("", selection: Binding(
-                get: {
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
-                    return model.keyboardKeyChoice(buttonIndex: index)
-                },
-                set: { key in
-                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                    model.setKeyboardKeyChoice(buttonIndex: index, key: key)
-                })) {
-                Text("None").tag(0)
-                ForEach(model.keyboardOutputKeys) { key in
-                    Text(key.label).tag(Int(key.id))
-                }
+        Picker("Extended key", selection: Binding(
+            get: {
+                guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
+                return model.keyboardKeyChoice(buttonIndex: index)
+            },
+            set: { key in
+                guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                model.setKeyboardKeyChoice(buttonIndex: index, key: key)
+            })) {
+            Text("Extended key").tag(0)
+            ForEach(model.keyboardOutputKeys) { key in
+                Text(key.label).tag(Int(key.id))
             }
-            .labelsHidden()
-            .controlSize(.small)
-            .frame(width: 156)
         }
+        .controlSize(.small)
+        .labelsHidden()
+        .frame(width: 150)
+        .help("Insert an extended HID keyboard usage directly.")
     }
 
     private var dpiEditor: some View {
@@ -1656,14 +1734,11 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 if let currentDPI = model.dpiCapabilities.currentValue {
                     HStack(spacing: 6) {
-                        Text("Live sensor DPI")
+                        Text("Live DPI")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text("\(currentDPI)")
                             .font(.caption.monospacedDigit().weight(.semibold))
-                        Text("(the mouse’s current speed)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -1791,7 +1866,7 @@ struct ContentView: View {
                     .frame(minHeight: 120, maxHeight: 250)
                 }
             }
-            Text("Quit G HUB and other mouse remappers while saving. Re-enable them after verifying the onboard behavior.")
+            Text("Quit G HUB and other mouse remappers while saving. Don't bother re-enabling them after ;).")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -1842,7 +1917,7 @@ struct ContentView: View {
                         get: { model.showNonStandardKeyboardKeys },
                         set: { model.setShowNonStandardKeyboardKeys($0) }))
                         .toggleStyle(.checkbox)
-                    Text("Includes keys such as F13 and above in the keyboard key override dropdown.")
+                    Text("Shows the optional extended-key override for usages such as Insert, F13–F24, and Sleep. Recording captures modifiers automatically.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

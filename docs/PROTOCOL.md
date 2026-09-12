@@ -76,13 +76,15 @@ requested stage that the mouse does not report, and currently supports only a
 single-sensor layout.
 
 Second, the selected onboard sector must pass the CRC check and match the
-validated format-4 DPI layout: one to five little-endian 16-bit stages
-at sector offsets `3..12`. Active stages are strictly increasing; unused slots
-are `0xFFFF`. The one-based default and DPI-shift stage indexes are stored at
-offsets `1` and `2`. These are detected from the returned descriptor and
-bytes; they are not assumed for an unknown format. A DPI write changes only
-the stage/index bytes, clears trailing unused slots to `0xFFFF`, recalculates
-the sector CRC, and verifies the complete sector after the write.
+validated format-3/4/5 DPI layout: one to five little-endian 16-bit stages
+at sector offsets `3..12`. Active stages are strictly increasing; the inactive
+sentinel is firmware-specific. G102/G203 and G603 firmware use `0x0000`, while
+some newer layouts use `0xFFFF`. The one-based default and DPI-shift stage
+indexes are stored at offsets `1` and `2`. These are detected from the returned
+descriptor and bytes, with a known-device fallback for a fully populated table;
+they are not assumed for an unknown format. A DPI write compacts active stages
+from slot zero, clears trailing unused slots with the selected sentinel,
+recalculates the sector CRC, and verifies the complete sector after the write.
 
 ## Sources
 

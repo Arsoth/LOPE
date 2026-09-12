@@ -39,9 +39,10 @@ final class AppModel: ObservableObject {
     @Published var waitingForKnownDevice = false
     @Published var knownDevicePollAttempts = 0
     @Published var appearancePreference: AppearancePreference
+    @Published var isDarkAppearance = false
 
     var keyInputDrafts: [Int: String] = [:]
-    var recordingKeyboardButtonID: Int?
+    @Published var recordingKeyboardButtonID: Int?
     var baselineProfileEnabled: [Int: Bool] = [:]
     var baselineDPIStages = [String]()
     var baselineDPICount = 5
@@ -54,6 +55,7 @@ final class AppModel: ObservableObject {
     var discoveredBackups: [BackupEntry] = []
     var reconnectMonitorTask: Task<Void, Never>?
     var knownDevicePollTask: Task<Void, Never>?
+    var liveDPIPollTask: Task<Void, Never>?
     var knownDisconnectedDevice: DeviceChoice?
     var initialBackupKeys = Set<String>()
 
@@ -157,6 +159,8 @@ final class AppModel: ObservableObject {
         inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
         refreshBackups()
+        applyWindowAppearance(appearancePreference)
+        isDarkAppearance = effectiveAppearanceIsDark(for: appearancePreference)
         Task { @MainActor in
             initialRefresh()
             startReconnectMonitor()
@@ -167,7 +171,45 @@ final class AppModel: ObservableObject {
 
     func setAppearancePreference(_ preference: AppearancePreference) {
         appearancePreference = preference
+        applyWindowAppearance(preference)
+        isDarkAppearance = effectiveAppearanceIsDark(for: preference)
         UserDefaults.standard.set(preference.rawValue, forKey: "\(AppConstants.defaultsPrefix).\(AppConstants.appearancePreferenceKey)")
+    }
+
+    private func effectiveAppearanceIsDark(for preference: AppearancePreference) -> Bool {
+        switch preference {
+        case .light:
+            return false
+        case .dark:
+            return true
+        case .system:
+            let appearance = NSApp.windows.first?.effectiveAppearance ?? NSApp.effectiveAppearance
+            return appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        }
+    }
+
+    private func applyWindowAppearance(_ preference: AppearancePreference) {
+        let appearance: NSAppearance?
+        switch preference {
+        case .system:
+            appearance = nil
+        case .light:
+            appearance = NSAppearance(named: .aqua)
+        case .dark:
+            appearance = NSAppearance(named: .darkAqua)
+        }
+
+        // preferredColorScheme updates SwiftUI's controls, but clearing that
+        // preference does not always make an existing WindowGroup re-adopt
+        // the system appearance until the app loses focus. Apply the same
+        // choice directly to the window so the effective appearance changes
+        // while the app is still active.
+        NSApp.appearance = appearance
+        for window in NSApp.windows {
+            window.appearance = appearance
+            window.contentView?.appearance = appearance
+            window.contentView?.needsDisplay = true
+        }
     }
 
     var hasButtonChanges: Bool {

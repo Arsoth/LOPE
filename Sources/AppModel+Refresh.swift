@@ -10,12 +10,17 @@ private let deviceReadRetryDelay: TimeInterval = 0.2
 private let profileReadAttempts = 5
 private let profileReadRetryDelay: TimeInterval = 0.25
 private let reconnectPollNanoseconds: UInt64 = 2_000_000_000
+// The live query is current-sensor-only, but still starts a short-lived engine
+// process and HID context. Two reads per second are responsive without making
+// the mouse or receiver handle unnecessary traffic.
+private let liveDPIPollNanoseconds: UInt64 = 500_000_000
 
 @MainActor
 extension AppModel {
     func refresh() {
         let expectedDevice = knownDisconnectedDevice
         stopKnownDevicePolling(clearDevice: false)
+        stopLiveDPIPolling()
         startRefresh(
             preferredDeviceIndex: selectedDeviceIndex,
             preferredProfileNumber: profileNumber,
@@ -101,6 +106,7 @@ extension AppModel {
 
     private func startInitialRefresh(cachedDevice: DeviceChoice) {
         refreshTask?.cancel()
+        stopLiveDPIPolling()
         refreshGeneration += 1
         let generation = refreshGeneration
         let currentDirectory = backupDirectory
@@ -171,6 +177,7 @@ extension AppModel {
         expectedDevice: DeviceChoice? = nil
     ) {
         refreshTask?.cancel()
+        stopLiveDPIPolling()
         refreshGeneration += 1
         let generation = refreshGeneration
         let currentDirectory = backupDirectory
@@ -366,6 +373,7 @@ extension AppModel {
             dpiDetails = snapshot.dpiError ?? "DPI capabilities could not be read."
         }
         stopKnownDevicePolling(clearDevice: true)
+        startLiveDPIPolling()
         scheduleInitialBackups(for: selected, profileNumbers: profiles.map(\.id))
         status = snapshot.accessWarning && selected.isWiredDevice && !isMXSeriesMouse
             ? "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh."
@@ -386,6 +394,7 @@ extension AppModel {
     }
 
     private func resetEditorState() {
+        stopLiveDPIPolling()
         onboardProfileCapacity = nil
         onboardProfileCapacityWasReported = false
         profiles = []
@@ -425,6 +434,58 @@ extension AppModel {
         baselineDefaultStage = 1
         baselineShiftStage = 1
         dpiDetails = "DPI capabilities have not been read."
+    }
+
+    private func startLiveDPIPolling() {
+        stopLiveDPIPolling()
+        guard let executable = engine,
+              let selected = devices.first(where: { $0.id == selectedDeviceIndex }),
+              !profiles.isEmpty,
+              dpiCapabilities.sensorCount != nil else { return }
+
+        let deviceID = selected.id
+        let deviceKey = selected.deviceKey
+        let currentDirectory = backupDirectory
+        liveDPIPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: liveDPIPollNanoseconds)
+                } catch {
+                    return
+                }
+                guard let self, !Task.isCancelled,
+                      !self.busy,
+                      !self.loadingProfile,
+                      self.selectedDeviceIndex == deviceID,
+                      self.devices.first(where: { $0.id == deviceID })?.deviceKey == deviceKey,
+                      !self.profiles.isEmpty else { continue }
+
+                let currentDPI = await Task.detached(priority: .utility) {
+                    Self.readCurrentSensorDPI(
+                        executable: executable,
+                        currentDirectory: currentDirectory,
+                        deviceKey: deviceKey,
+                        deviceIndex: deviceID
+                    )
+                }.value
+
+                guard !Task.isCancelled,
+                      let currentDPI,
+                      !self.busy,
+                      !self.loadingProfile,
+                      self.selectedDeviceIndex == deviceID,
+                      self.devices.first(where: { $0.id == deviceID })?.deviceKey == deviceKey,
+                      !self.profiles.isEmpty else { continue }
+                if self.dpiCapabilities.currentValue != currentDPI {
+                    self.dpiCapabilities.currentValue = currentDPI
+                }
+            }
+        }
+    }
+
+    private func stopLiveDPIPolling() {
+        liveDPIPollTask?.cancel()
+        liveDPIPollTask = nil
     }
 
     private func hasKnownOnboardProfileCapability(_ device: DeviceChoice) -> Bool {
@@ -686,6 +747,23 @@ extension AppModel {
                 accessWarning: accessWarning
             )
         }
+    }
+
+    private nonisolated static func readCurrentSensorDPI(
+        executable: URL,
+        currentDirectory: URL,
+        deviceKey: String,
+        deviceIndex: Int
+    ) -> Int? {
+        let selector = deviceKey.isEmpty
+            ? ["--device", String(deviceIndex)]
+            : ["--device-key", deviceKey]
+        guard let output = try? EngineRunner.run(
+            executable: executable,
+            arguments: selector + ["current-dpi"],
+            currentDirectory: currentDirectory
+        ) else { return nil }
+        return DPIOutputParser.parse(output).currentValue
     }
 
     private nonisolated static func runDeviceListWithRetry(

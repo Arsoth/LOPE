@@ -544,14 +544,33 @@ static void write_le16(uint8_t *bytes, uint16_t value) {
     bytes[1] = (uint8_t)(value >> 8);
 }
 
-static void detect_dpi_layout(Profile *profile) {
+static bool device_uses_zero_terminated_dpi(const Device *device) {
+    if (device == NULL || device->iface == NULL) {
+        return false;
+    }
+    switch (device->iface->product_id) {
+        case 0xC084: // G102/G203 family
+        case 0xC092: // G203 LIGHTSYNC
+        case 0xB01C: // G603 LIGHTSPEED
+            return true;
+        default:
+            break;
+    }
+    return text_contains_case_insensitive(device_label(device), "G102") ||
+           text_contains_case_insensitive(device_label(device), "G203") ||
+           text_contains_case_insensitive(device_label(device), "G603");
+}
+
+static void detect_dpi_layout(Profile *profile, const Device *device) {
+    bool zero_terminated = device_uses_zero_terminated_dpi(device);
     profile->dpi_offset = 0;
     profile->dpi_count = 0;
     profile->dpi_default_index = 0;
     profile->dpi_shift_index = 0;
+    profile->dpi_unused_value = zero_terminated ? 0 : UINT16_MAX;
     profile->dpi_layout_supported = false;
 
-    // Known format-3/4 sectors store one to five little-endian DPI stages at
+    // Known format-3/4/5 sectors store one to five little-endian DPI stages at
     // offsets 3..12; unused stage slots are 0 or 0xFFFF. Bytes 1 and 2 select
     // the default and shift stages. Treat this as a validated format
     // candidate, never as a universal offset.
@@ -562,12 +581,17 @@ static void detect_dpi_layout(Profile *profile) {
     uint16_t previous = 0;
     size_t count = 0;
     bool inactive = false;
+    bool saw_unused_value = false;
     for (size_t i = 0; i < 5; i++) {
         uint16_t dpi = read_le16(profile->data + 3 + i * 2);
         // G603 format-3 firmware uses zero for unused stages, while newer
         // gaming mice commonly use 0xFFFF. Both values terminate the active
         // ascending DPI list.
         if (dpi == 0 || dpi == UINT16_MAX) {
+            if (!saw_unused_value && !zero_terminated) {
+                profile->dpi_unused_value = dpi;
+            }
+            saw_unused_value = true;
             inactive = true;
             continue;
         }
@@ -585,6 +609,23 @@ static void detect_dpi_layout(Profile *profile) {
     profile->dpi_default_index = profile->data[1];
     profile->dpi_shift_index = profile->data[2];
     profile->dpi_layout_supported = true;
+}
+
+static bool write_dpi_stage_table(uint8_t *data,
+                                  const Profile *profile,
+                                  const uint16_t *stages,
+                                  size_t count) {
+    if (data == NULL || profile == NULL || stages == NULL ||
+        !profile->dpi_layout_supported || count == 0 || count > 5) {
+        return false;
+    }
+    for (size_t i = 0; i < count; i++) {
+        write_le16(data + profile->dpi_offset + i * 2, stages[i]);
+    }
+    for (size_t i = count; i < 5; i++) {
+        write_le16(data + profile->dpi_offset + i * 2, profile->dpi_unused_value);
+    }
+    return true;
 }
 
 static int adjustable_dpi_values(Device *device,
@@ -723,7 +764,7 @@ static int load_profile_with_headers(Device *device,
     profile->crc_ok = sector_crc_ok(profile->data, profile->data_length);
     profile->crc_checked = true;
     detect_button_layout(profile);
-    detect_dpi_layout(profile);
+    detect_dpi_layout(profile, device);
     return 1;
 }
 
@@ -783,7 +824,7 @@ static int load_profile_summary_with_headers(Device *device,
     profile->crc_ok = false;
     profile->crc_checked = false;
     detect_button_layout(profile);
-    detect_dpi_layout(profile);
+    detect_dpi_layout(profile, device);
     return 1;
 }
 

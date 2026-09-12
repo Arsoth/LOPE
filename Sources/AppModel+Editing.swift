@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
+import AppKit
 import Foundation
 
 @MainActor
@@ -80,6 +81,21 @@ extension AppModel {
         return keyboardKeyLabel(UInt8(keyboardKey(buttonIndex: buttonIndex)))
     }
 
+    func keyboardChordText(buttonIndex: Int) -> String {
+        guard let chord = keyboardBytes(buttonIndex), chord.key != 0 else { return "" }
+        let modifierLabels: [(UInt8, String)] = [
+            (0x01, "Ctrl"),
+            (0x02, "Shift"),
+            (0x04, "Alt"),
+            (0x08, "Cmd")
+        ]
+        let modifiers = modifierLabels.compactMap { bit, label in
+            chord.modifier & bit == 0 ? nil : label
+        }
+        let key = keyboardKeyText(buttonIndex: buttonIndex)
+        return (modifiers + [key]).joined(separator: "+")
+    }
+
     func setKeyboardKeyText(buttonIndex: Int, text: String) {
         let keyTokens = text.split { $0 == "," || $0 == "+" || $0.isWhitespace }
         guard keyTokens.count <= currentMouseProfile.keyboardOutputLimits.maxKeys else {
@@ -123,15 +139,13 @@ extension AppModel {
 
     func beginKeyboardRecording(buttonIndex: Int) {
         guard buttons.indices.contains(buttonIndex) else { return }
-        if !isKeyboardRecord(buttonIndex: buttonIndex) {
-            setKeyboardChord(buttonIndex: buttonIndex, modifier: 0, key: 0)
-        }
         recordingKeyboardButtonID = buttons[buttonIndex].id
         status = "Press one keyboard key to record it."
     }
 
     func cancelKeyboardRecording() {
         recordingKeyboardButtonID = nil
+        status = "Keyboard recording canceled."
     }
 
     func recordKeyboardEvent(buttonIndex: Int, keyCode: UInt8, modifier: UInt8) {
@@ -139,10 +153,6 @@ extension AppModel {
               recordingKeyboardButtonID == buttons[buttonIndex].id else { return }
         guard let key = keyboardKeys.first(where: { $0.id == keyCode }) else {
             status = "That keyboard input is not supported by the HID++ key table."
-            return
-        }
-        if isNonStandardKeyboardKey(key) && !showNonStandardKeyboardKeys {
-            status = "Enable non-standard keyboard keys in Settings before recording \(key.label)."
             return
         }
         setKeyboardChord(buttonIndex: buttonIndex, modifier: modifier, key: keyCode)
@@ -165,9 +175,35 @@ extension AppModel {
             98: 0x40, 100: 0x41, 101: 0x42, 109: 0x43, 103: 0x44, 111: 0x45,
             105: 0x68, 107: 0x69, 113: 0x6A, 106: 0x6B, 64: 0x6C, 79: 0x6D,
             80: 0x6E, 90: 0x6F, 123: 0x50, 124: 0x4F, 125: 0x51, 126: 0x52,
-            117: 0x4C
+            // macOS reports the Help/Insert key as key code 114 on many
+            // extended keyboards. HID++ needs the keyboard Insert usage.
+            114: 0x49,
+            115: 0x4A, 116: 0x4B, 117: 0x4C, 119: 0x4D, 121: 0x4E,
+            71: 0x53, 73: 0x54, 75: 0x55, 67: 0x56, 69: 0x57, 76: 0x58,
+            82: 0x59, 83: 0x5A, 84: 0x5B, 86: 0x5C, 87: 0x5D, 88: 0x5E,
+            89: 0x5F, 91: 0x60, 92: 0x61, 94: 0x62, 65: 0x63
         ]
         return usages[keyCode]
+    }
+
+    /// The Fn modifier turns Return into Insert on common Mac keyboards.
+    /// Keep this separate from the key-code table so ordinary Return still
+    /// records as Enter.
+    func keyboardUsage(for event: NSEvent) -> UInt8? {
+        let extendedFunctionUsages: [UInt32: UInt8] = [
+            0xF718: 0x70, // F21
+            0xF719: 0x71, // F22
+            0xF71A: 0x72, // F23
+            0xF71B: 0x73  // F24
+        ]
+        if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first,
+           let usage = extendedFunctionUsages[scalar.value] {
+            return usage
+        }
+        if event.keyCode == 36 && event.modifierFlags.contains(.function) {
+            return 0x49
+        }
+        return keyboardUsage(forMacKeyCode: event.keyCode)
     }
 
     func functionKeyChoice(buttonIndex: Int) -> Int {
@@ -190,7 +226,7 @@ extension AppModel {
 
     func specialKeyChoice(buttonIndex: Int) -> Int {
         let key = UInt8(keyboardKey(buttonIndex: buttonIndex))
-        return specialKeyboardKeys.contains(where: { $0.id == key }) ? Int(key) : 0
+        return keyboardOutputKeys.contains(where: { $0.id == key }) ? Int(key) : 0
     }
 
     func setSpecialKey(buttonIndex: Int, key: Int) {

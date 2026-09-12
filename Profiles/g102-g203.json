@@ -4,7 +4,7 @@
 	"name": "G102 / G203",
 	"match": {
 		"nameContains": ["G102", "G203"],
-		"productIDs": ["0xC084"],
+		"productIDs": ["0xC084", "0xC092"],
 		"priority": 20
 	},
 	"buttons": [
@@ -71,6 +71,7 @@
 		"layout": {
 			"buttonRecord": "4 bytes per control",
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"dpiUnusedStage": "0x0000; firmware treats the first zero as the end of the contiguous DPI table",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [

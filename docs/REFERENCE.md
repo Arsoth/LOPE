@@ -98,11 +98,12 @@ The top-level output menu is ordered as:
 3. Standard mouse and keyboard outputs
 
 Function keys and special keys are one keyboard-key list. Custom is a keyboard
-record workflow: modifiers are shown before the key controls, and **Record
-input** captures one macOS key event plus its Ctrl, Shift, Alt, and Command
-flags. The editor also provides a keyboard-key override list for choosing a
-known usage directly. F13 and higher are hidden until the Settings opt-in is
-enabled.
+record workflow: clicking the recorded-input box captures one macOS key event
+plus its Ctrl, Shift, Alt, and Command flags. The highlighted box displays the
+complete chord and exposes an X that cancels without changing the existing
+output. The editor knows the full keyboard usage table for recording, but keeps
+the optional extended-key override hidden until the Settings opt-in is enabled.
+That opt-in adds keys such as Insert, F13–F24, and Sleep.
 
 The standard HID++ keyboard record has one usage byte and one modifier bitmap.
 The descriptor field `keyboardOutput` stores the corresponding per-mouse
@@ -171,6 +172,7 @@ make
 ./bin/lope list
 ./bin/lope info
 ./bin/lope profiles
+./bin/lope current-dpi
 ./bin/lope self-test
 ```
 
