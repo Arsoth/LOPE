@@ -1,7 +1,5 @@
 # LOPE todo list
 
-## P2 — button highlighting coverage
-
 ### [ ] 7. Detect and highlight all standard mouse buttons when possible
 
 **Status: Deferred.** AppKit testing on G502 X and G604 exposed only buttons
@@ -28,8 +26,6 @@ firmware’s logical profile-record number.
 **Done when:** every standard button that macOS exposes is mapped and
 highlighted correctly; unsupported or ambiguous controls are reported clearly
 and never mapped by guesswork.
-
-## Unprioritized — processed notes
 
 ### [ ] 8. Overhaul the README and documentation split
 

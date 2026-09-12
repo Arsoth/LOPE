@@ -280,7 +280,7 @@ extension AppModel {
         }
         status = snapshot.accessWarning
             ? "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh."
-            : "Read-only inspection complete. Changes are previewed before writing."
+            : "Onboard Profile read successfully."
     }
 
     private func profileReadProgressHandler(generation: Int) -> @Sendable (String) -> Void {
