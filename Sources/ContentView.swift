@@ -15,16 +15,60 @@ private struct DPIStageTriangle: Shape {
     }
 }
 
-private struct DPIStageDiamond: Shape {
+private struct DPIStagePentagon: Shape {
+    private let cornerRadius: CGFloat = 3
+
     func path(in rect: CGRect) -> Path {
+        let vertices = [
+            CGPoint(x: rect.midX, y: rect.minY),
+            CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.38),
+            CGPoint(x: rect.minX + rect.width * 0.81, y: rect.maxY),
+            CGPoint(x: rect.minX + rect.width * 0.19, y: rect.maxY),
+            CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.38)
+        ]
+        let roundedVertices = vertices.enumerated().map { index, vertex in
+            let previous = vertices[(index + vertices.count - 1) % vertices.count]
+            let next = vertices[(index + 1) % vertices.count]
+            return (
+                before: point(on: vertex, toward: previous, distance: cornerRadius),
+                after: point(on: vertex, toward: next, distance: cornerRadius),
+                vertex: vertex
+            )
+        }
+
         var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.move(to: roundedVertices[0].before)
+        for (index, roundedVertex) in roundedVertices.enumerated() {
+            if index > 0 {
+                path.addLine(to: roundedVertex.before)
+            }
+            path.addQuadCurve(to: roundedVertex.after, control: roundedVertex.vertex)
+        }
+        path.addLine(to: roundedVertices[0].before)
         path.closeSubpath()
         return path
     }
+
+    private func point(on vertex: CGPoint, toward other: CGPoint, distance: CGFloat) -> CGPoint {
+        let dx = other.x - vertex.x
+        let dy = other.y - vertex.y
+        let length = max(sqrt(dx * dx + dy * dy), 0.001)
+        let fraction = min(distance, length / 2) / length
+        return CGPoint(x: vertex.x + dx * fraction, y: vertex.y + dy * fraction)
+    }
+}
+
+private enum DPIStagePalette {
+    static let shift = Color(red: 0.20, green: 0.52, blue: 0.94)
+    static let defaultStage = Color(red: 0.72, green: 0.83, blue: 0.20)
+    static let other = Color(red: 0.91, green: 0.24, blue: 0.25)
+    static let bar = Color(red: 0.42, green: 0.45, blue: 0.50)
+}
+
+private enum DPILegendRole: Hashable {
+    case defaultStage
+    case shift
+    case other
 }
 
 private struct DPIStageSelection: Identifiable, Equatable {
@@ -140,14 +184,8 @@ private struct DPIStageBar: View {
                 }
 
                 Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [.blue.opacity(0.88), .purple.opacity(0.84)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(height: 6)
+                    .fill(DPIStagePalette.bar)
+                    .frame(height: 4)
                     .overlay {
                         Capsule()
                             .stroke(.white.opacity(0.12), lineWidth: 0.5)
@@ -245,12 +283,11 @@ private struct DPIStageBar: View {
 
         return ZStack(alignment: .topLeading) {
             ZStack {
-                stageShape(isDefault: isDefault, isShift: isShift, isValid: parsedValue != nil)
+                stageShape(isDefault: isDefault, isShift: isShift)
                     .frame(width: 30, height: 30)
                 Text("\(index + 1)")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
-                    .offset(y: isShift && !isDefault ? 2 : 0)
+                    .font(.callout.weight(.bold))
+                    .foregroundStyle(.black)
             }
             .frame(width: 34, height: 34)
             .position(x: 42, y: 16)
@@ -303,16 +340,16 @@ private struct DPIStageBar: View {
     }
 
     @ViewBuilder
-    private func stageShape(isDefault: Bool, isShift: Bool, isValid: Bool) -> some View {
+    private func stageShape(isDefault: Bool, isShift: Bool) -> some View {
         if isDefault {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(isValid ? Color.red : Color.orange)
+                .fill(DPIStagePalette.defaultStage)
         } else if isShift {
-            DPIStageDiamond()
-                .fill(isValid ? Color.orange : Color.red)
+            DPIStagePentagon()
+                .fill(DPIStagePalette.shift)
         } else {
             Circle()
-                .fill(isValid ? Color.blue : Color.red)
+                .fill(DPIStagePalette.other)
         }
     }
 
@@ -332,7 +369,7 @@ private struct DPIStageBar: View {
                 dismissStageEditor()
             } label: {
                 HStack(spacing: 7) {
-                    roleIcon(isDefault: true, isShift: false, filled: isDefault, tint: .white)
+                    roleIcon(isDefault: true, isShift: false, filled: isDefault, tint: DPIStagePalette.defaultStage)
                     Text(isDefault ? "Default" : "Make Default")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -350,7 +387,7 @@ private struct DPIStageBar: View {
                 dismissStageEditor()
             } label: {
                 HStack(spacing: 7) {
-                    roleIcon(isDefault: false, isShift: true, filled: isShift, tint: .white)
+                    roleIcon(isDefault: false, isShift: true, filled: isShift, tint: DPIStagePalette.shift)
                     Text(isShift ? "DPI Shift" : "Make DPI Shift")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -414,18 +451,73 @@ private struct DPIStageBar: View {
 
     private var dpiLegend: some View {
         HStack(spacing: 9) {
-            legendItem(label: "Default", isDefault: true, isShift: false)
-            legendItem(label: "DPI Shift", isDefault: false, isShift: true)
-            legendItem(label: "Other", isDefault: false, isShift: false)
+            ForEach(legendOrder, id: \.self) { role in
+                legendItem(role)
+            }
         }
     }
 
-    private func legendItem(label: String, isDefault: Bool, isShift: Bool) -> some View {
-        HStack(spacing: 3) {
-            let tint: Color = isDefault ? .red : (isShift ? .orange : .blue)
+    private func legendItem(_ role: DPILegendRole) -> some View {
+        let label: String
+        let isDefault: Bool
+        let isShift: Bool
+        let tint: Color
+
+        switch role {
+        case .defaultStage:
+            label = "Default"
+            isDefault = true
+            isShift = false
+            tint = DPIStagePalette.defaultStage
+        case .shift:
+            label = "DPI Shift"
+            isDefault = false
+            isShift = true
+            tint = DPIStagePalette.shift
+        case .other:
+            label = "Other"
+            isDefault = false
+            isShift = false
+            tint = DPIStagePalette.other
+        }
+
+        return HStack(spacing: 3) {
             roleIcon(isDefault: isDefault, isShift: isShift, filled: true, tint: tint)
             Text(label)
         }
+    }
+
+    private var legendOrder: [DPILegendRole] {
+        let otherWeights = stages.enumerated().compactMap { index, text -> CGFloat? in
+            guard let value = Int(text), index + 1 != defaultStage, index + 1 != shiftStage else {
+                return nil
+            }
+            return position(for: value, width: 100)
+        }
+
+        guard let otherWeight = otherWeights.isEmpty ? nil : otherWeights.reduce(0, +) / CGFloat(otherWeights.count) else {
+            return defaultStage <= shiftStage ? [.defaultStage, .shift, .other] : [.shift, .defaultStage, .other]
+        }
+
+        let weightedRoles: [(role: DPILegendRole, weight: CGFloat, stage: Int)] = [
+            (.defaultStage, positionForLegend(stage: defaultStage), defaultStage),
+            (.shift, positionForLegend(stage: shiftStage), shiftStage),
+            (.other, otherWeight, Int.max)
+        ]
+
+        return weightedRoles
+            .sorted {
+                if $0.weight != $1.weight { return $0.weight < $1.weight }
+                return $0.stage < $1.stage
+            }
+            .map(\.role)
+    }
+
+    private func positionForLegend(stage: Int) -> CGFloat {
+        guard stages.indices.contains(stage - 1), let value = Int(stages[stage - 1]) else {
+            return CGFloat(stage)
+        }
+        return position(for: value, width: 100)
     }
 
     @ViewBuilder
@@ -439,12 +531,16 @@ private struct DPIStageBar: View {
                 }
             } else if isShift {
                 if filled {
-                    DPIStageDiamond().fill(tint)
+                    DPIStagePentagon().fill(tint)
                 } else {
-                    DPIStageDiamond().stroke(tint, lineWidth: 1.25)
+                    DPIStagePentagon().stroke(tint, lineWidth: 1.25)
                 }
             } else {
-                Circle().fill(tint)
+                if filled {
+                    Circle().fill(tint)
+                } else {
+                    Circle().stroke(tint, lineWidth: 1.25)
+                }
             }
         }
         .frame(width: 14, height: 14)
