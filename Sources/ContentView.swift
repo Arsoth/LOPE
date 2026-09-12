@@ -176,6 +176,52 @@ private extension View {
     }
 }
 
+private struct KeyboardInputMonitor: NSViewRepresentable {
+    let isActive: Bool
+    let onKeyDown: (NSEvent) -> Void
+
+    final class Coordinator {
+        var isActive = false
+        var onKeyDown: (NSEvent) -> Void = { _ in }
+        var monitor: Any?
+
+        func update(isActive: Bool, onKeyDown: @escaping (NSEvent) -> Void) {
+            self.isActive = isActive
+            self.onKeyDown = onKeyDown
+            if isActive, monitor == nil {
+                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    guard let self, self.isActive else { return event }
+                    self.onKeyDown(event)
+                    return nil
+                }
+            } else if !isActive, let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.update(isActive: isActive, onKeyDown: onKeyDown)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.update(isActive: isActive, onKeyDown: onKeyDown)
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.update(isActive: false, onKeyDown: { _ in })
+    }
+}
+
 private struct EscapeKeyMonitor: NSViewRepresentable {
     let onEscape: () -> Void
 
@@ -1014,56 +1060,77 @@ struct ContentView: View {
     @State private var restoreURL: URL?
     @State private var confirmRecoveryRestore = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var preferredColorScheme: ColorScheme? {
+        switch model.appearancePreference {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    private var appBackground: Color {
+        colorScheme == .light
+            ? Color(red: 0.965, green: 0.965, blue: 0.95)
+            : Color(nsColor: .windowBackgroundColor)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-            Divider()
-            TabView {
-                ZStack {
-                    if model.loadingProfile && model.buttons.isEmpty {
-                        loadingProfileState
+        ZStack {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                Divider()
+                TabView {
+                    ZStack {
+                        if model.loadingProfile && model.buttons.isEmpty {
+                            loadingProfileState
+                    } else if model.waitingForKnownDevice {
+                        knownDeviceWakeState
                     } else if !model.loadingProfile && !model.shouldShowButtonEditor {
-                        emptyState
-                    } else {
-                        buttonsPane
-                            .opacity(model.loadingProfile ? 0.72 : 1)
-                            .allowsHitTesting(!model.loadingProfile)
+                            emptyState
+                        } else {
+                            buttonsPane
+                                .opacity(model.loadingProfile ? 0.72 : 1)
+                                .allowsHitTesting(!model.loadingProfile)
+                        }
+                        if model.loadingProfile && !model.buttons.isEmpty {
+                            loadingProfileOverlay
+                        }
                     }
-                    if model.loadingProfile && !model.buttons.isEmpty {
-                        loadingProfileOverlay
-                    }
+                    .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
+                    backupsPane
+                        .tabItem { Label("Backups", systemImage: "archivebox") }
+                    settingsPane
+                        .tabItem { Label("Settings", systemImage: "gearshape") }
                 }
-                .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
-                backupsPane
-                    .tabItem { Label("Backups", systemImage: "archivebox") }
-                settingsPane
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-            }
-            Divider()
-            HStack(alignment: .top) {
-                Image(systemName: "info.circle")
-                Text(model.status)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                Spacer()
-            }
+                Divider()
+                HStack(alignment: .top) {
+                    Image(systemName: "info.circle")
+                    Text(model.status)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    Spacer()
+                }
 
-            // Future expansion: restore the button-press highlighting control
-            // here, below the footer/status line, after a reliable Logitech
-            // button-event path is available. AppKit only exposed buttons 1–3
-            // in testing, and the HID monitor did not provide dependable
-            // mappings for the remaining controls.
-            // HStack(spacing: 8) {
-            //     Spacer()
-            //     Button("Highlight presses") {
-            //         // Future button-event monitor action.
-            //     }
-            // }
+                // Future expansion: restore the button-press highlighting control
+                // here, below the footer/status line, after a reliable Logitech
+                // button-event path is available. AppKit only exposed buttons 1–3
+                // in testing, and the HID monitor did not provide dependable
+                // mappings for the remaining controls.
+                // HStack(spacing: 8) {
+                //     Spacer()
+                //     Button("Highlight presses") {
+                //         // Future button-event monitor action.
+                //     }
+                // }
+            }
         }
         .padding(20)
         .frame(minWidth: 960, minHeight: 520)
+        .background(appBackground)
+        .preferredColorScheme(preferredColorScheme)
         .onChange(of: model.profileNumber) { _ in
             model.reloadSelectedProfile()
         }
@@ -1074,6 +1141,12 @@ struct ContentView: View {
             if phase == .active {
                 model.updateInputMonitoringAuthorization()
             }
+        }
+        .alert("Allow wired mice", isPresented: $model.wiredAccessInstructionsPresented) {
+            Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, enable LOPE in System Settings > Privacy & Security > Input Monitoring, then return and choose Refresh.")
         }
         .alert("Restore this backup?", isPresented: $confirmRestore) {
             Button("Cancel", role: .cancel) { restoreURL = nil }
@@ -1184,6 +1257,34 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var knownDeviceWakeState: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(systemName: "computermouse.fill")
+                .font(.system(size: 42))
+                .foregroundStyle(.orange)
+            Text("Wake \(model.currentDeviceName)")
+                .font(.title3.weight(.medium))
+            if let guidance = model.knownDeviceRefreshGuidance {
+                Text(guidance.sleepDescription)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                Text(guidance.wakeInstructions)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 560)
+            }
+            Text(model.knownDevicePollAttempts == 0
+                 ? "Checking for the mouse once per second for up to 60 seconds…"
+                 : "Checking for the mouse once per second (\(model.knownDevicePollAttempts)/60)…")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            ProgressView()
+                .controlSize(.small)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var emptyStateTitle: String {
         if model.devices.isEmpty { return "No editable Logitech mouse detected" }
         if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
@@ -1278,10 +1379,13 @@ struct ContentView: View {
                                 guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
                                 model.selectOutput(buttonIndex: index, choice: choice)
                             })) {
-                            ForEach(model.presets) { preset in
+                            ForEach(model.presets.prefix(1)) { preset in
                                 Text(preset.label).tag(preset.raw)
                             }
                             Text("Custom").tag("custom")
+                            ForEach(model.presets.dropFirst()) { preset in
+                                Text(preset.label).tag(preset.raw)
+                            }
                         }
                         .labelsHidden()
                         .frame(width: 190)
@@ -1407,6 +1511,19 @@ struct ContentView: View {
 
     private func keyboardChordEditor(_ buttonID: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            KeyboardInputMonitor(
+                isActive: model.recordingKeyboardButtonID == buttonID,
+                onKeyDown: { event in
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }),
+                          let usage = model.keyboardUsage(forMacKeyCode: event.keyCode) else { return }
+                    var modifier: UInt8 = 0
+                    if event.modifierFlags.contains(.control) { modifier |= 0x01 }
+                    if event.modifierFlags.contains(.shift) { modifier |= 0x02 }
+                    if event.modifierFlags.contains(.option) { modifier |= 0x04 }
+                    if event.modifierFlags.contains(.command) { modifier |= 0x08 }
+                    model.recordKeyboardEvent(buttonIndex: index, keyCode: usage, modifier: modifier)
+                })
+                .frame(width: 0, height: 0)
             HStack(spacing: 8) {
                 Label("Custom keyboard output", systemImage: "keyboard")
                     .font(.caption.weight(.medium))
@@ -1435,75 +1552,63 @@ struct ContentView: View {
 
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Typed key")
+                    Text("Recorded input")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField("A, Tab, or 0x04", text: Binding(
-                        get: {
-                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return "" }
-                            return model.keyboardKeyText(buttonIndex: index)
-                        },
-                        set: { text in
-                            guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                            model.setKeyboardKeyText(buttonIndex: index, text: text)
-                        }))
-                        .textFieldStyle(.roundedBorder)
-                        .controlSize(.small)
-                        .frame(width: 150)
+                    HStack(spacing: 4) {
+                        Text(model.keyboardKeyText(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0).isEmpty
+                             ? "No key recorded"
+                             : model.keyboardKeyText(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0))
+                            .frame(width: 150, alignment: .leading)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 4)
+                            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 5))
+                        Text(model.keyboardOutputLengthLabel(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    Button(model.recordingKeyboardButtonID == buttonID ? "Cancel recording" : "Record input") {
+                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                        if model.recordingKeyboardButtonID == buttonID {
+                            model.cancelKeyboardRecording()
+                        } else {
+                            model.beginKeyboardRecording(buttonIndex: index)
+                        }
+                    }
+                    .controlSize(.small)
                 }
 
-                keyboardChoiceCard(buttonID: buttonID, title: "Function key", systemImage: "f.square")
-                keyboardChoiceCard(buttonID: buttonID, title: "Special key", systemImage: "command.square")
+                keyboardChoiceCard(buttonID: buttonID)
                 Spacer()
             }
         }
         .padding(.leading, 76)
         .padding(.top, 2)
-        .help("Type a key name such as A or F13, choose a function or special key, and add modifiers with the checkboxes.")
+        .help("Choose a keyboard key override or use Record input to capture one key and its modifiers.")
     }
 
-    private func keyboardChoiceCard(buttonID: Int, title: String, systemImage: String) -> some View {
+    private func keyboardChoiceCard(buttonID: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: systemImage)
+            Label("Keyboard key override", systemImage: "command.square")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if title == "Function key" {
-                Picker("", selection: Binding(
-                    get: {
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
-                        return model.functionKeyChoice(buttonIndex: index)
-                    },
-                    set: { number in
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                        model.setFunctionKey(buttonIndex: index, number: number)
-                    })) {
-                    Text("None").tag(0)
-                    ForEach(1...24, id: \.self) { number in
-                        Text("F\(number)").tag(number)
-                    }
+            Picker("", selection: Binding(
+                get: {
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
+                    return model.keyboardKeyChoice(buttonIndex: index)
+                },
+                set: { key in
+                    guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
+                    model.setKeyboardKeyChoice(buttonIndex: index, key: key)
+                })) {
+                Text("None").tag(0)
+                ForEach(model.keyboardOutputKeys) { key in
+                    Text(key.label).tag(Int(key.id))
                 }
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(width: 112)
-            } else {
-                Picker("", selection: Binding(
-                    get: {
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
-                        return model.specialKeyChoice(buttonIndex: index)
-                    },
-                    set: { key in
-                        guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
-                        model.setSpecialKey(buttonIndex: index, key: key)
-                    })) {
-                    Text("None").tag(0)
-                    ForEach(model.specialKeyboardKeys) { key in
-                        Text(key.label).tag(Int(key.id))
-                    }
-                }
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(width: 156)
             }
+            .labelsHidden()
+            .controlSize(.small)
+            .frame(width: 156)
         }
     }
 
@@ -1635,6 +1740,7 @@ struct ContentView: View {
                     confirmRestore = restoreURL != nil
                 }
                 Button("Refresh list", action: model.refreshBackups)
+                Button("Open in Finder", action: model.openBackupDirectoryInFinder)
             }
             Toggle("Show backups for all mice", isOn: Binding(
                 get: { model.showAllBackups },
@@ -1725,6 +1831,35 @@ struct ContentView: View {
                         set: { model.setShowAdvancedFields($0) }))
                         .toggleStyle(.checkbox)
                     Text("Shows the 8-digit button records and profile sector numbers. Leave this off for the normal editing view.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(4)
+            }
+            GroupBox("Keyboard outputs") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Show non-standard keyboard keys", isOn: Binding(
+                        get: { model.showNonStandardKeyboardKeys },
+                        set: { model.setShowNonStandardKeyboardKeys($0) }))
+                        .toggleStyle(.checkbox)
+                    Text("Includes keys such as F13 and above in the keyboard key override dropdown.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(4)
+            }
+            GroupBox("Appearance") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Picker("Color mode", selection: Binding(
+                        get: { model.appearancePreference },
+                        set: { model.setAppearancePreference($0) }
+                    )) {
+                        ForEach(AppearancePreference.allCases, id: \.self) { preference in
+                            Text(preference.label).tag(preference)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Text("System follows macOS. Light mode uses a soft off-white background; the DPI colors remain unchanged.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -89,6 +89,7 @@
 	],
 	"scrollWheelButtonLabels": { "14": "Scroll down", "15": "Scroll up" },
 	"dpiRange": { "minimum": 200, "maximum": 8200 },
+	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ 1.0/LGS onboard profile",

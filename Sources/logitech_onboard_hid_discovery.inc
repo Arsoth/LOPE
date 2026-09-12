@@ -342,20 +342,12 @@ static int compare_hid_interfaces(const void *left_pointer, const void *right_po
 
 static int hid_context_create(HidContext *context) {
     memset(context, 0, sizeof(*context));
-    // IOHIDDeviceOpen uses the HID-specific Input Monitoring permission.
-    // The GUI previously requested only the CoreGraphics event-tap variant,
-    // which can leave receiver interfaces denied even when the app appears
-    // enabled in System Settings.
-    IOHIDAccessType hid_access_before = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent);
-    IOHIDAccessType hid_access_after = hid_access_before;
-    bool hid_access_requested = false;
-    if (hid_access_before != kIOHIDAccessTypeGranted) {
-        hid_access_requested = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent);
-        hid_access_after = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent);
-    }
+    // IOHIDDeviceOpen uses the HID-specific Input Monitoring permission. Do
+    // not request it during enumeration: the GUI presents the wired-device
+    // instructions and lets the user open System Settings deliberately.
+    IOHIDAccessType hid_access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent);
     if (hid_debug_enabled()) {
-        hid_debug_log("hid-debug access before=%d requested=%d after=%d",
-                      hid_access_before, hid_access_requested, hid_access_after);
+        hid_debug_log("hid-debug access=%d", hid_access);
     }
     context->manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     if (context->manager == NULL) {

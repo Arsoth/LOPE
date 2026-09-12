@@ -29,13 +29,19 @@ final class AppModel: ObservableObject {
     @Published var busy = false
     @Published var loadingProfile = false
     @Published var inputMonitoringAuthorized = false
+    @Published var wiredAccessInstructionsPresented = false
     @Published var backups: [BackupEntry] = []
     @Published var showAllBackups = false
     @Published var recoveryBackups: [URL] = []
     @Published var backupDirectoryPath = ""
     @Published var showAdvancedFields = false
+    @Published var showNonStandardKeyboardKeys = false
+    @Published var waitingForKnownDevice = false
+    @Published var knownDevicePollAttempts = 0
+    @Published var appearancePreference: AppearancePreference
 
     var keyInputDrafts: [Int: String] = [:]
+    var recordingKeyboardButtonID: Int?
     var baselineProfileEnabled: [Int: Bool] = [:]
     var baselineDPIStages = [String]()
     var baselineDPICount = 5
@@ -47,6 +53,9 @@ final class AppModel: ObservableObject {
     var recoveryDeviceKey: String?
     var discoveredBackups: [BackupEntry] = []
     var reconnectMonitorTask: Task<Void, Never>?
+    var knownDevicePollTask: Task<Void, Never>?
+    var knownDisconnectedDevice: DeviceChoice?
+    var initialBackupKeys = Set<String>()
 
     var currentMouseProfile: MouseProfileDescriptor {
         currentCatalogProfile ?? MouseProfileCatalog.genericProfile
@@ -62,10 +71,20 @@ final class AppModel: ObservableObject {
         currentCatalogProfile != nil
     }
 
+    var knownDeviceRefreshGuidance: OnboardProfileRefreshGuidance? {
+        guard let device = knownDisconnectedDevice else { return nil }
+        return MouseProfileCatalog.shared.matchingProfile(
+            deviceName: device.name,
+            productID: device.productID
+        )?.refreshGuidance
+    }
+
     var isMXSeriesMouse: Bool {
-        let tokens = currentDeviceName.lowercased()
-            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-        return tokens.contains("mx")
+        let selected = devices.first(where: { $0.id == selectedDeviceIndex })
+        return DeviceClassification.isMXSeriesMouse(
+            name: currentDeviceName.isEmpty ? (selected?.name ?? "") : currentDeviceName,
+            productID: selected?.productID ?? ""
+        )
     }
 
     var shouldShowButtonEditor: Bool {
@@ -131,6 +150,10 @@ final class AppModel: ObservableObject {
         backupDirectoryPath = selectedDirectory.path
         let advancedFieldsKey = "\(AppConstants.defaultsPrefix).showAdvancedFields"
         showAdvancedFields = defaults.bool(forKey: advancedFieldsKey)
+        let nonStandardKeysKey = "\(AppConstants.defaultsPrefix).showNonStandardKeyboardKeys"
+        showNonStandardKeyboardKeys = defaults.bool(forKey: nonStandardKeysKey)
+        let appearanceKey = "\(AppConstants.defaultsPrefix).\(AppConstants.appearancePreferenceKey)"
+        appearancePreference = AppearancePreference(rawValue: defaults.string(forKey: appearanceKey) ?? "") ?? .system
         inputMonitoringAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
         try? FileManager.default.createDirectory(at: selectedDirectory, withIntermediateDirectories: true)
         refreshBackups()
@@ -141,6 +164,11 @@ final class AppModel: ObservableObject {
     }
 
     var defaultBackupDirectoryPath: String { defaultBackupDirectory.path }
+
+    func setAppearancePreference(_ preference: AppearancePreference) {
+        appearancePreference = preference
+        UserDefaults.standard.set(preference.rawValue, forKey: "\(AppConstants.defaultsPrefix).\(AppConstants.appearancePreferenceKey)")
+    }
 
     var hasButtonChanges: Bool {
         buttons.contains { normalize($0.currentRaw) != normalize($0.draftRaw) }

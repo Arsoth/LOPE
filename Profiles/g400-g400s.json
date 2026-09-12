@@ -48,6 +48,7 @@
 		{ "number": 8, "control": "G8 · DPI up", "aliases": [], "notes": null }
 	],
 	"dpiRange": { "minimum": 200, "maximum": 4000 },
+	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ profile transport",

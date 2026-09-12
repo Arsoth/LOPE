@@ -179,6 +179,61 @@ extension AppModel {
         }
         return candidate
     }
+
+    func scheduleInitialBackups(for device: DeviceChoice, profileNumbers: [Int]) {
+        guard !profileNumbers.isEmpty,
+              !hasBinaryBackup(for: device) else { return }
+        let key = "\(device.productID.lowercased())|\(device.name.lowercased())"
+        guard initialBackupKeys.insert(key).inserted, let executable = engine else { return }
+
+        let directory = backupDirectory
+        let mouseIdentifier = sanitizedMouseIdentifier(device.name)
+        let backupURLs = profileNumbers.map { _ in
+            let suffix = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
+            let filename = "\(mouseIdentifier)-\(backupTimestamp())-\(suffix).\(AppConstants.backupExtension)"
+            return directory.appendingPathComponent(filename)
+        }
+        let selector = device.deviceKey.isEmpty
+            ? ["--device", String(device.id)]
+            : ["--device-key", device.deviceKey]
+
+        Task { @MainActor [weak self] in
+            let result = await Task.detached(priority: .utility) {
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                var saved = 0
+                var failed = 0
+                for (profileNumber, url) in zip(profileNumbers, backupURLs) {
+                    do {
+                        _ = try EngineRunner.run(
+                            executable: executable,
+                            arguments: selector + ["--profile", String(profileNumber), "dump", url.path],
+                            currentDirectory: directory
+                        )
+                        saved += 1
+                    } catch {
+                        failed += 1
+                    }
+                }
+                return (saved, failed)
+            }.value
+
+            guard let self else { return }
+            self.initialBackupKeys.remove(key)
+            self.refreshBackups()
+            guard self.devices.first(where: { $0.id == self.selectedDeviceIndex })?.deviceKey == device.deviceKey else { return }
+            if result.0 > 0 {
+                let suffix = result.1 == 0 ? "" : " (\(result.1) could not be saved.)"
+                self.status = "Created initial backups for \(result.0) onboard profile(s).\(suffix)"
+            }
+        }
+    }
+
+    private func hasBinaryBackup(for device: DeviceChoice) -> Bool {
+        guard devices.contains(where: { $0.id == selectedDeviceIndex && $0.deviceKey == device.deviceKey }) else {
+            return false
+        }
+        return discoveredBackups.contains { !$0.isJSON && $0.deviceMatch == .selected }
+    }
 }
 
 private extension String {

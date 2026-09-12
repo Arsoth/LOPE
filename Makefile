@@ -52,9 +52,9 @@ test: $(APP) $(SWIFT_PROFILE_PARSER_TEST)
 	./$(APP) self-test
 	./$(SWIFT_PROFILE_PARSER_TEST)
 
-$(SWIFT_PROFILE_PARSER_TEST): Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Profiles/g604.json Tests/ProfileOutputParserSelfTest.swift
+$(SWIFT_PROFILE_PARSER_TEST): Sources/AppModels.swift Sources/AppSupport.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift $(PROFILE_FILES) Tests/ProfileOutputParserSelfTest.swift
 	@mkdir -p .build
-	swiftc -O -target $(GUI_TARGET) Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
+	swiftc -O -target $(GUI_TARGET) Sources/AppModels.swift Sources/AppSupport.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
 
 clean:
 	rm -f $(APP) bin/$(APP) $(GUI_BIN) $(SWIFT_PROFILE_PARSER_TEST)

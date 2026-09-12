@@ -79,6 +79,9 @@ struct BackupEntry: Identifiable {
 }
 
 struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
+    static let wiredAccessPromptID = -1
+    static let wiredAccessPromptDeviceKey = "lope-wired-access-prompt"
+
     let id: Int
     let name: String
     let connection: String
@@ -87,6 +90,34 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
 
     var title: String {
         "\(name) — \(connection)"
+    }
+
+    var isWiredAccessPrompt: Bool {
+        id == Self.wiredAccessPromptID && deviceKey == Self.wiredAccessPromptDeviceKey
+    }
+
+    var isWiredDevice: Bool {
+        !isWiredAccessPrompt && connection.caseInsensitiveCompare("Wired") == .orderedSame
+    }
+
+    static let wiredAccessPrompt = DeviceChoice(
+        id: wiredAccessPromptID,
+        name: "Allow wired mice",
+        connection: "Input Monitoring",
+        productID: "",
+        deviceKey: wiredAccessPromptDeviceKey
+    )
+
+    static func addingWiredAccessPrompt(
+        to devices: [DeviceChoice],
+        accessAuthorized: Bool
+    ) -> [DeviceChoice] {
+        guard !accessAuthorized,
+              devices.contains(where: { $0.isWiredDevice }),
+              !devices.contains(where: { $0.isWiredAccessPrompt }) else {
+            return devices
+        }
+        return devices + [wiredAccessPrompt]
     }
 }
 

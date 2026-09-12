@@ -46,6 +46,11 @@
 		}
 	],
 	"dpiRange": { "minimum": 200, "maximum": 12000 },
+	"refreshGuidance": {
+		"sleepDescription": "In Endurance mode, the G603 can enter a low-power sleep state very quickly (the setup guide indicates about 3 seconds without activity).",
+		"wakeInstructions": "Keep moving the mouse while LOPE reads it. If it is asleep, turn it on or move/click it, then choose Refresh."
+	},
+	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES · format-3 DPI variant",

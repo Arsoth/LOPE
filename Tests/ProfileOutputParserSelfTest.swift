@@ -6,6 +6,11 @@ import Foundation
 @main
 struct ProfileOutputParserSelfTest {
     static func main() {
+        guard AppearancePreference.allCases == [.system, .light, .dark],
+              AppearancePreference.light.label == "Light" else {
+            fatalError("appearance preference options failed")
+        }
+
         let cases: [(String, Int?)] = [
             ("Onboard profiles for G502 X:\nProfile capacity: 5\nProfile 1 (sector 0x0100, enabled=yes)", 5),
             ("Profile 1 (sector 0x0100, enabled=yes)", nil),
@@ -28,11 +33,36 @@ struct ProfileOutputParserSelfTest {
             fatalError("scroll-wheel output recognition failed")
         }
 
+        let wired = DeviceChoice(id: 1, name: "G Pro", connection: "Wired", productID: "0xC085", deviceKey: "wired")
+        let receiver = DeviceChoice(id: 2, name: "G604", connection: "LIGHTSPEED", productID: "0x4085", deviceKey: "receiver")
+        let bluetooth = DeviceChoice(id: 3, name: "MX Master 3S", connection: "Bluetooth", productID: "0xB034", deviceKey: "bluetooth")
+        let withoutAccess = DeviceChoice.addingWiredAccessPrompt(to: [wired, receiver], accessAuthorized: false)
+        let withAccess = DeviceChoice.addingWiredAccessPrompt(to: [wired, receiver], accessAuthorized: true)
+        guard withoutAccess.last?.isWiredAccessPrompt == true,
+              withAccess.count == 2,
+              DeviceClassification.isMXSeriesMouse(name: bluetooth.name, productID: bluetooth.productID),
+              DeviceClassification.isMXSeriesMouse(name: "MX Anywhere 3", productID: ""),
+              !DeviceClassification.isMXSeriesMouse(name: "G603", productID: "0xB01C") else {
+            fatalError("wired access prompt or MX classification failed")
+        }
+
         let g604Profile = MouseProfileCatalog.shared.profile(deviceName: "G604", productID: "0x4085")
         guard g604Profile.hiddenProfileButtonNumbers?.contains(16) == true,
               g604Profile.scrollWheelButtonLabel(for: 14) == "Scroll down",
-              g604Profile.scrollWheelButtonLabel(for: 15) == "Scroll up" else {
+              g604Profile.scrollWheelButtonLabel(for: 15) == "Scroll up",
+              g604Profile.refreshGuidance?.sleepDescription.contains("several minutes") == true,
+              !MouseProfileCatalog.shared.profiles.isEmpty,
+              MouseProfileCatalog.shared.profiles.allSatisfy({
+                  $0.keyboardOutputLimits.maxKeys == 1 && $0.keyboardOutputLimits.maxLength == 1
+              }) else {
             fatalError("G604 hidden/non-programmable control metadata failed")
+        }
+
+        let g603Profile = MouseProfileCatalog.shared.profile(deviceName: "G603", productID: "0xB01C")
+        guard g603Profile.refreshGuidance?.sleepDescription.contains("3 seconds") == true,
+              OnboardProfileRefreshPolicy.pollIntervalNanoseconds == 1_000_000_000,
+              OnboardProfileRefreshPolicy.maximumPollAttempts == 60 else {
+            fatalError("known-device refresh guidance or retry policy failed")
         }
 
         let selectionCases: [(Int?, [Int], Int, Int?)] = [

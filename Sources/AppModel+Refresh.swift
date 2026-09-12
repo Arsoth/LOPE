@@ -2,7 +2,6 @@
 // Copyright (C) 2026
 
 import AppKit
-import ApplicationServices
 import Foundation
 import IOKit.hidsystem
 
@@ -15,9 +14,12 @@ private let reconnectPollNanoseconds: UInt64 = 2_000_000_000
 @MainActor
 extension AppModel {
     func refresh() {
+        let expectedDevice = knownDisconnectedDevice
+        stopKnownDevicePolling(clearDevice: false)
         startRefresh(
             preferredDeviceIndex: selectedDeviceIndex,
-            preferredProfileNumber: profileNumber
+            preferredProfileNumber: profileNumber,
+            expectedDevice: expectedDevice
         )
     }
 
@@ -42,7 +44,8 @@ extension AppModel {
                     return
                 }
                 guard let self, !Task.isCancelled else { return }
-                guard !self.busy, let executable = self.engine else { continue }
+                guard !self.busy, !self.waitingForKnownDevice,
+                      let executable = self.engine else { continue }
 
                 let selected = self.devices.first { $0.id == self.selectedDeviceIndex }
                 let selectedIndex = selected?.id ?? self.selectedDeviceIndex
@@ -108,11 +111,6 @@ extension AppModel {
         currentDeviceName = cachedDevice.name
         deviceSummary = cachedDevice.title
         status = "Reading \(cachedDevice.name)…"
-        if !inputMonitoringAuthorized {
-            IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-            updateInputMonitoringAuthorization()
-        }
-
         guard let engine else {
             busy = false
             loadingProfile = false
@@ -146,10 +144,14 @@ extension AppModel {
             // A stale cached key should not prevent the normal discovery path
             // from finding a newly connected mouse.
             guard snapshot.profileText != nil else {
-                self.startRefresh(
-                    preferredDeviceIndex: cachedDevice.id,
-                    preferredProfileNumber: preferredProfileNumber
-                )
+                if self.hasKnownOnboardProfileCapability(cachedDevice) {
+                    self.beginKnownDeviceRefresh(cachedDevice)
+                } else {
+                    self.startRefresh(
+                        preferredDeviceIndex: cachedDevice.id,
+                        preferredProfileNumber: preferredProfileNumber
+                    )
+                }
                 return
             }
 
@@ -165,7 +167,8 @@ extension AppModel {
 
     private func startRefresh(
         preferredDeviceIndex: Int,
-        preferredProfileNumber: Int
+        preferredProfileNumber: Int,
+        expectedDevice: DeviceChoice? = nil
     ) {
         refreshTask?.cancel()
         refreshGeneration += 1
@@ -175,15 +178,6 @@ extension AppModel {
         busy = true
         loadingProfile = true
         status = "Reading the mouse…"
-        // Receiver and Bluetooth HID++ interfaces are protected by macOS
-        // Input Monitoring. Avoid asking an already-authorized app for access
-        // on every refresh; the access request can otherwise delay the first
-        // device enumeration even though no prompt is needed.
-        if !inputMonitoringAuthorized {
-            IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-            updateInputMonitoringAuthorization()
-        }
-
         guard let engine else {
             busy = false
             loadingProfile = false
@@ -203,7 +197,7 @@ extension AppModel {
                     executable: engine,
                     currentDirectory: currentDirectory,
                     preferredDeviceIndex: preferredDeviceIndex,
-                    preferredDeviceKey: nil
+                    preferredDeviceKey: expectedDevice?.deviceKey
                 )
             }.value
 
@@ -213,6 +207,10 @@ extension AppModel {
             guard enumeration.errorMessage == nil,
                   let selectedIndex = enumeration.selectedDeviceIndex,
                   let selected = enumeration.devices.first(where: { $0.id == selectedIndex }) else {
+                if let expectedDevice, enumeration.errorMessage == nil {
+                    self.showKnownDeviceUnavailable(expectedDevice, availableDevices: enumeration.devices)
+                    return
+                }
                 self.applyRefreshSnapshot(RefreshSnapshot(
                     devices: enumeration.devices,
                     selectedDeviceIndex: nil,
@@ -227,6 +225,14 @@ extension AppModel {
                 return
             }
 
+            // When the refresh is watching a previously known mouse, another
+            // connected device must not satisfy the poll. Keep waiting for the
+            // requested device until its stable HID identity is enumerable.
+            if let expectedDevice, selected.deviceKey != expectedDevice.deviceKey {
+                self.showKnownDeviceUnavailable(expectedDevice, availableDevices: enumeration.devices)
+                return
+            }
+
             // Publish the device list as soon as enumeration completes. The
             // profile read is slower, but the picker can now populate while
             // the button editor remains in its explicit loading state.
@@ -234,6 +240,9 @@ extension AppModel {
             self.selectedDeviceIndex = selected.id
             self.currentDeviceName = selected.name
             self.deviceSummary = selected.title
+            if expectedDevice != nil {
+                self.stopKnownDevicePolling(clearDevice: false)
+            }
             self.rememberSelectedDevice(selected)
             self.prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
             self.status = "Found \(selected.name). Reading onboard profile…"
@@ -259,7 +268,13 @@ extension AppModel {
     }
 
     func selectDevice(_ index: Int) {
-        guard let selected = devices.first(where: { $0.id == index }), selectedDeviceIndex != index else { return }
+        guard let selected = devices.first(where: { $0.id == index }) else { return }
+        if selected.isWiredAccessPrompt {
+            wiredAccessInstructionsPresented = true
+            return
+        }
+        guard selectedDeviceIndex != index else { return }
+        stopKnownDevicePolling(clearDevice: true)
         recoveryBackups.removeAll()
         recoveryDeviceKey = nil
         selectedDeviceIndex = index
@@ -312,10 +327,14 @@ extension AppModel {
         refreshBackups()
 
         guard let profileText = snapshot.profileText else {
+            if self.hasKnownOnboardProfileCapability(selected) {
+                self.beginKnownDeviceRefresh(selected)
+                return
+            }
             resetEditorState()
             dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
             if snapshot.profileError != nil {
-                status = profileReadStatus(for: selected.name, accessWarning: snapshot.accessWarning)
+                status = profileReadStatus(for: selected.name, accessWarning: snapshot.accessWarning && selected.isWiredDevice)
             } else {
                 status = "Connected to \(selected.name), but no compatible onboard profile was found."
             }
@@ -346,7 +365,9 @@ extension AppModel {
         if dpiDetails.isEmpty {
             dpiDetails = snapshot.dpiError ?? "DPI capabilities could not be read."
         }
-        status = snapshot.accessWarning
+        stopKnownDevicePolling(clearDevice: true)
+        scheduleInitialBackups(for: selected, profileNumbers: profiles.map(\.id))
+        status = snapshot.accessWarning && selected.isWiredDevice && !isMXSeriesMouse
             ? "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh."
             : "Onboard Profile read successfully."
     }
@@ -406,8 +427,108 @@ extension AppModel {
         dpiDetails = "DPI capabilities have not been read."
     }
 
+    private func hasKnownOnboardProfileCapability(_ device: DeviceChoice) -> Bool {
+        guard let descriptor = MouseProfileCatalog.shared.matchingProfile(
+            deviceName: device.name,
+            productID: device.productID
+        ) else { return false }
+        return descriptor.profileIO.supported
+    }
+
+    private func beginKnownDeviceRefresh(_ device: DeviceChoice) {
+        knownDisconnectedDevice = device
+        waitingForKnownDevice = true
+        knownDevicePollAttempts = 0
+        currentDeviceName = device.name
+        deviceSummary = "\(device.title) — waiting for the mouse"
+        resetEditorState()
+        status = knownDeviceRefreshStatus(for: device, expired: false)
+
+        guard knownDevicePollTask == nil else { return }
+        knownDevicePollTask = Task { @MainActor [weak self] in
+            for attempt in 1...OnboardProfileRefreshPolicy.maximumPollAttempts {
+                do {
+                    try await Task.sleep(nanoseconds: OnboardProfileRefreshPolicy.pollIntervalNanoseconds)
+                } catch {
+                    return
+                }
+                guard let self, !Task.isCancelled,
+                      self.knownDisconnectedDevice == device else { return }
+
+                self.knownDevicePollAttempts = attempt
+                guard !self.busy else { continue }
+                self.startRefresh(
+                    preferredDeviceIndex: device.id,
+                    preferredProfileNumber: self.profileNumber,
+                    expectedDevice: device
+                )
+            }
+
+            guard let self, !Task.isCancelled,
+                  self.knownDisconnectedDevice == device else { return }
+            self.waitingForKnownDevice = false
+            self.knownDevicePollTask = nil
+            self.status = self.knownDeviceRefreshStatus(for: device, expired: true)
+        }
+    }
+
+    private func stopKnownDevicePolling(clearDevice: Bool) {
+        knownDevicePollTask?.cancel()
+        knownDevicePollTask = nil
+        waitingForKnownDevice = false
+        knownDevicePollAttempts = 0
+        if clearDevice {
+            knownDisconnectedDevice = nil
+        }
+    }
+
+    private func showKnownDeviceUnavailable(
+        _ device: DeviceChoice,
+        availableDevices: [DeviceChoice] = []
+    ) {
+        busy = false
+        loadingProfile = false
+        refreshTask = nil
+        knownDisconnectedDevice = device
+        waitingForKnownDevice = true
+        currentDeviceName = device.name
+        deviceSummary = "\(device.title) — waiting for the mouse"
+        resetEditorState()
+        status = knownDeviceRefreshStatus(for: device, expired: false)
+        if availableDevices.isEmpty {
+            devices = [device]
+            selectedDeviceIndex = device.id
+        } else {
+            devices = availableDevices
+            // Keep other detected mice selectable while the known target is
+            // being watched. Zero is deliberately not a device ID: the
+            // engine's list is one-based, so the picker has no stale target.
+            selectedDeviceIndex = 0
+        }
+        if knownDevicePollTask == nil {
+            beginKnownDeviceRefresh(device)
+        }
+    }
+
+    private func knownDeviceRefreshStatus(for device: DeviceChoice, expired: Bool) -> String {
+        let guidance = MouseProfileCatalog.shared.matchingProfile(
+            deviceName: device.name,
+            productID: device.productID
+        )?.refreshGuidance
+        guard let guidance else {
+            return "\(device.name) is not currently detected. Turn it on, then choose Refresh."
+        }
+        if expired {
+            return "Still waiting for \(device.name). \(guidance.wakeInstructions)"
+        }
+        let checked = knownDevicePollAttempts == 0
+            ? "LOPE will check once per second for up to 60 seconds."
+            : "Checking once per second (\(knownDevicePollAttempts)/60)."
+        return "\(guidance.sleepDescription) \(guidance.wakeInstructions) \(checked)"
+    }
+
     private func profileReadStatus(for deviceName: String, accessWarning: Bool) -> String {
-        if accessWarning {
+        if accessWarning && !isMXSeriesMouse {
             return "macOS is blocking access to \(deviceName). Enable Input Monitoring, then choose Refresh."
         }
         return "Couldn’t read \(deviceName)’s onboard profile. Is the mouse turned on and awake? Wake it, then choose Refresh."
@@ -425,12 +546,17 @@ extension AppModel {
                 currentDirectory: currentDirectory
             )
             let discovered = parseDeviceChoices(list)
+            let accessAuthorized = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+            let displayedDevices = DeviceChoice.addingWiredAccessPrompt(
+                to: discovered,
+                accessAuthorized: accessAuthorized
+            )
             let accessWarning = list.contains("macOS denied HID access")
             let selectedIndex = (preferredDeviceKey.flatMap { key in
                 discovered.first(where: { $0.deviceKey == key })
             } ?? discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first)?.id
             return DeviceEnumerationSnapshot(
-                devices: discovered,
+                devices: displayedDevices,
                 selectedDeviceIndex: selectedIndex,
                 accessWarning: accessWarning,
                 errorMessage: nil
@@ -471,7 +597,7 @@ extension AppModel {
             }
 
             guard let selected = enumeration.devices.first(where: { $0.deviceKey == cachedDevice.deviceKey }) else {
-                guard let fallback = enumeration.devices.first else {
+                guard let fallback = enumeration.devices.first(where: { !$0.isWiredAccessPrompt }) else {
                     self.devices = []
                     self.selectedDeviceIndex = 0
                     self.currentDeviceName = ""
@@ -635,7 +761,6 @@ extension AppModel {
     }
 
     func openInputMonitoringSettings() {
-        CGRequestListenEventAccess()
         updateInputMonitoringAuthorization()
         let candidates = [
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",

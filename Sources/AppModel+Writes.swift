@@ -220,9 +220,23 @@ extension AppModel {
         setBackupDirectory(defaultBackupDirectory)
     }
 
+    func openBackupDirectoryInFinder() {
+        try? FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+        guard NSWorkspace.shared.open(backupDirectory) else {
+            status = "Could not open the backups directory in Finder."
+            return
+        }
+        status = "Opened the backups directory in Finder."
+    }
+
     func setShowAdvancedFields(_ show: Bool) {
         showAdvancedFields = show
         UserDefaults.standard.set(show, forKey: "\(AppConstants.defaultsPrefix).showAdvancedFields")
+    }
+
+    func setShowNonStandardKeyboardKeys(_ show: Bool) {
+        showNonStandardKeyboardKeys = show
+        UserDefaults.standard.set(show, forKey: "\(AppConstants.defaultsPrefix).showNonStandardKeyboardKeys")
     }
 
     func chooseJSONBackup() -> URL? {

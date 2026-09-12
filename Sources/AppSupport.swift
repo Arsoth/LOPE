@@ -25,6 +25,21 @@ enum AppConstants {
     static let defaultsPrefix = "LOPE"
     static let lastSelectedDeviceKey = "lastSelectedDevice"
     static let backupExtension = "logiob"
+    static let appearancePreferenceKey = "appearancePreference"
+}
+
+enum AppearancePreference: String, CaseIterable, Hashable {
+    case system
+    case light
+    case dark
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
 }
 
 enum EngineRunner {

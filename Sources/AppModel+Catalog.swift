@@ -55,7 +55,7 @@ extension AppModel {
 
     var keyboardKeys: [KeyboardKeyChoice] {
         var choices = [
-            KeyboardKeyChoice(id: 0x2A, label: "Backspace"),
+            // KeyboardKeyChoice(id: 0x2A, label: "Backspace"),
             KeyboardKeyChoice(id: 0x2B, label: "Tab"),
             KeyboardKeyChoice(id: 0x28, label: "Enter"),
             KeyboardKeyChoice(id: 0x29, label: "Escape"),
@@ -63,31 +63,42 @@ extension AppModel {
             KeyboardKeyChoice(id: 0x49, label: "Insert"),
             KeyboardKeyChoice(id: 0x4A, label: "Home"),
             KeyboardKeyChoice(id: 0x4B, label: "Page Up"),
-            KeyboardKeyChoice(id: 0x4C, label: "Delete"),
+            // KeyboardKeyChoice(id: 0x4C, label: "Delete"),
             KeyboardKeyChoice(id: 0x4D, label: "End"),
             KeyboardKeyChoice(id: 0x4E, label: "Page Down"),
-            KeyboardKeyChoice(id: 0x4F, label: "Right Arrow"),
-            KeyboardKeyChoice(id: 0x50, label: "Left Arrow"),
-            KeyboardKeyChoice(id: 0x51, label: "Down Arrow"),
-            KeyboardKeyChoice(id: 0x52, label: "Up Arrow")
+            // KeyboardKeyChoice(id: 0x4F, label: "Right Arrow"),
+            // KeyboardKeyChoice(id: 0x50, label: "Left Arrow"),
+            // KeyboardKeyChoice(id: 0x51, label: "Down Arrow"),
+            // KeyboardKeyChoice(id: 0x52, label: "Up Arrow")
         ]
-        for code in 0x3A...0x45 {
-            choices.append(KeyboardKeyChoice(id: UInt8(code), label: "F\(code - 0x39)"))
-        }
-        for code in 0x68...0x73 {
-            choices.append(KeyboardKeyChoice(id: UInt8(code), label: "F\(code - 0x5B)"))
-        }
-        for (offset, letter) in Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").enumerated() {
-            choices.append(KeyboardKeyChoice(id: UInt8(0x04 + offset), label: String(letter)))
-        }
+        // for code in 0x3A...0x45 {
+        //     choices.append(KeyboardKeyChoice(id: UInt8(code), label: "F\(code - 0x39)"))
+        // }
+        // for code in 0x68...0x73 {
+        //     choices.append(KeyboardKeyChoice(id: UInt8(code), label: "F\(code - 0x5B)"))
+        // }
+        // for (offset, letter) in Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").enumerated() {
+        //     choices.append(KeyboardKeyChoice(id: UInt8(0x04 + offset), label: String(letter)))
+        // }
         return choices
     }
 
     var specialKeyboardKeys: [KeyboardKeyChoice] {
-        keyboardKeys.filter { key in
-            let code = key.id
-            return !(0x3A...0x45).contains(code) && !(0x68...0x73).contains(code) &&
-                !(0x04...0x1D).contains(code)
+        keyboardKeys.filter { !isNonStandardKeyboardKey($0) }
+    }
+
+    var keyboardOutputKeys: [KeyboardKeyChoice] {
+        showNonStandardKeyboardKeys ? keyboardKeys : specialKeyboardKeys
+    }
+
+    func isNonStandardKeyboardKey(_ key: KeyboardKeyChoice) -> Bool {
+        (0x68...0x73).contains(key.id)
+    }
+
+    private var keyboardOutputPresets: [OutputPreset] {
+        keyboardOutputKeys.map { key in
+            let raw = String(format: "800200%02X", key.id)
+            return OutputPreset(id: raw, label: key.label, raw: raw)
         }
     }
 

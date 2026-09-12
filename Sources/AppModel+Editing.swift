@@ -13,6 +13,9 @@ extension AppModel {
         guard buttons.indices.contains(buttonIndex) else { return }
         if choice == "custom" {
             buttons[buttonIndex].draftChoice = "custom"
+            if !isKeyboardRecord(buttonIndex: buttonIndex) {
+                setKeyboardChord(buttonIndex: buttonIndex, modifier: 0, key: 0)
+            }
         } else {
             setPreset(buttonIndex: buttonIndex, raw: choice)
         }
@@ -48,7 +51,7 @@ extension AppModel {
         guard buttons.indices.contains(buttonIndex), let bytes = rawBytes(buttons[buttonIndex].draftRaw) else {
             return false
         }
-        return bytes[0] == 0x80 && bytes[1] == 0x02 && bytes[3] != 0
+        return bytes[0] == 0x80 && bytes[1] == 0x02
     }
 
     func isModifierEnabled(buttonIndex: Int, bit: UInt8) -> Bool {
@@ -78,11 +81,93 @@ extension AppModel {
     }
 
     func setKeyboardKeyText(buttonIndex: Int, text: String) {
+        let keyTokens = text.split { $0 == "," || $0 == "+" || $0.isWhitespace }
+        guard keyTokens.count <= currentMouseProfile.keyboardOutputLimits.maxKeys else {
+            status = "This mouse stores at most \(currentMouseProfile.keyboardOutputLimits.maxKeys) key per keyboard output."
+            return
+        }
         keyInputDrafts[buttonIndex] = text
         if let key = keyboardKeyCode(for: text) {
             let chord = keyboardBytes(buttonIndex) ?? (modifier: 0, key: 0)
             setKeyboardChord(buttonIndex: buttonIndex, modifier: chord.modifier, key: key)
         }
+    }
+
+    func keyboardOutputCurrentLength(buttonIndex: Int) -> Int {
+        guard buttons.indices.contains(buttonIndex),
+              let bytes = rawBytes(buttons[buttonIndex].draftRaw) else { return 0 }
+        return bytes[0] == 0x80 && bytes[1] == 0x02 && bytes[3] != 0 ? 1 : 0
+    }
+
+    func keyboardOutputLengthLabel(buttonIndex: Int) -> String {
+        let limits = currentMouseProfile.keyboardOutputLimits
+        let maximum = min(limits.maxKeys, limits.maxLength)
+        return "\(keyboardOutputCurrentLength(buttonIndex: buttonIndex))/\(maximum)"
+    }
+
+    func keyboardKeyChoice(buttonIndex: Int) -> Int {
+        let key = UInt8(keyboardKey(buttonIndex: buttonIndex))
+        return keyboardOutputKeys.contains(where: { $0.id == key }) ? Int(key) : 0
+    }
+
+    func setKeyboardKeyChoice(buttonIndex: Int, key: Int) {
+        guard key > 0, let usage = UInt8(exactly: key),
+              let selected = keyboardKeys.first(where: { $0.id == usage }) else { return }
+        if isNonStandardKeyboardKey(selected) && !showNonStandardKeyboardKeys {
+            status = "Enable non-standard keyboard keys in Settings before choosing \(selected.label)."
+            return
+        }
+        let chord = keyboardBytes(buttonIndex) ?? (modifier: 0, key: 0)
+        setKeyboardChord(buttonIndex: buttonIndex, modifier: chord.modifier, key: usage)
+    }
+
+    func beginKeyboardRecording(buttonIndex: Int) {
+        guard buttons.indices.contains(buttonIndex) else { return }
+        if !isKeyboardRecord(buttonIndex: buttonIndex) {
+            setKeyboardChord(buttonIndex: buttonIndex, modifier: 0, key: 0)
+        }
+        recordingKeyboardButtonID = buttons[buttonIndex].id
+        status = "Press one keyboard key to record it."
+    }
+
+    func cancelKeyboardRecording() {
+        recordingKeyboardButtonID = nil
+    }
+
+    func recordKeyboardEvent(buttonIndex: Int, keyCode: UInt8, modifier: UInt8) {
+        guard buttons.indices.contains(buttonIndex),
+              recordingKeyboardButtonID == buttons[buttonIndex].id else { return }
+        guard let key = keyboardKeys.first(where: { $0.id == keyCode }) else {
+            status = "That keyboard input is not supported by the HID++ key table."
+            return
+        }
+        if isNonStandardKeyboardKey(key) && !showNonStandardKeyboardKeys {
+            status = "Enable non-standard keyboard keys in Settings before recording \(key.label)."
+            return
+        }
+        setKeyboardChord(buttonIndex: buttonIndex, modifier: modifier, key: keyCode)
+        recordingKeyboardButtonID = nil
+        status = "Recorded \(key.label)."
+    }
+
+    func keyboardUsage(forMacKeyCode keyCode: UInt16) -> UInt8? {
+        let usages: [UInt16: UInt8] = [
+            0: 0x04, 1: 0x16, 2: 0x07, 3: 0x09, 4: 0x0B, 5: 0x0A,
+            6: 0x1D, 7: 0x1B, 8: 0x06, 9: 0x19, 11: 0x05, 12: 0x14,
+            13: 0x1A, 14: 0x08, 15: 0x15, 16: 0x1C, 17: 0x17,
+            18: 0x1E, 19: 0x1F, 20: 0x20, 21: 0x21, 22: 0x23, 23: 0x22,
+            24: 0x2E, 25: 0x26, 26: 0x24, 27: 0x2D, 28: 0x25, 29: 0x27,
+            30: 0x30, 31: 0x12, 32: 0x18, 33: 0x2F, 34: 0x0C, 35: 0x13,
+            37: 0x0F, 38: 0x0D, 39: 0x34, 40: 0x0E, 41: 0x33, 42: 0x31,
+            43: 0x36, 44: 0x38, 45: 0x11, 46: 0x10, 47: 0x37, 49: 0x2C,
+            50: 0x35, 36: 0x28, 48: 0x2B, 51: 0x2A, 53: 0x29,
+            122: 0x3A, 120: 0x3B, 99: 0x3C, 118: 0x3D, 96: 0x3E, 97: 0x3F,
+            98: 0x40, 100: 0x41, 101: 0x42, 109: 0x43, 103: 0x44, 111: 0x45,
+            105: 0x68, 107: 0x69, 113: 0x6A, 106: 0x6B, 64: 0x6C, 79: 0x6D,
+            80: 0x6E, 90: 0x6F, 123: 0x50, 124: 0x4F, 125: 0x51, 126: 0x52,
+            117: 0x4C
+        ]
+        return usages[keyCode]
     }
 
     func functionKeyChoice(buttonIndex: Int) -> Int {
@@ -125,7 +210,7 @@ extension AppModel {
 
     private func keyboardBytes(_ buttonIndex: Int) -> (modifier: UInt8, key: UInt8)? {
         guard buttons.indices.contains(buttonIndex), let bytes = rawBytes(buttons[buttonIndex].draftRaw),
-              bytes[0] == 0x80, bytes[1] == 0x02, bytes[3] != 0 else { return nil }
+              bytes[0] == 0x80, bytes[1] == 0x02 else { return nil }
         return (bytes[2], bytes[3])
     }
 
