@@ -15,6 +15,11 @@ static int run_dump(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
+    if (is_g600_device(device)) {
+        int result = run_g600_dump(options, device);
+        hid_context_release(&context);
+        return result;
+    }
     Profile profile;
     if (!load_selected_profile(device, options->profile, &profile)) {
         hid_context_release(&context);
@@ -365,6 +370,10 @@ static int run_restore(const Options *options) {
     if (package.product_id != 0 && package.product_id != device->iface->product_id) {
         fprintf(stderr, "refusing restore: backup product 0x%04X does not match connected product 0x%04X\n",
                 package.product_id, device->iface->product_id);
+        goto done;
+    }
+    if (is_g600_device(device)) {
+        result = run_g600_restore(options, device, &package);
         goto done;
     }
     if (!get_profile_info(device, &info)) {

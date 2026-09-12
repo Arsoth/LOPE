@@ -535,6 +535,38 @@ static void detect_button_layout(Profile *profile) {
     }
 }
 
+// Modern HID++ 0x8100 profiles place the G-Shift bank 64 bytes after the
+// normal button bank. The shift flag is still required: a plausible-looking
+// second bank on an unrelated profile must never authorize a write.
+static void detect_gshift_button_layout(Profile *profile) {
+    profile->gshift_button_offset = 0;
+    profile->gshift_valid_specs = 0;
+    profile->gshift_known_specs = 0;
+    profile->gshift_layout_supported = false;
+    if (!profile->layout_supported ||
+        (profile->info.shift_flags & 0x03) != 0x02) {
+        return;
+    }
+    size_t count = profile->info.button_count;
+    size_t offset = profile->button_offset + 64;
+    if (offset + count * 4 > profile->data_length - 2) {
+        return;
+    }
+    size_t valid = 0;
+    size_t known = 0;
+    for (size_t i = 0; i < count; i++) {
+        const uint8_t *spec = profile->data + offset + i * 4;
+        valid += spec_structurally_valid(spec) ? 1 : 0;
+        known += spec_known(spec) ? 1 : 0;
+    }
+    if (valid >= count - 1 && known >= 1) {
+        profile->gshift_button_offset = offset;
+        profile->gshift_valid_specs = valid;
+        profile->gshift_known_specs = known;
+        profile->gshift_layout_supported = true;
+    }
+}
+
 static uint16_t read_le16(const uint8_t *bytes) {
     return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8));
 }
@@ -849,6 +881,7 @@ static int load_profile_with_headers(Device *device,
     profile->crc_ok = sector_crc_ok(profile->data, profile->data_length);
     profile->crc_checked = true;
     detect_button_layout(profile);
+    detect_gshift_button_layout(profile);
     detect_dpi_layout(profile, device);
     detect_rgb_layout(profile);
     return 1;
@@ -911,6 +944,7 @@ static int load_profile_summary_with_headers(Device *device,
     profile->crc_ok = false;
     profile->crc_checked = false;
     detect_button_layout(profile);
+    detect_gshift_button_layout(profile);
     detect_dpi_layout(profile, device);
     detect_rgb_layout(profile);
     return 1;

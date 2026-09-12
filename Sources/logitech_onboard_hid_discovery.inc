@@ -397,8 +397,9 @@ static int hid_context_create(HidContext *context) {
             // the descriptor/usage-page check identifies the real vendor
             // interface. The fallback remains necessary for direct wireless
             // and Bluetooth devices whose HID++ descriptor is hidden by macOS.
-            bool known_device_fallback = is_known_hidpp_product(product_id) &&
-                                         !is_receiver_product(product_id);
+            bool known_device_fallback = (is_known_hidpp_product(product_id) &&
+                                          !is_receiver_product(product_id)) ||
+                                         product_id == 0xC24A;
             bool vendor = page == HIDPP_USAGE_PAGE || hidpp_reports ||
                           known_device_fallback;
             bool mouse = page == MOUSE_USAGE_PAGE && usage == MOUSE_USAGE;
@@ -575,6 +576,13 @@ static int discover_devices(HidContext *context,
             }
             continue;
         }
+        // G600 uses legacy numbered feature reports rather than HID++ 0x8100.
+        // It has no HID++ ping response, so the product ID is the discovery
+        // signal after the direct vendor channel has opened successfully.
+        if (iface->product_id == 0xC24A && !is_receiver_interface(iface)) {
+            add_device(devices, count, iface, 0xFF, 0xFF, 0.0, false);
+            continue;
+        }
         if (requested_slot >= 0) {
             double protocol = 0;
             uint8_t resolved_device_number = (uint8_t)requested_slot;
@@ -676,6 +684,10 @@ static int discover_device_by_key(HidContext *context,
             return 1;
         }
         iface->channel_open = true;
+        if (iface->product_id == 0xC24A && !is_receiver_interface(iface)) {
+            add_device(devices, count, iface, 0xFF, 0xFF, 0.0, false);
+            return 1;
+        }
         double protocol = 0;
         uint8_t resolved_device_number = device_number;
         if (is_receiver_interface(iface) && device_number >= 1 &&

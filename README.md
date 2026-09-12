@@ -56,6 +56,21 @@ non-MX mice can be displayed with neutral runtime button labels.
 
 Quit G HUB and other mouse remappers while saving so they cannot race LOPE.
 
+### Confirmed functional mice
+
+This is the deliberately narrow list of mice whose complete LOPE feature set
+has been tested and confirmed as working. It includes G-Shift wherever the
+mouse exposes it, along with the other supported onboard features.
+
+| Mouse        | Status                               |
+| ------------ | ------------------------------------ |
+| G502 X wired | Confirmed and tested 100% functional |
+| G504         | Confirmed and tested 100% functional |
+| G603         | Confirmed and tested 100% functional |
+
+Other catalog entries are not part of this confirmation list unless their
+complete read/write feature set has been tested.
+
 ## Build and test
 
 From the repository root:

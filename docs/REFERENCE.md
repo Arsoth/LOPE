@@ -115,6 +115,21 @@ The DPI editor supports one to five strictly increasing stages, subject to the
 values reported by the mouse. Default and DPI-shift stages are separate
 one-based selections. Profile toggles cannot disable the final enabled profile.
 
+### G-Shift button assignments
+
+For a profile whose reported modern layout includes a validated G-Shift bank,
+the button editor shows Normal and G-Shift layers. Each layer has its own
+drafts, and saving sends both changed banks in the same profile-sector update.
+The G-Shift layer is enabled from the mouse’s reported layout and validated
+records; it is not inferred from the product name. Legacy formats with a
+different storage scheme remain read-only until their writer is implemented.
+
+The G600 is supported for read-only inspection through its dedicated legacy
+feature-report reader. It keeps the normal and G-Shift assignments as separate
+20-button layers and can back up the complete selected profile report. Its
+profile saves remain disabled until DPI, RGB, and profile-state support are
+implemented as well.
+
 ## Backup lifecycle
 
 The default folder is:
@@ -133,10 +148,10 @@ Binary packages preserve bytes the editor does not understand and are the
 preferred emergency restore format.
 
 Editable JSON is an explicit import/export format. It includes device metadata,
-profile state, friendly physical-control names, the readable output, and the
-raw four-byte record. Loading JSON changes only the editor draft; it never
-writes to the mouse by itself. Restore and save operations require the selected
-device to match the backup metadata.
+profile state, friendly physical-control names, the readable output, the
+layer (`normal` or `gShift`), and the raw four-byte record. Loading JSON changes
+only the editor draft; it never writes to the mouse by itself. Restore and save
+operations require the selected device to match the backup metadata.
 
 ## Troubleshooting
 

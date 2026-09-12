@@ -361,6 +361,9 @@ extension AppModel {
         resetDPIState()
         if profiles.isEmpty {
             buttons = []
+            normalButtonRows = []
+            gShiftButtonRows = []
+            buttonLayer = .normal
             status = "The mouse was found, but no onboard profiles were readable."
             return
         }
@@ -369,7 +372,10 @@ extension AppModel {
             availableProfileIDs: profiles.map(\.id),
             preferredProfileNumber: profileNumber
         ) ?? profiles[0].id
-        buttons = parsed.rowsByProfile[profileNumber] ?? []
+        setButtonRows(
+            normal: parsed.rowsByProfile[profileNumber] ?? [],
+            gShift: parsed.gShiftRowsByProfile[profileNumber] ?? []
+        )
         applyRGBZones(
             parsed.rgbByProfile[profileNumber] ?? [],
             profileFormat: parsed.profileFormatsByProfile[profileNumber]
@@ -406,6 +412,9 @@ extension AppModel {
         onboardProfileCapacityWasReported = false
         profiles = []
         buttons = []
+        normalButtonRows = []
+        gShiftButtonRows = []
+        buttonLayer = .normal
         baselineProfileEnabled.removeAll()
         keyInputDrafts.removeAll()
         rgbZones.removeAll()
@@ -427,7 +436,7 @@ extension AppModel {
         profileNumber = placeholderNumber
         baselineProfileEnabled = [placeholderNumber: true]
         keyInputDrafts.removeAll()
-        buttons = loadingButtonRows()
+        setButtonRows(normal: loadingButtonRows(), gShift: [])
         rgbZones.removeAll()
         baselineRGBColors.removeAll()
         rgbEditingAllZones = false
@@ -958,7 +967,10 @@ extension AppModel {
                 "profiles"
             ])
             let parsed = parseProfiles(profileText)
-            buttons = parsed.rowsByProfile[profileNumber] ?? parsed.rowsByProfile.values.first ?? []
+            setButtonRows(
+                normal: parsed.rowsByProfile[profileNumber] ?? parsed.rowsByProfile.values.first ?? [],
+                gShift: parsed.gShiftRowsByProfile[profileNumber] ?? parsed.gShiftRowsByProfile.values.first ?? []
+            )
             applyRGBZones(
                 parsed.rgbByProfile[profileNumber] ?? [],
                 profileFormat: parsed.profileFormatsByProfile[profileNumber]

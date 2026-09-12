@@ -204,6 +204,15 @@ static void print_profile_summary(const Profile *profile, bool show_buttons) {
     } else {
         printf("  button array: not recognized; writes are disabled\n");
     }
+    if (profile->gshift_layout_supported) {
+        printf("  G-Shift layout: supported (offset %zu; %zu/%u structurally valid, %zu recognized)\n",
+               profile->gshift_button_offset,
+               profile->gshift_valid_specs,
+               profile->info.button_count,
+               profile->gshift_known_specs);
+    } else if ((profile->info.shift_flags & 0x03) == 0x02) {
+        printf("  G-Shift layout: not recognized; editing is disabled\n");
+    }
     if (!show_buttons || (profile->button_offset == 0 && !profile->layout_supported)) {
         return;
     }
@@ -219,6 +228,16 @@ static void print_profile_summary(const Profile *profile, bool show_buttons) {
         if (spec_is_back(spec)) {
             back_count++;
             back_button = (int)i + 1;
+        }
+    }
+    if (profile->gshift_layout_supported) {
+        for (size_t i = 0; i < profile->info.button_count; i++) {
+            const uint8_t *spec = profile->data + profile->gshift_button_offset + i * 4;
+            char description[160];
+            describe_spec(spec, description, sizeof(description));
+            printf("  G-Shift button %zu: %-30s [", i + 1, description);
+            print_hex4(spec);
+            printf("]\n");
         }
     }
     if (back_count == 1) {

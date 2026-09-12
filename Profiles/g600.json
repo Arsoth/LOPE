@@ -128,29 +128,33 @@
 	"profileIO": {
 		"supported": false,
 		"capability": "G600 layered onboard profile",
-		"feature": "0x8100",
+		"feature": "legacy feature reports 0xF3-0xF5",
 		"load": {
 			"command": "profiles",
 			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy/runtime",
-			"readSector": "runtime-detected",
-			"controlSector": "runtime-detected",
+			"getInfo": "three fixed 154-byte feature reports",
+			"readSector": "feature report ID 0xF3 + profile index",
+			"controlSector": "not applicable",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "G600 normal and G-Shift layers need a dedicated layer-aware writer",
+			"reason": "The legacy format is only partially implemented; DPI, RGB, and profile-state writes are not supported",
+			"dpi": "unsupported",
+			"rgb": "unsupported",
+			"profileState": "unsupported",
 			"backup": "required",
 			"verify": "required"
 		},
 		"layout": {
-			"buttonRecord": "runtime-reported",
-			"buttonOffsetByFormat": "runtime-validated",
+			"buttonRecord": "three bytes: code, modifier, key",
+			"buttonOffsetByFormat": "normal 31; G-Shift 94",
 			"layers": "normal + G-Shift",
-			"crc": "runtime-validated"
+			"crc": "not applicable to feature reports"
 		},
 		"notes": [
-			"The G600 has 20 physical/profile controls and a second G-Shift assignment layer. The current editor must not overwrite the alternate layer."
+			"The G600 has 20 physical/profile controls and a second G-Shift assignment layer. LOPE can inspect and back up both banks, but does not expose writes until the complete legacy feature set is supported.",
+			"DPI, RGB, and profile enable-state writes are not included in the legacy feature-report path."
 		]
 	},
 	"sources": [

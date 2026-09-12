@@ -90,6 +90,12 @@ static int run_info(const Options *options) {
     printf("  HID++ protocol: %.1f\n", device->protocol);
     print_feature_list(device);
 
+    if (is_g600_device(device)) {
+        int result = run_g600_info(options, device);
+        hid_context_release(&context);
+        return result;
+    }
+
     ProfileInfo profile_info;
     if (!device_feature_index(device, FEATURE_ONBOARD_PROFILES, &(uint8_t){0}) ||
         !get_profile_info(device, &profile_info)) {
@@ -134,6 +140,11 @@ static int run_profiles(const Options *options) {
     if (!select_device(devices, count, options, &device)) {
         hid_context_release(&context);
         return 1;
+    }
+    if (is_g600_device(device)) {
+        int result = run_g600_profiles(options, device);
+        hid_context_release(&context);
+        return result;
     }
     ProfileInfo info;
     if (!get_profile_info(device, &info)) {

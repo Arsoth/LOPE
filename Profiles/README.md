@@ -10,7 +10,7 @@ Each JSON file describes one Logitech G mouse family. The descriptor is delibera
 4. List profile-array positions under `buttons`. These are the runtime profile record numbers, not necessarily the names printed on the shell.
 5. If the firmware exposes vertical wheel motion as extra profile records, map their record numbers to labels under `scrollWheelButtonLabels`. They remain visible and editable, and also stay available as output presets.
 6. If the profile record list includes known non-programmable controls, list their runtime record numbers under `hiddenProfileButtonNumbers` so they are preserved in the device data but not offered for editing.
-7. Fill in `profileIO`. Use the standard HID++ 0x8100 values only after a real profile read has confirmed them. Set `profileIO.supported` to `false` and `save.strategy` to `read-only` for an unverified or legacy device.
+7. Fill in `profileIO`. Use the standard HID++ 0x8100 values only after a real profile read has confirmed them. The editor detects the modern G-Shift bank from the device-reported shift flags and validated records, so do not hard-code G-Shift support in a descriptor. A verified device-specific legacy writer may use its own explicit save strategy; otherwise set `profileIO.supported` to `false` and `save.strategy` to `read-only`.
 8. Add the file name to `index.json` and put source links in `sources`.
 
 The app loads the JSON files from the bundled `MouseProfiles` directory. During development it also reads `Profiles/` from the current working directory. Unknown devices continue to use the runtime-detected generic mapping.
@@ -19,7 +19,10 @@ The app loads the JSON files from the bundled `MouseProfiles` directory. During 
 
 The common modern writer uses feature `0x8100`, reads info with `0x00`, reads sectors with `0x50`, and writes with `0x60` / `0x70` / `0x80`. It backs up the complete sector, preserves bytes it does not understand, recalculates CRC-16/CCITT-FALSE, and verifies the full sector after writing. Those details remain in every modern descriptor so a future device-specific implementation has a single place to compare load/save requirements.
 
-The catalog intentionally marks G600, G700/G700s, and newer unverified firmware families read-only. G600 has a separate G-Shift layer; G700/G700s use legacy storage; and newer HITS/LIGHTFORCE firmware may extend the profile record. A descriptor must not turn on writes until those details are captured and implemented.
+The catalog marks G600, G700/G700s, and newer unverified firmware families
+read-only. G600 has a dedicated legacy feature-report reader that preserves the
+separate normal and G-Shift banks for inspection and backup, but its save path
+is not enabled until DPI, RGB, and profile-state support are implemented too.
 
 ## Sources and confidence
 

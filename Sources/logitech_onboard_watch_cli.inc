@@ -139,7 +139,8 @@ static void print_usage(const char *program) {
     printf("  --default N                          onboard default DPI stage, 1..5\n");
     printf("  --shift N                            onboard DPI-shift stage, 1..5\n");
     printf("  --backup FILE                        backup path for bind\n");
-    printf("  --button-change N:RAW                batch button record (apply; RAW is 8 hex digits)\n");
+    printf("  --button-change normal:N:RAW         batch normal-layer record (apply; RAW is 8 hex digits)\n");
+    printf("  --button-change gshift:N:RAW         batch G-Shift-layer record (apply)\n");
     printf("  --rgb-change N:RRGGBB                batch RGB zone color (apply; zone is 1-based)\n");
     printf("  --dpi VALUES                         batch DPI stages, comma-separated\n");
     printf("  --profile-state-change N:STATE       batch profile state (enable or disable)\n");

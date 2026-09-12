@@ -38,6 +38,7 @@
 #define SHORT_REPORT_BYTES 7
 #define LONG_REPORT_BYTES 20
 #define MAX_REPORT_BYTES 64
+#define MAX_FEATURE_REPORT_BYTES 256
 #define MAX_SECTOR_BYTES 4096
 #define MAX_FEATURES 128
 #define MAX_DEVICES 64
@@ -200,6 +201,10 @@ typedef struct {
     size_t valid_specs;
     size_t known_specs;
     bool layout_supported;
+    size_t gshift_button_offset;
+    size_t gshift_valid_specs;
+    size_t gshift_known_specs;
+    bool gshift_layout_supported;
     size_t dpi_offset;
     size_t dpi_count;
     uint8_t dpi_default_index;

@@ -20,6 +20,7 @@ final class AppModel: ObservableObject {
     @Published var onboardProfileCapacityWasReported = false
     @Published var profileNumber = 1
     @Published var buttons: [ButtonRow] = []
+    @Published var buttonLayer: ButtonLayer = .normal
     @Published var dpiStages = ["", "", "", "", ""]
     @Published var dpiCount = 5
     @Published var defaultStage = 3
@@ -61,6 +62,13 @@ final class AppModel: ObservableObject {
     var liveDPIPollTask: Task<Void, Never>?
     var knownDisconnectedDevice: DeviceChoice?
     var initialBackupKeys = Set<String>()
+
+    var normalButtonRows: [ButtonRow] = []
+    var gShiftButtonRows: [ButtonRow] = []
+
+    var hasGShiftLayer: Bool {
+        !gShiftButtonRows.isEmpty
+    }
 
     // Test and diagnostic callers can replace the process boundary without
     // changing the production HID++ command construction.
@@ -222,7 +230,10 @@ final class AppModel: ObservableObject {
     }
 
     var hasButtonChanges: Bool {
-        buttons.contains { normalize($0.currentRaw) != normalize($0.draftRaw) }
+        let alternateRows = buttonLayer == .normal ? gShiftButtonRows : normalButtonRows
+        return (buttons + alternateRows).contains {
+            normalize($0.currentRaw) != normalize($0.draftRaw)
+        }
     }
 
     var hasDPIChanges: Bool {
@@ -249,7 +260,15 @@ final class AppModel: ObservableObject {
     }
 
     var canApplyDPI: Bool {
-        dpiValidationMessage == nil
+        dpiCapabilities.errorMessage == nil && dpiValidationMessage == nil
+    }
+
+    var canEditOnboardDPI: Bool {
+        currentMouseProfile.profileIO.save["dpi"] != "unsupported"
+    }
+
+    var canEditProfileState: Bool {
+        currentMouseProfile.profileIO.save["profileState"] != "unsupported"
     }
 
     var dpiValidationMessage: String? {
@@ -268,5 +287,34 @@ final class AppModel: ObservableObject {
 
     var hasPendingChanges: Bool {
         hasButtonChanges || hasDPIChanges || hasProfileChanges || hasRGBChanges
+    }
+
+    func setButtonRows(normal: [ButtonRow], gShift: [ButtonRow]) {
+        normalButtonRows = normal
+        gShiftButtonRows = gShift
+        buttonLayer = .normal
+        buttons = normal
+        keyInputDrafts.removeAll()
+        recordingKeyboardButtonID = nil
+    }
+
+    func selectButtonLayer(_ layer: ButtonLayer) {
+        guard layer != buttonLayer else { return }
+        guard layer == .normal || hasGShiftLayer else { return }
+
+        if buttonLayer == .normal {
+            normalButtonRows = buttons
+        } else {
+            gShiftButtonRows = buttons
+        }
+        buttonLayer = layer
+        buttons = layer == .normal ? normalButtonRows : gShiftButtonRows
+        keyInputDrafts.removeAll()
+        recordingKeyboardButtonID = nil
+    }
+
+    func allButtonRowsForSave() -> [ButtonRow] {
+        let alternateRows = buttonLayer == .normal ? gShiftButtonRows : normalButtonRows
+        return buttons + alternateRows
     }
 }

@@ -122,13 +122,15 @@ extension AppModel {
     func parseProfiles(_ text: String) -> (
         choices: [ProfileChoice],
         rowsByProfile: [Int: [ButtonRow]],
+        gShiftRowsByProfile: [Int: [ButtonRow]],
         rgbByProfile: [Int: [ParsedRGBZone]],
         profileFormatsByProfile: [Int: Int]
     ) {
         let profilePattern = try! NSRegularExpression(pattern: #"^Profile\s+(\d+)\s+\(sector\s+(0x[0-9A-Fa-f]+),\s+enabled=(yes|no)\)"#)
-        let buttonPattern = try! NSRegularExpression(pattern: #"^\s*button\s+(\d+):\s*(.*?)\s*\[([0-9A-Fa-f ]+)\]"#)
+        let buttonPattern = try! NSRegularExpression(pattern: #"^\s*(?:(G-Shift)\s+)?button\s+(\d+):\s*(.*?)\s*\[([0-9A-Fa-f ]+)\]"#)
         var choices: [ProfileChoice] = []
         var rows: [Int: [ButtonRow]] = [:]
+        var gShiftRows: [Int: [ButtonRow]] = [:]
         var rgb: [Int: [ParsedRGBZone]] = [:]
         var profileFormats: [Int: Int] = [:]
         var currentProfile: Int?
@@ -149,6 +151,7 @@ extension AppModel {
                     ))
                 }
                 rows[id] = []
+                gShiftRows[id] = []
                 rgb[id] = []
                 continue
             }
@@ -177,25 +180,32 @@ extension AppModel {
             }
             guard let profile = currentProfile,
                   let match = buttonPattern.firstMatch(in: line, range: full),
-                  let number = Int(capture(match, in: line, index: 1)) else { continue }
+                  let number = Int(capture(match, in: line, index: 2)) else { continue }
             if currentMouseProfile.hiddenProfileButtonNumbers?.contains(number) == true {
                 continue
             }
-            let rawBytes = capture(match, in: line, index: 3)
+            let layer: ButtonLayer = capture(match, in: line, index: 1).isEmpty ? .normal : .gShift
+            let rawBytes = capture(match, in: line, index: 4)
             let raw = normalize(rawBytes)
             let label = currentMouseProfile.button(for: number)?.label
                 ?? currentMouseProfile.scrollWheelButtonLabel(for: number)
                 ?? ProfileOutputParser.scrollWheelOutputLabel(raw)
                 ?? "Button \(number)"
-            rows[profile, default: []].append(ButtonRow(
+            let row = ButtonRow(
                 id: number,
                 label: label,
                 currentRaw: raw,
                 draftRaw: raw,
-                draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke"
-            ))
+                draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke",
+                layer: layer
+            )
+            if layer == .normal {
+                rows[profile, default: []].append(row)
+            } else {
+                gShiftRows[profile, default: []].append(row)
+            }
         }
-        return (choices, rows, rgb, profileFormats)
+        return (choices, rows, gShiftRows, rgb, profileFormats)
     }
 
     func parseDPI(_ text: String) {

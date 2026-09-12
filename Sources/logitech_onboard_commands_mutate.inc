@@ -338,20 +338,31 @@ static bool parse_batch_raw_record(const char *text, uint8_t spec[4]) {
     return true;
 }
 
-static bool parse_batch_button_change(const char *text, int *button, uint8_t spec[4]) {
+static bool parse_batch_button_change(const char *text, int *button, bool *gshift,
+                                      uint8_t spec[4]) {
     if (text == NULL) {
         return false;
     }
-    const char *separator = strchr(text, ':');
-    if (separator == NULL || separator == text || separator[1] == '\0') {
+    const char *payload = text;
+    if (strncmp(payload, "gshift:", 7) == 0) {
+        *gshift = true;
+        payload += 7;
+    } else if (strncmp(payload, "normal:", 7) == 0) {
+        *gshift = false;
+        payload += 7;
+    } else {
+        return false;
+    }
+    const char *separator = strchr(payload, ':');
+    if (separator == NULL || separator == payload || separator[1] == '\0') {
         return false;
     }
     char number_text[16];
-    size_t number_length = (size_t)(separator - text);
+    size_t number_length = (size_t)(separator - payload);
     if (number_length >= sizeof(number_text)) {
         return false;
     }
-    memcpy(number_text, text, number_length);
+    memcpy(number_text, payload, number_length);
     number_text[number_length] = '\0';
     char *end = NULL;
     errno = 0;
@@ -548,16 +559,20 @@ static int run_apply(const Options *options) {
     }
 
     int requested_buttons[MAX_BATCH_BUTTON_CHANGES];
+    bool requested_gshift[MAX_BATCH_BUTTON_CHANGES];
     uint8_t requested_specs[MAX_BATCH_BUTTON_CHANGES][4];
     for (size_t i = 0; i < options->button_change_count; i++) {
-        if (!parse_batch_button_change(options->button_changes[i], &requested_buttons[i], requested_specs[i])) {
-            fprintf(stderr, "invalid --button-change '%s'; use N:8-hex-digit-raw-record\n",
+        if (!parse_batch_button_change(options->button_changes[i], &requested_buttons[i],
+                                       &requested_gshift[i], requested_specs[i])) {
+            fprintf(stderr, "invalid --button-change '%s'; use normal:N:8-hex-digit-raw-record or gshift:N:8-hex-digit-raw-record\n",
                     options->button_changes[i]);
             return 1;
         }
         for (size_t previous = 0; previous < i; previous++) {
-            if (requested_buttons[previous] == requested_buttons[i]) {
-                fprintf(stderr, "duplicate --button-change for button %d\n", requested_buttons[i]);
+            if (requested_buttons[previous] == requested_buttons[i] &&
+                requested_gshift[previous] == requested_gshift[i]) {
+                fprintf(stderr, "duplicate --button-change for %sbutton %d\n",
+                        requested_gshift[i] ? "G-Shift " : "", requested_buttons[i]);
                 return 1;
             }
         }
@@ -669,6 +684,12 @@ static int run_apply(const Options *options) {
     if (!select_device(devices, device_count, options, &device)) {
         goto done;
     }
+    if (is_g600_device(device)) {
+        result = run_g600_apply(options, device, requested_buttons,
+                                requested_gshift, requested_specs,
+                                options->button_change_count, operation_id);
+        goto done;
+    }
     if (!get_profile_info(device, &info)) {
         goto done;
     }
@@ -717,7 +738,13 @@ static int run_apply(const Options *options) {
                         requested_buttons[i], profile.info.button_count);
                 goto done;
             }
-            size_t offset = profile.button_offset + (size_t)(requested_buttons[i] - 1) * 4;
+            if (requested_gshift[i] && !profile.gshift_layout_supported) {
+                fprintf(stderr, "refusing to apply: the selected profile's G-Shift layout was not validated\n");
+                goto done;
+            }
+            size_t button_offset = requested_gshift[i]
+                ? profile.gshift_button_offset : profile.button_offset;
+            size_t offset = button_offset + (size_t)(requested_buttons[i] - 1) * 4;
             memcpy(new_profile + offset, requested_specs[i], 4);
         }
 

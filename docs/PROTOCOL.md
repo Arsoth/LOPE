@@ -68,6 +68,20 @@ not preserve a modifier state across separate button clicks.
 
 Known profile layouts place the normal button array at offset 32 for older formats and offset 48 for newer formats. This project first checks the reported format’s candidate, validates every record, and only permits writes when the result is unambiguous.
 
+When the descriptor’s lower shift-layout bits are `0x02`, the validated modern
+layout places a same-sized G-Shift button array 64 bytes after the normal
+array (offset 96 or 112). LOPE validates that second bank independently,
+prints it as `G-Shift button N`, and writes it only when that validation passes.
+
+The G600 is a separate legacy read-only path. Product ID `0xC24A` exposes three
+154-byte feature reports (`0xF3`..`0xF5`), one per profile. Each report includes
+20 three-byte normal button records at native offset 31 and 20 three-byte
+G-Shift records at native offset 94. LOPE converts those records to the
+editor's canonical four-byte output representation and can back up the complete
+report for inspection or recovery. It does not write the selected report: the
+legacy path intentionally does not yet support DPI, RGB, or profile enable
+state, so G600 profile saves are disabled.
+
 ## Adjustable DPI
 
 The GUI’s DPI editor combines two checks. First, feature `0x2201` reports the

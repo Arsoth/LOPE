@@ -23,6 +23,23 @@ struct ProfileWriteSelfTest {
         guard invalidMessage == "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again." else {
             fatalError("primary-click validation message was not actionable or profile-specific")
         }
+        let inaccessibleGShiftMessage = ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
+            profileNumber: 2,
+            profileName: "G502 X",
+            normalButtonRaws: ["80010002", "FFFFFFFF"],
+            gShiftButtonRaws: ["80010001"]
+        )
+        guard inaccessibleGShiftMessage == "Profile 2 on G502 X has primary click assigned only on the G-Shift layer, but no Normal-layer button activates G-Shift. Assign G-Shift to a Normal button or add a primary click to the Normal layer, then save again." else {
+            fatalError("inaccessible G-Shift primary-click warning was not actionable")
+        }
+        guard ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
+            profileNumber: 2,
+            profileName: "G502 X",
+            normalButtonRaws: ["900B0000"],
+            gShiftButtonRaws: ["80010001"]
+        ) == nil else {
+            fatalError("bound G-Shift button was incorrectly treated as inaccessible")
+        }
 
         let presetModel = AppModel(startInitialRefresh: false)
         configure(presetModel)
@@ -63,7 +80,8 @@ struct ProfileWriteSelfTest {
                     number: 1,
                     physicalControl: "G1 · Primary click",
                     output: "Left click",
-                    raw: "FFFFFFFF"
+                    raw: "FFFFFFFF",
+                    layer: ButtonLayer.normal.rawValue
                 )],
                 dpi: nil
             ),
@@ -180,6 +198,46 @@ struct ProfileWriteSelfTest {
             fatalError("valid primary-click assignment did not invoke the write engine")
         }
 
+        let layeredModel = AppModel(startInitialRefresh: false)
+        configure(layeredModel)
+        let layeredText = """
+        Profile 2 (sector 0x0100, enabled=yes)
+          button 1: Left click [80010001]
+          G-Shift button 1: Right click [80010002]
+        """
+        let parsedLayers = layeredModel.parseProfiles(layeredText)
+        guard parsedLayers.rowsByProfile[2]?.first?.layer == .normal,
+              parsedLayers.gShiftRowsByProfile[2]?.first?.layer == .gShift else {
+            fatalError("normal/G-Shift profile-output layers were not parsed separately")
+        }
+        let normalRows = layeredModel.buttons
+        let gShiftRows = [ButtonRow(
+            id: 1,
+            label: "G1 · Primary click (Left)",
+            currentRaw: "80010002",
+            draftRaw: "80010002",
+            draftChoice: "80010002",
+            layer: .gShift
+        )]
+        layeredModel.setButtonRows(normal: normalRows, gShift: gShiftRows)
+        layeredModel.setRaw(layer: .normal, buttonIndex: 0, raw: ProfileWriteValidation.primaryClickRaw)
+        layeredModel.selectButtonLayer(.gShift)
+        layeredModel.setRaw(buttonIndex: 0, raw: "80010004")
+        layeredModel.selectButtonLayer(.normal)
+        guard layeredModel.gShiftButtonRows[0].draftRaw == "80010004",
+              layeredModel.buttons[0].draftRaw == ProfileWriteValidation.primaryClickRaw else {
+            fatalError("G-Shift edits were not retained across layer switching")
+        }
+        var layeredCalls = [[String]]()
+        layeredModel.engineRunnerOverride = { arguments in
+            layeredCalls.append(arguments)
+            return "Verified sector 0x0100"
+        }
+        layeredModel.applyButtons()
+        guard layeredCalls.contains(where: { $0.contains("gshift:1:80010004") }) else {
+            fatalError("G-Shift button edits were not forwarded to the write engine")
+        }
+
         try? FileManager.default.removeItem(at: jsonURL)
         print("profile write self-test: primary-click validation and save guards passed")
     }
@@ -207,7 +265,8 @@ struct ProfileWriteSelfTest {
             label: "G1 · Primary click (Left)",
             currentRaw: "80010002",
             draftRaw: "80010002",
-            draftChoice: "80010002"
+            draftChoice: "80010002",
+            layer: .normal
         )]
     }
 }

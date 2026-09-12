@@ -13,7 +13,7 @@ extension AppModel {
             status = "\(currentMouseProfile.name) is cataloged as read-only for onboard profile writes."
             return
         }
-        let changes = buttons.filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
+        let changes = allButtonRowsForSave().filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
         guard !changes.isEmpty else {
             status = "No button changes to apply."
             return
@@ -24,6 +24,10 @@ extension AppModel {
 
     func applyDPI() {
         guard !busy else { return }
+        guard canEditOnboardDPI else {
+            status = "Onboard DPI editing is unavailable for this legacy profile path."
+            return
+        }
         guard currentMouseProfile.profileIO.canSave else {
             status = "\(currentMouseProfile.name) is cataloged as read-only for onboard profile writes."
             return
@@ -42,12 +46,20 @@ extension AppModel {
             status = "\(currentMouseProfile.name) is cataloged as read-only for onboard profile writes."
             return
         }
-        let buttonChanges = buttons.filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
+        let buttonChanges = allButtonRowsForSave().filter { normalize($0.currentRaw) != normalize($0.draftRaw) }
         let dpiChanged = hasDPIChanges
         let rgbChanges = rgbZones.filter { $0.current != $0.draft }
         let profileChanges = profiles
             .filter { $0.enabled != (baselineProfileEnabled[$0.id] ?? $0.enabled) }
             .sorted { $0.enabled && !$1.enabled }
+        if !canEditOnboardDPI && dpiChanged {
+            status = "Onboard DPI editing is unavailable for this legacy profile path."
+            return
+        }
+        if !canEditProfileState && !profileChanges.isEmpty {
+            status = "Profile enable-state editing is unavailable for this legacy profile path."
+            return
+        }
         guard !buttonChanges.isEmpty || dpiChanged || !rgbChanges.isEmpty || !profileChanges.isEmpty else {
             status = "No changes to apply."
             return
@@ -83,7 +95,10 @@ extension AppModel {
             "--operation-id", operationID,
             "apply"
         ]
-        arguments += buttonChanges.flatMap { ["--button-change", "\($0.id):\(normalize($0.draftRaw))"] }
+        arguments += buttonChanges.flatMap {
+            let prefix = $0.layer == .gShift ? "gshift:" : "normal:"
+            return ["--button-change", "\(prefix)\($0.id):\(normalize($0.draftRaw))"]
+        }
         if dpiChanged {
             arguments += [
                 "--dpi", dpiStages.prefix(dpiCount).joined(separator: ","),
@@ -128,10 +143,24 @@ extension AppModel {
         let mouseName = runtimeMouseName?.isEmpty == false
             ? runtimeMouseName!
             : currentDeviceName
+        let normalButtonRaws = allButtonRowsForSave()
+            .filter { $0.layer == .normal }
+            .map(\.draftRaw)
+        let gShiftButtonRaws = allButtonRowsForSave()
+            .filter { $0.layer == .gShift }
+            .map(\.draftRaw)
+        if let message = ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
+            profileNumber: profileNumber,
+            profileName: mouseName,
+            normalButtonRaws: normalButtonRaws,
+            gShiftButtonRaws: gShiftButtonRaws
+        ) {
+            return message
+        }
         return ProfileWriteValidation.missingPrimaryClickMessage(
             profileNumber: profileNumber,
             profileName: mouseName,
-            buttonRaws: buttons.map(\.draftRaw)
+            buttonRaws: normalButtonRaws
         )
     }
 
@@ -342,14 +371,25 @@ extension AppModel {
                 return
             }
 
-            var proposedButtons: [(Int, String)] = []
+            var proposedButtons: [(ButtonLayer, Int, String)] = []
             for button in backup.profile.buttons {
-                guard let index = buttons.firstIndex(where: { $0.id == button.number }),
-                      let raw = jsonRaw(for: button) else {
-                    status = "JSON button \(button.number) has no recognized output or 8-digit raw record."
+                guard let layer = ButtonLayer(rawValue: button.layer) else {
+                    status = "JSON button \(button.number) has an unrecognized layer '\(button.layer)'."
                     return
                 }
-                proposedButtons.append((index, raw))
+                // `buttons` is the active-layer source of truth while the
+                // editor is being initialized; use it for the active layer
+                // even when the test/import caller has not populated the
+                // cached per-layer array separately.
+                let targetRows = layer == buttonLayer
+                    ? buttons
+                    : (layer == .normal ? normalButtonRows : gShiftButtonRows)
+                guard let index = targetRows.firstIndex(where: { $0.id == button.number }),
+                      let raw = jsonRaw(for: button) else {
+                    status = "JSON \(layer.label) button \(button.number) has no recognized output or 8-digit raw record."
+                    return
+                }
+                proposedButtons.append((layer, index, raw))
             }
 
             var proposedDPI: EditableBackup.DPI?
@@ -390,8 +430,8 @@ extension AppModel {
                     self.profiles[index].enabled = enabled
                 }
             }
-            for (index, raw) in proposedButtons {
-                setRaw(buttonIndex: index, raw: raw)
+            for (layer, index, raw) in proposedButtons {
+                setRaw(layer: layer, buttonIndex: index, raw: raw)
             }
             if let dpi = proposedDPI {
                 dpiCount = dpi.stages.count
@@ -422,13 +462,14 @@ extension AppModel {
     private func makeEditableBackup(binaryBackup: URL?, useDrafts: Bool) -> EditableBackup {
         let selectedDevice = devices.first(where: { $0.id == selectedDeviceIndex })
         let selectedProfile = profiles.first(where: { $0.id == profileNumber })
-        let profileButtons = buttons.map { button in
+        let profileButtons = allButtonRowsForSave().map { button in
             let raw = normalize(useDrafts ? button.draftRaw : button.currentRaw)
             return EditableBackup.Button(
                 number: button.id,
                 physicalControl: button.displayLabel,
                 output: outputLabel(for: raw),
-                raw: raw
+                raw: raw,
+                layer: button.layer.rawValue
             )
         }
         let dpi: EditableBackup.DPI?

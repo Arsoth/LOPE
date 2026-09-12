@@ -10,6 +10,7 @@
 #include "logitech_onboard_hid_discovery.inc"
 #include "logitech_onboard_profile_io.inc"
 #include "logitech_onboard_profile_rendering.inc"
+#include "logitech_onboard_g600.inc"
 #include "logitech_onboard_backup.inc"
 #include "logitech_onboard_commands_read.inc"
 #include "logitech_onboard_commands_mutate.inc"

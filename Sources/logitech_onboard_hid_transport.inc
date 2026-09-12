@@ -531,6 +531,56 @@ static Reply device_call_with_report(Device *device,
     return reply;
 }
 
+static bool channel_get_feature_report(HidChannel *channel,
+                                       uint8_t report_id,
+                                       uint8_t *report,
+                                       size_t capacity,
+                                       size_t *length) {
+    if (channel == NULL || !channel->opened || report == NULL || capacity == 0 ||
+        capacity > MAX_FEATURE_REPORT_BYTES) {
+        return false;
+    }
+    memset(report, 0, capacity);
+    report[0] = report_id;
+    CFIndex actual_length = (CFIndex)capacity;
+    IOReturn result = IOHIDDeviceGetReport(channel->device,
+                                           kIOHIDReportTypeFeature,
+                                           report_id,
+                                           report,
+                                           &actual_length);
+    hid_debug_log("hid-debug feature-get report=0x%02X capacity=%zu length=%ld result=0x%08X",
+                  report_id, capacity, (long)actual_length, result);
+    if (result != kIOReturnSuccess || actual_length < 1) {
+        return false;
+    }
+    if ((size_t)actual_length > capacity) {
+        actual_length = (CFIndex)capacity;
+    }
+    if (length != NULL) {
+        *length = (size_t)actual_length;
+    }
+    return true;
+}
+
+static bool channel_set_feature_report(HidChannel *channel,
+                                       uint8_t report_id,
+                                       uint8_t *report,
+                                       size_t length) {
+    if (channel == NULL || !channel->opened || report == NULL || length < 1 ||
+        length > MAX_FEATURE_REPORT_BYTES) {
+        return false;
+    }
+    report[0] = report_id;
+    IOReturn result = IOHIDDeviceSetReport(channel->device,
+                                           kIOHIDReportTypeFeature,
+                                           report_id,
+                                           report,
+                                           (CFIndex)length);
+    hid_debug_log("hid-debug feature-set report=0x%02X length=%zu result=0x%08X",
+                  report_id, length, result);
+    return result == kIOReturnSuccess;
+}
+
 static Reply device_call(Device *device,
                          uint16_t feature_id,
                          uint8_t function,

@@ -762,6 +762,7 @@ private struct DPIStageBar: View {
     let shiftStage: Int
     let capabilities: DPICapabilities
     let isLoading: Bool
+    let validationMessage: String?
     let onDragValue: (Int, Int) -> Int
     let onDragEnded: () -> Void
     let onAdjust: (Int, DPICapabilities.AdjustmentDirection) -> Void
@@ -789,6 +790,14 @@ private struct DPIStageBar: View {
 
     private var trackInset: CGFloat {
         endpointLabelWidth + trackToEndpointSpacing
+    }
+
+    private let validationIconSize: CGFloat = 14
+
+    // Match the warning icon center to the center of the minimum endpoint
+    // label, accounting for the label's small visual offset.
+    private var validationLeadingInset: CGFloat {
+        trackInset / 2 - endpointCenterAdjustment - validationIconSize / 2
     }
 
     var body: some View {
@@ -870,6 +879,28 @@ private struct DPIStageBar: View {
 
                 dpiLegend
                     .position(x: proxy.size.width / 2, y: 93)
+
+                if let validationMessage {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .frame(width: validationIconSize, height: validationIconSize)
+                        Text(validationMessage)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .font(.body)
+                    .foregroundStyle(.orange)
+                    .frame(
+                        width: max(proxy.size.width - validationLeadingInset, 1),
+                        alignment: .leading
+                    )
+                    .position(
+                        x: validationLeadingInset + max(proxy.size.width - validationLeadingInset, 1) / 2,
+                        y: 93
+                    )
+                    .allowsHitTesting(false)
+                    .zIndex(4)
+                }
 
             }
             // Keep one bubble alive while moving between stages. Replacing
@@ -1001,6 +1032,7 @@ private struct DPIStageBar: View {
         .frame(width: 84, height: 62)
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .pointerCursor()
         .accessibilityLabel("DPI stage \(index + 1)")
         .accessibilityValue(parsedValue.map { "\(formattedDPIValue($0)) DPI" } ?? "Invalid value")
         .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
@@ -1407,13 +1439,13 @@ struct ContentView: View {
                             loadingProfileOverlay
                         }
                     }
-                    .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
+                    .tabItem { Label("Configure", systemImage: "cursorarrow.click").pointerCursor() }
                     .tag(AppTab.configure)
                     backupsPane
-                        .tabItem { Label("Backups", systemImage: "archivebox") }
+                        .tabItem { Label("Backups", systemImage: "archivebox").pointerCursor() }
                         .tag(AppTab.backups)
                     settingsPane
-                        .tabItem { Label("Settings", systemImage: "gearshape") }
+                        .tabItem { Label("Settings", systemImage: "gearshape").pointerCursor() }
                         .tag(AppTab.settings)
                 }
                 Divider()
@@ -1451,6 +1483,7 @@ struct ContentView: View {
                     Color.black.opacity(0.24)
                         .ignoresSafeArea()
                         .onTapGesture { primaryClickModalPresented = false }
+                        .pointerCursor()
                     CenteredAppModal(
                         title: "Primary click required",
                         message: model.primaryClickValidationMessage ?? "Choose “Left click” for the primary-click button, then save again.",
@@ -1463,6 +1496,7 @@ struct ContentView: View {
                         }
                         .keyboardShortcut(.defaultAction)
                         .buttonStyle(.borderedProminent)
+                        .pointerCursor()
                     }
                 }
                 .transition(.opacity)
@@ -1483,24 +1517,30 @@ struct ContentView: View {
         }
         .alert("Allow wired mice", isPresented: $model.wiredAccessInstructionsPresented) {
             Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+                .pointerCursor()
             Button("Cancel", role: .cancel) {}
+                .pointerCursor()
         } message: {
             Text("LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, enable LOPE in System Settings > Privacy & Security > Input Monitoring, then return and choose Refresh.")
         }
         .alert("Restore this backup?", isPresented: $confirmRestore) {
             Button("Cancel", role: .cancel) { restoreURL = nil }
+                .pointerCursor()
             Button("Restore and verify", role: .destructive) {
                 if let restoreURL { model.restore(restoreURL) }
                 restoreURL = nil
             }
+            .pointerCursor()
         } message: {
             Text(restoreURL?.lastPathComponent ?? "Selected backup")
         }
         .alert("Restore backups from this save?", isPresented: $confirmRecoveryRestore) {
             Button("Cancel", role: .cancel) {}
+                .pointerCursor()
             Button("Restore and verify", role: .destructive) {
                 model.restoreLastSaveBackups()
             }
+            .pointerCursor()
         } message: {
             Text("LOPE will restore the exact pre-save sectors captured by the failed operation. Any sector that was already unchanged will be skipped safely.")
         }
@@ -1521,19 +1561,24 @@ struct ContentView: View {
                 .labelsHidden()
                 .frame(width: 180)
                 .disabled(model.devices.isEmpty)
+                .pointerCursor(enabled: !model.devices.isEmpty)
             }
             Button("Refresh", action: model.refresh)
                 .keyboardShortcut("r", modifiers: [.command])
                 .disabled(model.busy)
+                .pointerCursor(enabled: !model.busy)
             if model.busy { ProgressView().controlSize(.small) }
             Spacer()
             Button("Revert edits") { model.reloadSelectedProfile() }
+                .pointerCursor()
             Button("Save to mouse", action: saveToMouse)
                 .buttonStyle(.borderedProminent)
                 .disabled(
                     !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave ||
                     (model.hasDPIChanges && !model.canApplyDPI)
                 )
+                .pointerCursor(enabled: model.hasPendingChanges && !model.busy && model.currentMouseProfile.profileIO.canSave &&
+                    (!model.hasDPIChanges || model.canApplyDPI))
         }
     }
 
@@ -1587,6 +1632,7 @@ struct ContentView: View {
                 .frame(maxWidth: 560)
             if !model.inputMonitoringAuthorized {
                 Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+                    .pointerCursor()
             }
             Spacer()
         }
@@ -1650,6 +1696,7 @@ struct ContentView: View {
                         confirmRecoveryRestore = true
                     }
                     .buttonStyle(.bordered)
+                    .pointerCursor()
                 }
                 .padding(8)
                 .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
@@ -1664,6 +1711,18 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     profilesEditor
+                    if model.hasGShiftLayer {
+                        HStack(spacing: 10) {
+                            Text("Button assignments")
+                                .font(.callout.weight(.medium))
+                            Text("G-Shift assignments apply while holding the mouse’s G-Shift button.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 7))
+                    }
                     Divider()
                     VStack(spacing: 8) {
                         ForEach(model.buttons) { button in
@@ -1671,7 +1730,16 @@ struct ContentView: View {
                         }
                     }
                     Divider()
-                    dpiEditor
+                    if model.canEditOnboardDPI {
+                        dpiEditor
+                    } else {
+                        Text("Onboard DPI editing is unavailable for this legacy profile path.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    }
                     if model.shouldShowRGBEditor {
                         Divider()
                         rgbEditor
@@ -1727,6 +1795,7 @@ struct ContentView: View {
                         }
                         .labelsHidden()
                         .frame(width: 190, alignment: .trailing)
+                        .pointerCursor()
                         if model.showAdvancedFields {
                             TextField("8 hex digits", text: Binding(
                                 get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
@@ -1797,10 +1866,23 @@ struct ContentView: View {
                     .labelsHidden()
                     .frame(width: 150)
                     .disabled(model.busy)
-                    // Keep the profile picker aligned with the recorded-key
-                    // column in each button row.
+                    .pointerCursor(enabled: !model.busy)
+                    if model.hasGShiftLayer {
+                        Picker("Button layer", selection: Binding(
+                            get: { model.buttonLayer },
+                            set: { model.selectButtonLayer($0) }
+                        )) {
+                            ForEach(ButtonLayer.allCases, id: \.self) { layer in
+                                Text(layer.label).tag(layer)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 150)
+                        .pointerCursor()
+                    }
                     Spacer(minLength: 0)
-                        .frame(width: 10)
+                        .frame(width: 6)
                     Text("Enable:")
                         .font(.callout.weight(.medium))
                     ForEach(model.profiles) { profile in
@@ -1861,17 +1943,21 @@ struct ContentView: View {
             get: { model.profileEnabled(profileID) },
             set: { model.setProfileEnabled(profileID: profileID, enabled: $0) }
         )
-        return HStack(spacing: 4) {
+        return HStack(spacing: 2) {
             Text(label)
+                .font(.caption)
             Toggle("", isOn: enabled)
                 .labelsHidden()
                 .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .disabled(model.busy || !model.canEditProfileState)
+                .pointerCursor(enabled: !model.busy && model.canEditProfileState)
             Text(crcLabel)
                 .font(.caption)
                 .foregroundStyle(crcColor)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 3)
+        .padding(.vertical, 2)
         .background(
             profileID == model.profileNumber
                 ? Color.accentColor.opacity(0.12)
@@ -1923,6 +2009,7 @@ struct ContentView: View {
         .font(.caption)
         .fixedSize()
         .help(label)
+        .pointerCursor()
     }
 
     private func keyboardRecordingBox(_ buttonID: Int) -> some View {
@@ -1948,6 +2035,7 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())
+            .pointerCursor(enabled: !isRecording)
 
             if isRecording {
                 Button {
@@ -1960,6 +2048,7 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .contentShape(Rectangle())
                 .help("Cancel recording")
+                .pointerCursor()
             }
         }
         .frame(width: 190, height: 26, alignment: .leading)
@@ -1998,6 +2087,7 @@ struct ContentView: View {
         .labelsHidden()
         .frame(width: 150)
         .help("Insert an extended HID keyboard usage directly.")
+        .pointerCursor()
     }
 
     private var dpiEditor: some View {
@@ -2025,6 +2115,7 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(model.dpiCount <= 1)
+                    .pointerCursor(enabled: model.dpiCount > 1)
                     .accessibilityLabel("Remove DPI stage")
                     Text("\(model.dpiCount) of 5")
                         .font(.callout.monospacedDigit())
@@ -2039,61 +2130,56 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(model.dpiCount >= 5)
+                    .pointerCursor(enabled: model.dpiCount < 5)
                     .accessibilityLabel("Add DPI stage")
                 }
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                if let currentDPI = model.dpiCapabilities.currentValue {
-                    HStack(spacing: 6) {
-                        Text("Live DPI")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(formattedDPIValue(currentDPI))
-                            .font(.caption.monospacedDigit().weight(.semibold))
+                    if let currentDPI = model.dpiCapabilities.currentValue {
+                        HStack(spacing: 6) {
+                            Text("Live DPI")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(formattedDPIValue(currentDPI))
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                        }
                     }
-                }
 
-                DPIStageBar(
-                    stages: Array(model.dpiStages.prefix(model.dpiCount)),
-                    defaultStage: model.defaultStage,
-                    shiftStage: model.shiftStage,
-                    capabilities: model.dpiCapabilities,
-                    isLoading: model.loadingProfile,
-                    onDragValue: { index, value in
-                        model.moveDPIStageDuringDrag(index: index, value: value)
-                    },
-                    onDragEnded: {
-                        model.finishDPIStageDrag()
-                    },
-                    onAdjust: { index, direction in
-                        model.adjustDPIStage(index: index, direction: direction)
-                    },
-                    onTextChange: { index, text in
-                        model.setDPIStageText(index: index, text: text)
-                    },
-                    onCommitText: { index in
-                        model.commitDPIStageText(index: index)
-                    },
-                    onSetDefault: { index in
-                        model.setDefaultDPIStage(index + 1)
-                    },
-                    onSetShift: { index in
-                        model.setShiftDPIStage(index + 1)
-                    },
-                    onDelete: { index in
-                        model.deleteDPIStage(index: index)
-                    }
-                )
-                .frame(height: 105)
-                .zIndex(10)
-
-                if let validation = model.dpiValidationMessage {
-                    Label(validation, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                    DPIStageBar(
+                        stages: Array(model.dpiStages.prefix(model.dpiCount)),
+                        defaultStage: model.defaultStage,
+                        shiftStage: model.shiftStage,
+                        capabilities: model.dpiCapabilities,
+                        isLoading: model.loadingProfile,
+                        validationMessage: model.dpiValidationMessage,
+                        onDragValue: { index, value in
+                            model.moveDPIStageDuringDrag(index: index, value: value)
+                        },
+                        onDragEnded: {
+                            model.finishDPIStageDrag()
+                        },
+                        onAdjust: { index, direction in
+                            model.adjustDPIStage(index: index, direction: direction)
+                        },
+                        onTextChange: { index, text in
+                            model.setDPIStageText(index: index, text: text)
+                        },
+                        onCommitText: { index in
+                            model.commitDPIStageText(index: index)
+                        },
+                        onSetDefault: { index in
+                            model.setDefaultDPIStage(index + 1)
+                        },
+                        onSetShift: { index in
+                            model.setShiftDPIStage(index + 1)
+                        },
+                        onDelete: { index in
+                            model.deleteDPIStage(index: index)
+                        }
+                    )
+                    .frame(height: 105)
+                    .zIndex(10)
             }
             .padding(8)
             .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
@@ -2158,6 +2244,7 @@ struct ContentView: View {
                 .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
         }
         .help("Click to choose a color. Shift-click to apply the chosen color to all RGB zones.")
+        .pointerCursor()
         .popover(
             isPresented: Binding(
                 get: { presentedRGBZoneID == zone.id },
@@ -2174,6 +2261,7 @@ struct ContentView: View {
                 Text(model.rgbEditingAllZones ? "All RGB zones" : zone.name)
                     .font(.headline)
                 ColorPicker("Color", selection: rgbColorBinding(zoneID: zone.id), supportsOpacity: false)
+                    .pointerCursor()
                 if let current = model.rgbZones.first(where: { $0.id == zone.id })?.draft {
                     Text(current.hex)
                         .font(.caption.monospaced())
@@ -2225,27 +2313,34 @@ struct ContentView: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Button("Save selected profile backup") { model.dumpBackup() }
+                    .pointerCursor()
                 Button("Export JSON…") {
                     if let url = model.chooseJSONExport() {
                         model.exportCurrentJSON(to: url)
                     }
                 }
+                .pointerCursor()
                 Button("Import JSON…") {
                     if let url = model.chooseJSONBackup() {
                         model.loadEditableBackup(url)
                     }
                 }
+                .pointerCursor()
                 Button("Choose another backup…") {
                     restoreURL = model.chooseRestoreBackup()
                     confirmRestore = restoreURL != nil
                 }
+                .pointerCursor()
                 Button("Refresh list", action: model.refreshBackups)
+                    .pointerCursor()
                 Button("Open in Finder", action: model.openBackupDirectoryInFinder)
+                    .pointerCursor()
             }
             Toggle("Show backups for all mice", isOn: Binding(
                 get: { model.showAllBackups },
                 set: { model.setShowAllBackups($0) }))
             .toggleStyle(.checkbox)
+            .pointerCursor()
             Text(model.showAllBackups
                  ? "Showing every backup. Unknown-device files require review before restore or import."
                  : "Showing backups matched to the selected mouse. Legacy files that cannot be matched safely are hidden.")
@@ -2277,11 +2372,13 @@ struct ContentView: View {
                                     Button("Load") {
                                         model.loadEditableBackup(backup.url)
                                     }
+                                    .pointerCursor()
                                 } else {
                                     Button("Restore") {
                                         restoreURL = backup.url
                                         confirmRestore = true
                                     }
+                                    .pointerCursor()
                                 }
                             }
                             .padding(.vertical, 2)
@@ -2319,8 +2416,10 @@ struct ContentView: View {
                                 model.setBackupDirectory(folder)
                             }
                         }
+                        .pointerCursor()
                         Button("Use default") { model.resetBackupDirectory() }
                             .disabled(model.backupDirectoryPath == model.defaultBackupDirectoryPath)
+                            .pointerCursor(enabled: model.backupDirectoryPath != model.defaultBackupDirectoryPath)
                     }
                 }
                 .padding(4)
@@ -2331,6 +2430,7 @@ struct ContentView: View {
                         get: { model.showAdvancedFields },
                         set: { model.setShowAdvancedFields($0) }))
                         .toggleStyle(.checkbox)
+                        .pointerCursor()
                     Text("Shows the 8-digit button records and profile sector numbers. Leave this off for the normal editing view.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2343,6 +2443,7 @@ struct ContentView: View {
                         get: { model.showNonStandardKeyboardKeys },
                         set: { model.setShowNonStandardKeyboardKeys($0) }))
                         .toggleStyle(.checkbox)
+                        .pointerCursor()
                     Text("Shows the optional extended-key override for usages such as Insert, F13–F24, and Sleep. Recording captures modifiers automatically.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2360,6 +2461,7 @@ struct ContentView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .pointerCursor()
                     Text("System follows macOS. Light mode uses a soft off-white background; the DPI colors remain unchanged.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

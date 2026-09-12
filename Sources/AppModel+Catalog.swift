@@ -11,7 +11,8 @@ extension AppModel {
                 label: button.label,
                 currentRaw: raw,
                 draftRaw: raw,
-                draftChoice: choice
+                draftChoice: choice,
+                layer: .normal
             )
         }
     }

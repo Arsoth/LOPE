@@ -190,7 +190,9 @@ static int package_read(const char *path, BackupPackage *package) {
             package_release(package);
             return 0;
         }
-        if (!sector_crc_ok(package->sectors[i].data, package->sectors[i].size)) {
+        bool legacy_g600 = package->profile_format == 0xFF &&
+                           package->product_id == 0xC24A;
+        if (!legacy_g600 && !sector_crc_ok(package->sectors[i].data, package->sectors[i].size)) {
             fprintf(stderr, "backup %s has an invalid CRC in sector %zu\n", path, i + 1);
             close(fd);
             package_release(package);

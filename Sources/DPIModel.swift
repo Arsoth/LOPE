@@ -233,7 +233,7 @@ enum DPIEditorValidation {
                 return "DPI stage \(index + 1) is not supported by this mouse."
             }
             if index > 0, value <= numbers[index - 1] {
-                return "DPI stages must be strictly increasing."
+                return "DPI stages may not overlap."
             }
         }
 

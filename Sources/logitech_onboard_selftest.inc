@@ -87,9 +87,40 @@ static int run_self_test(void) {
         fprintf(stderr, "DPI parser self-test failed\n");
         return 1;
     }
+    HidInterface g600_interface = {0};
+    Device g600_device = {0};
+    g600_interface.product_id = G600_PRODUCT_ID;
+    g600_device.iface = &g600_interface;
+    uint8_t g600_keyboard[3] = {0x00, 0x04, 0x2B};
+    uint8_t g600_mouse[3] = {0x04, 0x00, 0x00};
+    uint8_t g600_shift[3] = {0x17, 0x00, 0x00};
+    uint8_t g600_spec[4] = {0};
+    uint8_t g600_native[3] = {0};
+    g600_native_to_spec(g600_keyboard, g600_spec);
+    bool g600_mapping_ok = is_g600_device(&g600_device) &&
+        g600_spec[0] == 0x80 && g600_spec[1] == 0x02 &&
+        g600_spec[2] == 0x04 && g600_spec[3] == 0x2B &&
+        g600_spec_to_native(g600_spec, g600_native) &&
+        memcmp(g600_keyboard, g600_native, sizeof(g600_native)) == 0;
+    g600_native_to_spec(g600_mouse, g600_spec);
+    g600_mapping_ok = g600_mapping_ok && g600_spec[0] == 0x80 &&
+        g600_spec[1] == 0x01 && g600_spec[2] == 0x00 && g600_spec[3] == 0x08 &&
+        g600_spec_to_native(g600_spec, g600_native) &&
+        memcmp(g600_mouse, g600_native, sizeof(g600_native)) == 0;
+    g600_native_to_spec(g600_shift, g600_spec);
+    g600_mapping_ok = g600_mapping_ok && g600_spec[0] == 0x90 &&
+        g600_spec[1] == 0x0B && g600_spec[2] == 0x00 && g600_spec[3] == 0x00 &&
+        g600_spec_to_native(g600_spec, g600_native) &&
+        memcmp(g600_shift, g600_native, sizeof(g600_native)) == 0 &&
+        g600_profile_sector(1) == 0x00F3 && g600_profile_sector(3) == 0x00F5;
+    if (!g600_mapping_ok) {
+        fprintf(stderr, "G600 legacy mapping self-test failed\n");
+        return 1;
+    }
     memset(&profile, 0, sizeof(profile));
     profile.info.profile_format = 5;
     profile.info.button_count = 5;
+    profile.info.shift_flags = 0x02;
     profile.data_length = 255;
     profile.data = (uint8_t *)calloc(profile.data_length, 1);
     if (profile.data == NULL) {
@@ -104,6 +135,16 @@ static int run_self_test(void) {
     };
     for (size_t i = 0; i < 5; i++) {
         memcpy(profile.data + 32 + i * 4, specs[i], 4);
+    }
+    uint8_t gshift_specs[5][4] = {
+        {0x80, 0x01, 0x00, 0x10},
+        {0x80, 0x01, 0x00, 0x20},
+        {0x80, 0x01, 0x00, 0x40},
+        {0x80, 0x01, 0x00, 0x80},
+        {0x80, 0x01, 0x01, 0x00},
+    };
+    for (size_t i = 0; i < 5; i++) {
+        memcpy(profile.data + 96 + i * 4, gshift_specs[i], 4);
     }
     uint16_t sample_dpi[5] = {800, 1200, 1600, 2400, 3200};
     for (size_t i = 0; i < 5; i++) {
@@ -126,6 +167,7 @@ static int run_self_test(void) {
     sector_put_crc(profile.data, profile.data_length);
     profile.crc_ok = sector_crc_ok(profile.data, profile.data_length);
     detect_button_layout(&profile);
+    detect_gshift_button_layout(&profile);
     HidInterface g203_interface = {0};
     Device g203_device = {0};
     g203_interface.product_id = 0xC092;
@@ -141,6 +183,15 @@ static int run_self_test(void) {
                          parsed_rgb_color[1] == 0xB2 && parsed_rgb_color[2] == 0xC3 &&
                          !parse_batch_rgb_change("3:GG0000", &parsed_rgb_zone,
                                                  parsed_rgb_color);
+    int parsed_button = 0;
+    bool parsed_gshift = false;
+    uint8_t parsed_button_spec[4] = {0};
+    bool gshift_parser_ok = parse_batch_button_change(
+        "gshift:3:80010004", &parsed_button, &parsed_gshift, parsed_button_spec) &&
+        parsed_button == 3 && parsed_gshift && parsed_button_spec[3] == 0x04;
+    bool normal_parser_ok = parse_batch_button_change(
+        "normal:2:80010002", &parsed_button, &parsed_gshift, parsed_button_spec) &&
+        parsed_button == 2 && !parsed_gshift && parsed_button_spec[3] == 0x02;
     uint8_t rgb_zones[1] = {1};
     uint8_t rgb_colors[1][3] = {{0xAA, 0xBB, 0xCC}};
     bool rgb_write_ok = write_rgb_zone_colors(profile.data, &profile, rgb_zones,
@@ -159,9 +210,10 @@ static int run_self_test(void) {
                      alt_tab[2] == 0x04 && alt_tab[3] == 0x2B;
     int rear = find_rear_thumb_button(&profile);
     bool passed = profile.crc_ok && profile.layout_supported && profile.button_offset == 32 &&
+                  profile.gshift_layout_supported && profile.gshift_button_offset == 96 &&
                   profile.dpi_layout_supported && profile.dpi_offset == 3 &&
                   read_le16(profile.data + profile.dpi_offset + 2 * 2) == 1600 &&
-                  rear == 4 && target_ok && rgb_parser_ok && rgb_write_ok &&
+                  rear == 4 && target_ok && rgb_parser_ok && gshift_parser_ok && normal_parser_ok && rgb_write_ok &&
                   rgb_unsupported_ok && profile.rgb_layout_supported &&
                   profile.rgb_zone_count == 2;
     uint16_t compacted_dpi[4] = {800, 1200, 2400, 3200};
@@ -200,6 +252,7 @@ static int run_self_test(void) {
     memset(&newer, 0, sizeof(newer));
     newer.info.profile_format = 7;
     newer.info.button_count = 5;
+    newer.info.shift_flags = 0x02;
     newer.data_length = 255;
     newer.data = (uint8_t *)calloc(newer.data_length, 1);
     if (newer.data == NULL) {
@@ -207,11 +260,15 @@ static int run_self_test(void) {
     }
     for (size_t i = 0; i < 5; i++) {
         memcpy(newer.data + 48 + i * 4, specs[i], 4);
+        memcpy(newer.data + 112 + i * 4, gshift_specs[i], 4);
     }
     sector_put_crc(newer.data, newer.data_length);
     newer.crc_ok = sector_crc_ok(newer.data, newer.data_length);
     detect_button_layout(&newer);
-    bool newer_ok = newer.crc_ok && newer.layout_supported && newer.button_offset == 48 && find_rear_thumb_button(&newer) == 4;
+    detect_gshift_button_layout(&newer);
+    bool newer_ok = newer.crc_ok && newer.layout_supported && newer.button_offset == 48 &&
+                    newer.gshift_layout_supported && newer.gshift_button_offset == 112 &&
+                    find_rear_thumb_button(&newer) == 4;
     free(newer.data);
     if (!newer_ok) {
         fprintf(stderr, "newer profile layout self-test failed\n");
@@ -337,6 +394,6 @@ static int run_self_test(void) {
         fprintf(stderr, "batch failure-path self-test failed\n");
         return 1;
     }
-    printf("self-test: receiver model-name fallback, connection types, CRC-16, DPI sentinel/compaction, format/layout detection, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
+    printf("self-test: receiver model-name fallback, connection types, CRC-16, DPI sentinel/compaction, format/layout detection, G600 legacy mapping, batch planning/failure handling, rear-thumb identification, and Alt+Tab encoding passed\n");
     return 0;
 }

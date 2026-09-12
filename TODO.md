@@ -9,74 +9,7 @@
 
 # LOPE TODO Ingest:
 
-- backups should use subdirectories for the mice models (but still identify the model based on file name as well for sanity), and exporting and importing json should default to documents folder not backups folder
-
 # LOPE todo list
-
-### [x] 1. Require a primary click before saving a profile
-
-- [x] Define how the primary-click output is recognized across presets, raw
-      records, and imported JSON.
-- [x] Block every mouse-write path when the selected profile has no assigned
-      primary click, including button-only and combined saves.
-- [x] Show an actionable validation message and identify the profile that needs
-      a primary click assignment.
-- [x] Add regression coverage proving rejected saves do not invoke the write
-      engine and valid primary-click assignments continue to save normally.
-
-**Done when:** A profile cannot be written to the mouse unless its primary
-click is assigned, the editor explains how to fix the validation failure, and
-the guard is covered for all save entry points.
-
-### [x] 2. Make onboard DPI dragging smooth and responsive
-
-- [x] Reproduce the current delay, stutter, or handle-position mismatch while
-      dragging DPI stages on supported mice.
-- [x] Trace pointer events, value snapping, stage reordering, and SwiftUI view
-      updates to identify the source of lag or dropped intermediate positions.
-- [x] Update the interaction path so the dragged handle tracks continuously
-      without blocking work or applying redundant updates.
-- [x] Preserve supported-value snapping, strict stage ordering, default/shift
-      assignments, accessibility behavior, and text editing.
-- [x] Add regression coverage for continuous drag updates and stage crossings,
-      then verify the interaction on representative supported DPI ranges.
-
-**Done when:** A DPI handle follows the pointer continuously without visible
-delay or stuttering, including while crossing other stages, and all existing
-validation and stage-ordering behavior remains intact.
-
-### [x] 3. Add onboard RGB profile editing for supported G-series mice
-
-- [x] Determine which G-series mice and onboard profile formats expose writable
-      RGB zones, and document the capability and zone names in the device
-      descriptors.
-- [x] Define a safe read/write representation for per-profile RGB zone colors,
-      including validation for unsupported or read-only devices.
-- [x] Show an RGB settings row only for profiles and devices that advertise the
-      capability, with a color swatch and zone name for each zone.
-- [x] Open a color-wheel picker when a zone is clicked and apply one color to
-      all zones when the row is Shift-clicked.
-- [x] Include RGB changes in save, backup, import/export, and read-back
-      verification flows where the profile format supports them.
-- [x] Add focused tests for capability gating, color conversion, per-zone
-      editing, Shift-click all-zone editing, and unsupported devices.
-
-**Done when:** Supported G-series onboard RGB profiles expose editable named
-zones with individual and Shift-click all-zone color selection, changes save
-and verify safely, and unsupported profiles show no RGB controls or write path.
-
-### [x] 4. Organize backups by mouse model and keep JSON in Documents
-
-- [x] Store backups in a subdirectory named for the compatible mouse model.
-- [x] Keep the mouse model in every backup filename as a secondary sanity check.
-- [x] Default JSON import and export panels to the user's Documents folder
-      instead of the backup directory.
-- [x] Preserve device matching, backup discovery, and restore behavior across
-      the model subdirectories.
-
-**Done when:** Binary backups are grouped under the correct mouse-model
-directory and still carry the model in their filenames, while JSON import and
-export default to Documents without breaking discovery or restore flows.
 
 # Ignore below item(s):
 

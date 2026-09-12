@@ -84,6 +84,29 @@ extension AppModel {
         }
     }
 
+    func setRaw(layer: ButtonLayer, buttonIndex: Int, raw: String) {
+        if layer == buttonLayer {
+            setRaw(buttonIndex: buttonIndex, raw: raw)
+            return
+        }
+
+        let normalized = normalize(raw)
+        switch layer {
+        case .normal:
+            guard normalButtonRows.indices.contains(buttonIndex) else { return }
+            normalButtonRows[buttonIndex].draftRaw = normalized
+            normalButtonRows[buttonIndex].draftChoice = presets.contains {
+                normalize($0.raw) == normalized
+            } ? normalized : "keystroke"
+        case .gShift:
+            guard gShiftButtonRows.indices.contains(buttonIndex) else { return }
+            gShiftButtonRows[buttonIndex].draftRaw = normalized
+            gShiftButtonRows[buttonIndex].draftChoice = presets.contains {
+                normalize($0.raw) == normalized
+            } ? normalized : "keystroke"
+        }
+    }
+
     func isKeyboardRecord(buttonIndex: Int) -> Bool {
         guard buttons.indices.contains(buttonIndex), let bytes = rawBytes(buttons[buttonIndex].draftRaw) else {
             return false

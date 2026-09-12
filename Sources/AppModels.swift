@@ -16,12 +16,41 @@ struct ProfileChoice: Identifiable, Hashable {
     }
 }
 
+enum ButtonLayer: String, CaseIterable, Hashable, Sendable {
+    case normal
+    case gShift
+
+    var label: String {
+        switch self {
+        case .normal: return "Normal"
+        case .gShift: return "G-Shift"
+        }
+    }
+}
+
 struct ButtonRow: Identifiable {
     let id: Int
     let label: String
     let currentRaw: String
     var draftRaw: String
     var draftChoice: String
+    let layer: ButtonLayer
+
+    init(
+        id: Int,
+        label: String,
+        currentRaw: String,
+        draftRaw: String,
+        draftChoice: String,
+        layer: ButtonLayer
+    ) {
+        self.id = id
+        self.label = label
+        self.currentRaw = currentRaw
+        self.draftRaw = draftRaw
+        self.draftChoice = draftChoice
+        self.layer = layer
+    }
 
     var displayLabel: String {
         let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -142,6 +171,34 @@ struct EditableBackup: Codable {
         var physicalControl: String
         var output: String
         var raw: String
+        var layer: String
+
+        init(
+            number: Int,
+            physicalControl: String,
+            output: String,
+            raw: String,
+            layer: String
+        ) {
+            self.number = number
+            self.physicalControl = physicalControl
+            self.output = output
+            self.raw = raw
+            self.layer = layer
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case number, physicalControl, output, raw, layer
+        }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            number = try values.decode(Int.self, forKey: .number)
+            physicalControl = try values.decode(String.self, forKey: .physicalControl)
+            output = try values.decode(String.self, forKey: .output)
+            raw = try values.decode(String.self, forKey: .raw)
+            layer = try values.decode(String.self, forKey: .layer)
+        }
     }
 
     struct DPI: Codable {

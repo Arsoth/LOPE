@@ -67,6 +67,14 @@ struct ProfileOutputParserSelfTest {
             fatalError("G203 LIGHTSYNC product-ID catalog match failed")
         }
 
+        let g600Profile = MouseProfileCatalog.shared.profile(deviceName: "G600 MMO", productID: "0xC24A")
+        guard g600Profile.id == "g600",
+              !g600Profile.profileIO.supported,
+              !g600Profile.profileIO.canSave,
+              g600Profile.profileIO.save["strategy"] == "read-only" else {
+            fatalError("G600 must remain read-only until all legacy profile features are supported")
+        }
+
         let selectionCases: [(Int?, [Int], Int, Int?)] = [
             (nil, [1], 2, 1),       // multi-profile mouse -> one-profile mouse
             (nil, [1, 2], 1, 1),    // one-profile mouse -> multi-profile mouse
@@ -118,7 +126,7 @@ struct ProfileOutputParserSelfTest {
         guard validMessage == nil else { fatalError("valid DPI stages were rejected") }
         let invalidCases: [([String], Int, String)] = [
             (["800", "", "", "", ""], 2, "Enter a numeric value for DPI stage 2."),
-            (["800", "800", "", "", ""], 2, "DPI stages must be strictly increasing."),
+            (["800", "800", "", "", ""], 2, "DPI stages may not overlap."),
             (["800", "1200", "", "", ""], 2, "DPI stage 2 is not supported by this mouse.")
         ]
         for (stages, count, expected) in invalidCases {
