@@ -103,6 +103,16 @@ they are not assumed for an unknown format. A DPI write compacts active stages
 from slot zero, clears trailing unused slots with the selected sentinel,
 recalculates the sector CRC, and verifies the complete sector after the write.
 
+## Onboard profile polling rate
+
+The selected onboard profile stores its report interval in sector byte `0`, in
+milliseconds. The GUI stages this value with the other profile edits and the
+batch `apply` path writes it in the same backed-up sector transaction before
+recalculating and verifying the sector CRC. HID++ `0x8061` values for 125,
+250, 500, and 1000 Hz map to 8, 4, 2, and 1 milliseconds respectively; its
+2000/4000/8000 Hz values are connection-level settings and are not representable
+by this profile field.
+
 ## Sources
 
 These are implementation references, not Logitech guarantees for every firmware revision:

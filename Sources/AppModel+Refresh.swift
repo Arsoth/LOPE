@@ -469,6 +469,8 @@ extension AppModel {
     shiftStage = 1
     dpiCapabilities = DPICapabilities()
     pollingRateCapabilities = PollingRateCapabilities()
+    pollingRateDraft = nil
+    baselinePollingRate = nil
     baselineDPIStages = ["", "", "", "", ""]
     baselineDPICount = 5
     baselineDefaultStage = 1

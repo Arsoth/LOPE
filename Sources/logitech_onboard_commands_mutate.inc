@@ -547,10 +547,16 @@ static int run_apply(const Options *options) {
         fprintf(stderr, "apply requires an explicit --profile N selection\n");
         return 1;
     }
+    uint32_t requested_report_rate = 0;
+    if (options->report_rate != NULL &&
+        !parse_report_rate_hertz(options->report_rate, &requested_report_rate)) {
+        fprintf(stderr, "invalid --report-rate; use a positive integer rate in Hz\n");
+        return 1;
+    }
     if (options->button_change_count == 0 && options->rgb_change_count == 0 &&
         options->dpi_values == NULL &&
-        options->profile_state_change_count == 0) {
-        fprintf(stderr, "apply requires at least one button, RGB, DPI, or profile-state change\n");
+        options->profile_state_change_count == 0 && options->report_rate == NULL) {
+        fprintf(stderr, "apply requires at least one button, RGB, DPI, polling-rate, or profile-state change\n");
         return 1;
     }
     if (options->dpi_values == NULL && (options->dpi_default >= 0 || options->dpi_shift >= 0)) {
@@ -685,6 +691,10 @@ static int run_apply(const Options *options) {
         goto done;
     }
     if (is_g600_device(device)) {
+        if (options->report_rate != NULL) {
+            fprintf(stderr, "refusing to apply: G600 profile reports do not support saved polling-rate edits\n");
+            goto done;
+        }
         result = run_g600_apply(options, device, requested_buttons,
                                 requested_gshift, requested_specs,
                                 options->button_change_count, operation_id);
@@ -717,7 +727,8 @@ static int run_apply(const Options *options) {
     }
 
     bool wants_profile_sector = options->button_change_count > 0 ||
-        options->rgb_change_count > 0 || options->dpi_values != NULL;
+        options->rgb_change_count > 0 || options->dpi_values != NULL ||
+        options->report_rate != NULL;
     if (wants_profile_sector) {
         if (!load_profile_with_headers(device, &info, headers, header_count, options->profile, &profile) ||
             !validate_profile_for_write(&profile)) {
@@ -731,6 +742,21 @@ static int run_apply(const Options *options) {
             goto done;
         }
         memcpy(new_profile, profile.data, profile.data_length);
+
+        if (options->report_rate != NULL) {
+            if (profile.data_length < 1) {
+                fprintf(stderr, "refusing to apply: the selected profile has no report-rate field\n");
+                goto done;
+            }
+            uint8_t report_rate_interval = 0;
+            if (!report_rate_profile_interval(device, requested_report_rate,
+                                              &report_rate_interval)) {
+                goto done;
+            }
+            new_profile[0] = report_rate_interval;
+            printf("Planned profile polling rate: %u Hz (%u ms interval)\n",
+                   requested_report_rate, report_rate_interval);
+        }
 
         for (size_t i = 0; i < options->button_change_count; i++) {
             if (requested_buttons[i] > (int)profile.info.button_count) {

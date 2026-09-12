@@ -273,7 +273,10 @@ extension AppModel {
   }
 
   func parsePollingRate(_ text: String) {
-    pollingRateCapabilities = PollingRateOutputParser.parse(text)
+    let parsed = PollingRateOutputParser.parse(text)
+    pollingRateCapabilities = parsed
+    pollingRateDraft = parsed.currentRate
+    baselinePollingRate = parsed.currentRate
   }
 
   private nonisolated static func capture(

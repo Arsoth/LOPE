@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
   @Published var dpiCapabilities = DPICapabilities()
   @Published var dpiDetails = "DPI capabilities have not been read."
   @Published var pollingRateCapabilities = PollingRateCapabilities()
+  @Published var pollingRateDraft: Int?
   @Published var rgbZones: [RGBZoneState] = []
   @Published var busy = false
   @Published var loadingProfile = false
@@ -45,6 +46,14 @@ final class AppModel: ObservableObject {
   @Published var appearancePreference: AppearancePreference
   @Published var isDarkAppearance = false
 
+  /// The editor can remain visible while discovery/profile reads are in
+  /// flight. Its controls are then catalog-derived or preserved from the
+  /// previous session, so validation and catalog warnings do not describe a
+  /// loaded mouse yet.
+  var isProvisionalMouseData: Bool {
+    loadingProfile || waitingForKnownDevice
+  }
+
   var keyInputDrafts: [Int: String] = [:]
   @Published var recordingKeyboardButtonID: Int?
   var baselineProfileEnabled: [Int: Bool] = [:]
@@ -52,6 +61,7 @@ final class AppModel: ObservableObject {
   var baselineDPICount = 5
   var baselineDefaultStage = 3
   var baselineShiftStage = 1
+  var baselinePollingRate: Int?
   var baselineRGBColors: [Int: RGBColor] = [:]
   var rgbEditingAllZones = false
   var currentDeviceName = ""
@@ -289,6 +299,10 @@ final class AppModel: ObservableObject {
       || defaultStage != baselineDefaultStage || shiftStage != baselineShiftStage
   }
 
+  var hasPollingRateChanges: Bool {
+    pollingRateDraft != baselinePollingRate
+  }
+
   func rgbCapabilities(profileFormat: Int? = nil) -> MouseProfileDescriptor.RGBProfile? {
     let selected = devices.first(where: { $0.id == selectedDeviceIndex })
     guard currentMouseProfile.profileIO.canSave else { return nil }
@@ -320,7 +334,8 @@ final class AppModel: ObservableObject {
   }
 
   var dpiValidationMessage: String? {
-    DPIEditorValidation.message(
+    guard !isProvisionalMouseData else { return nil }
+    return DPIEditorValidation.message(
       stages: dpiStages,
       count: dpiCount,
       defaultStage: defaultStage,
@@ -334,7 +349,7 @@ final class AppModel: ObservableObject {
   }
 
   var hasPendingChanges: Bool {
-    hasButtonChanges || hasDPIChanges || hasProfileChanges || hasRGBChanges
+    hasButtonChanges || hasDPIChanges || hasPollingRateChanges || hasProfileChanges || hasRGBChanges
   }
 
   func setButtonRows(normal: [ButtonRow], gShift: [ButtonRow]) {

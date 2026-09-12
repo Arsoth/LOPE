@@ -180,6 +180,47 @@ static bool parse_report_rate_hertz(const char *text, uint32_t *hertz) {
     return true;
 }
 
+// The onboard profile format stores the report interval in milliseconds at
+// byte zero. The first four 0x8061 values are the same 8/4/2/1 ms intervals;
+// the 2000/4000/8000 Hz values are connection-level only and cannot be saved
+// in this profile field without changing the profile format.
+static bool report_rate_profile_interval(Device *device,
+                                         uint32_t requested_hertz,
+                                         uint8_t *milliseconds) {
+    if (device == NULL || milliseconds == NULL) {
+        return false;
+    }
+    ReportRateCapabilities capabilities;
+    if (!read_report_rate_capabilities(device, &capabilities)) {
+        fprintf(stderr, "refusing to save profile polling rate: no readable HID++ report-rate feature\n");
+        return false;
+    }
+    for (size_t i = 0; i < capabilities.rate_count; i++) {
+        const ReportRateEntry entry = capabilities.rates[i];
+        if (entry.hertz != requested_hertz) {
+            continue;
+        }
+        if (capabilities.feature_id == FEATURE_ADJUSTABLE_REPORT_RATE &&
+            entry.wire_value >= 1 && entry.wire_value <= 8) {
+            *milliseconds = entry.wire_value;
+            return true;
+        }
+        if (capabilities.feature_id == FEATURE_EXTENDED_REPORT_RATE &&
+            entry.wire_value <= 3) {
+            static const uint8_t extended_intervals[] = {8, 4, 2, 1};
+            *milliseconds = extended_intervals[entry.wire_value];
+            return true;
+        }
+        fprintf(stderr,
+                "refusing to save profile polling rate: %u Hz is not representable in the onboard profile format\n",
+                requested_hertz);
+        return false;
+    }
+    fprintf(stderr, "refusing to save profile polling rate: %u Hz is not supported on the active connection\n",
+            requested_hertz);
+    return false;
+}
+
 static int select_device(Device *devices, size_t count, const Options *options, Device **selected);
 
 static int run_set_report_rate(const Options *options) {

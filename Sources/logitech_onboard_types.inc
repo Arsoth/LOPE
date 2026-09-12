@@ -255,6 +255,7 @@ typedef struct {
     int dpi_default;
     int dpi_shift;
     const char *dpi_values;
+    const char *report_rate;
     const char *backup_directory;
     const char *operation_id;
     const char *button_changes[MAX_BATCH_BUTTON_CHANGES];

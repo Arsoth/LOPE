@@ -145,6 +145,7 @@ static void print_usage(const char *program) {
     printf("  --button-change gshift:N:RAW         batch G-Shift-layer record (apply)\n");
     printf("  --rgb-change N:RRGGBB                batch RGB zone color (apply; zone is 1-based)\n");
     printf("  --dpi VALUES                         batch DPI stages, comma-separated\n");
+    printf("  --report-rate HZ                     batch profile polling rate (apply)\n");
     printf("  --profile-state-change N:STATE       batch profile state (enable or disable)\n");
     printf("  --backup-directory DIR               directory for an apply operation's backups\n");
     printf("  --operation-id ID                    stable ID shared by all apply backups\n");
@@ -219,6 +220,7 @@ static int parse_options(int argc, char **argv, Options *options) {
             strcmp(arg, "--profile") == 0 || strcmp(arg, "--button") == 0 ||
             strcmp(arg, "--backup") == 0 || strcmp(arg, "--default") == 0 ||
             strcmp(arg, "--shift") == 0 || strcmp(arg, "--dpi") == 0 ||
+            strcmp(arg, "--report-rate") == 0 ||
             strcmp(arg, "--button-change") == 0 || strcmp(arg, "--rgb-change") == 0 ||
             strcmp(arg, "--profile-state-change") == 0 ||
             strcmp(arg, "--backup-directory") == 0 || strcmp(arg, "--operation-id") == 0) {
@@ -261,6 +263,8 @@ static int parse_options(int argc, char **argv, Options *options) {
                 }
             } else if (strcmp(arg, "--dpi") == 0) {
                 options->dpi_values = value;
+            } else if (strcmp(arg, "--report-rate") == 0) {
+                options->report_rate = value;
             } else if (strcmp(arg, "--button-change") == 0) {
                 if (options->button_change_count >= MAX_BATCH_BUTTON_CHANGES) {
                     fprintf(stderr, "too many --button-change values\n");

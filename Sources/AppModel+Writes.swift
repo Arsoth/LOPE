@@ -42,33 +42,16 @@ extension AppModel {
     executeBatchSave(buttonChanges: [], dpiChanged: true, profileChanges: [])
   }
 
-  /// Report rate is a connection-level HID++ setting, not part of an
-  /// onboard profile sector. Apply it immediately and require the native
-  /// engine to validate the active-connection list and read the result back.
+  /// Polling rate is stored in the selected onboard profile. Stage the
+  /// change here so it is written with the rest of the profile on Save.
   func applyPollingRate(_ rate: Int) {
     guard !busy else { return }
-    guard pollingRateCapabilities.accepts(rate) else {
-      status = "That polling rate is not supported by the connected mouse."
+    guard pollingRateCapabilities.profileSupportedRates.contains(rate) else {
+      status = "That polling rate cannot be saved in the selected onboard profile."
       return
     }
-
-    busy = true
-    defer { busy = false }
-    do {
-      let output = try runEngine(["set-report-rate", String(rate)])
-      let verified = PollingRateOutputParser.parse(output)
-      guard verified.currentRate == rate else {
-        throw EngineError.failed("The polling-rate change could not be verified by the mouse.")
-      }
-      if verified.hasKnownRates {
-        pollingRateCapabilities = verified
-      } else {
-        pollingRateCapabilities.currentRate = rate
-      }
-      status = "Polling rate set to \(rate) Hz and verified by the mouse."
-    } catch {
-      status = error.localizedDescription
-    }
+    pollingRateDraft = rate
+    status = "Polling rate changed to \(rate) Hz; save the profile to write it to the mouse."
   }
 
   func applyAll() {
@@ -81,6 +64,7 @@ extension AppModel {
       normalize($0.currentRaw) != normalize($0.draftRaw)
     }
     let dpiChanged = hasDPIChanges
+    let pollingRateChanged = hasPollingRateChanges
     let rgbChanges = rgbZones.filter { $0.current != $0.draft }
     let profileChanges =
       profiles
@@ -94,7 +78,7 @@ extension AppModel {
       status = "Profile enable-state editing is unavailable for this legacy profile path."
       return
     }
-    guard !buttonChanges.isEmpty || dpiChanged || !rgbChanges.isEmpty || !profileChanges.isEmpty
+    guard !buttonChanges.isEmpty || dpiChanged || pollingRateChanged || !rgbChanges.isEmpty || !profileChanges.isEmpty
     else {
       status = "No changes to apply."
       return
@@ -106,14 +90,16 @@ extension AppModel {
     guard validatePrimaryClickBeforeWrite() else { return }
     executeBatchSave(
       buttonChanges: buttonChanges, dpiChanged: dpiChanged,
-      rgbChanges: rgbChanges, profileChanges: profileChanges)
+      rgbChanges: rgbChanges, profileChanges: profileChanges,
+      pollingRate: pollingRateChanged ? pollingRateDraft : nil)
   }
 
   private func executeBatchSave(
     buttonChanges: [ButtonRow],
     dpiChanged: Bool,
     rgbChanges: [RGBZoneState] = [],
-    profileChanges: [ProfileChoice]
+    profileChanges: [ProfileChoice],
+    pollingRate: Int? = nil
   ) {
     guard !busy else { return }
     guard validatePrimaryClickBeforeWrite() else { return }
@@ -141,6 +127,9 @@ extension AppModel {
         "--default", String(defaultStage),
         "--shift", String(shiftStage),
       ]
+    }
+    if let pollingRate {
+      arguments += ["--report-rate", String(pollingRate)]
     }
     arguments += rgbChanges.map { ["--rgb-change", "\($0.id + 1):\($0.draft.bareHex)"] }.flatMap {
       $0

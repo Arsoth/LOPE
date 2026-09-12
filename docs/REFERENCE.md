@@ -78,11 +78,21 @@ per second for up to 60 seconds. Polling ends when the requested device is found
 when the user selects another device, or when the timeout expires. Another mouse
 appearing in the meantime does not satisfy the requested-device poll.
 
+While discovery or the wake poll is in progress, the visible editor surface is
+provisional: it may contain catalog-derived placeholders or the previous
+profile. DPI validation, live-DPI display, and profile/catalog warning banners
+stay hidden until a profile read has latched the selected mouse's data.
+
 The Configure tab shows a polling-rate picker beside the active DPI-stage
 control when the connected mouse reports HID++ report-rate support. The native
-engine prefers feature `0x8061` and its active-connection rate list, falling back
-to `0x8060`; a selected rate is validated against the reported list and read back
-after applying it.
+engine prefers feature `0x8061` and its active-connection rate list, falling
+back to `0x8060`. Selecting a rate creates a pending change; Save writes the
+selected profile's report interval in the same backed-up, CRC-protected sector
+transaction as DPI, button, and RGB changes, then verifies the complete sector
+read-back. The profile format stores whole-millisecond intervals, so the GUI
+offers only rates up to 1000 Hz for onboard-profile saves. The standalone
+`set-report-rate` command remains a connection-level diagnostic rather than the
+GUI's profile-save path.
 
 The G603 and G604 descriptors add device-specific sleep text. The G603 can
 sleep very quickly in Endurance mode; the G604 can sleep after several minutes.

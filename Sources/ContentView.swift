@@ -18,11 +18,26 @@ private struct StatusEvent: Identifiable {
   }
 }
 
-private struct StatusPopupFrameKey: PreferenceKey {
-  static var defaultValue: CGRect?
+private struct TopRoundedRectangle: Shape {
+  let radius: CGFloat
 
-  static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
-    value = nextValue() ?? value
+  func path(in rect: CGRect) -> Path {
+    let radius = min(radius, min(rect.width, rect.height) / 2)
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+    path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
+    path.addQuadCurve(
+      to: CGPoint(x: rect.minX + radius, y: rect.minY),
+      control: CGPoint(x: rect.minX, y: rect.minY)
+    )
+    path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
+    path.addQuadCurve(
+      to: CGPoint(x: rect.maxX, y: rect.minY + radius),
+      control: CGPoint(x: rect.maxX, y: rect.minY)
+    )
+    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+    path.closeSubpath()
+    return path
   }
 }
 
@@ -163,68 +178,6 @@ private struct DPIStageOutsideClickMonitor: NSViewRepresentable {
   func makeCoordinator() -> Coordinator {
     Coordinator()
   }
-
-  func makeNSView(context: Context) -> NSView {
-    let view = NSView()
-    update(view, coordinator: context.coordinator)
-    context.coordinator.install()
-    return view
-  }
-
-  func updateNSView(_ nsView: NSView, context: Context) {
-    update(nsView, coordinator: context.coordinator)
-  }
-
-  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
-    coordinator.remove()
-  }
-
-  private func update(_ view: NSView, coordinator: Coordinator) {
-    coordinator.view = view
-    coordinator.isActive = isActive
-    coordinator.excludedFrame = excludedFrame
-    coordinator.onOutsideClick = onOutsideClick
-  }
-}
-
-private struct StatusPopupOutsideClickMonitor: NSViewRepresentable {
-  let isActive: Bool
-  let excludedFrame: CGRect?
-  let onOutsideClick: () -> Void
-
-  final class Coordinator {
-    weak var view: NSView?
-    var isActive = false
-    var excludedFrame: CGRect?
-    var onOutsideClick: () -> Void = {}
-    var monitor: Any?
-
-    func install() {
-      guard monitor == nil else { return }
-      monitor = NSEvent.addLocalMonitorForEvents(
-        matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-      ) { [weak self] event in
-        guard let self, self.isActive, let view = self.view else { return event }
-        let point = view.convert(event.locationInWindow, from: nil)
-        if let excludedFrame = self.excludedFrame, excludedFrame.contains(point) {
-          return event
-        }
-        self.onOutsideClick()
-        return nil
-      }
-    }
-
-    func remove() {
-      if let monitor {
-        NSEvent.removeMonitor(monitor)
-        self.monitor = nil
-      }
-    }
-
-    deinit { remove() }
-  }
-
-  func makeCoordinator() -> Coordinator { Coordinator() }
 
   func makeNSView(context: Context) -> NSView {
     let view = NSView()
@@ -1491,12 +1444,13 @@ struct ContentView: View {
   @State private var statusHistory = [
     StatusEvent(message: "Connect a Logitech mouse, then choose Refresh.")
   ]
-  @State private var statusPopupFrame: CGRect?
   @Environment(\.scenePhase) private var scenePhase
 
   private let statusFadeDelayNanoseconds: UInt64 = 30_000_000_000
   private let statusPanelHeight: CGFloat = 270
-  private let statusPanelFooterOffset: CGFloat = 28
+  private let statusTimestampColumnWidth: CGFloat = 48
+  private let statusEventColumnSpacing: CGFloat = 4
+  private let statusFooterHorizontalInset: CGFloat = 20
 
   private var preferredColorScheme: ColorScheme {
     model.isDarkAppearance ? .dark : .light
@@ -1551,8 +1505,6 @@ struct ContentView: View {
             .tabItem { Label("Settings", systemImage: "gearshape").pointerCursor() }
             .tag(AppTab.settings)
         }
-        Divider()
-          .padding(.horizontal, 20)
         statusFooter
 
         // Future expansion: restore the button-press highlighting control
@@ -1568,7 +1520,49 @@ struct ContentView: View {
         // }
       }
     }
-    .padding(.vertical, 20)
+    .coordinateSpace(name: "statusRoot")
+    .overlay {
+      if statusHistoryPresented {
+        Color.clear
+          .contentShape(Rectangle())
+          .onTapGesture { statusHistoryPresented = false }
+          .accessibilityHidden(true)
+          .zIndex(0)
+      }
+    }
+    .overlay(alignment: .bottomLeading) {
+      if statusHistoryPresented {
+        GeometryReader { proxy in
+          statusHistoryPopup
+            .frame(
+              width: max(proxy.size.width - statusFooterHorizontalInset * 2, 1),
+              height: statusPanelHeight,
+              alignment: .topLeading
+            )
+            .position(
+              x: proxy.size.width / 2,
+              y: proxy.size.height - statusPanelHeight / 2
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .transition(.move(edge: .bottom))
+        .zIndex(1)
+      }
+    }
+    .overlay(alignment: .bottom) {
+      if statusHistoryPresented {
+        statusFooter
+          .zIndex(2)
+      }
+    }
+    .overlay {
+      if statusHistoryPresented {
+        EscapeKeyMonitor(onEscape: { statusHistoryPresented = false })
+          .frame(width: 0, height: 0)
+          .allowsHitTesting(false)
+      }
+    }
+    .padding(.top, 20)
     .frame(minWidth: 960, minHeight: 520)
     .background(appBackground)
     .preferredColorScheme(preferredColorScheme)
@@ -1668,59 +1662,36 @@ struct ContentView: View {
   }
 
   private var statusFooter: some View {
-    HStack(alignment: .top) {
-      Button {
-        statusHistoryPresented.toggle()
-      } label: {
-        Image(systemName: "info.circle")
+    VStack(alignment: .leading, spacing: 14) {
+      Divider()
+        .padding(.horizontal, statusFooterHorizontalInset)
+
+      HStack(alignment: .top) {
+        Button {
+          statusHistoryPresented.toggle()
+        } label: {
+          Image(systemName: "info.circle")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Show recent events")
+        .pointerCursor()
+        Text(model.status)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+          .opacity(statusMessageOpacity)
+        Spacer()
       }
-      .buttonStyle(.plain)
-      .accessibilityLabel("Show recent events")
-      .pointerCursor()
-      Text(model.status)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .textSelection(.enabled)
-        .opacity(statusMessageOpacity)
-      Spacer()
+      .padding(.horizontal, statusFooterHorizontalInset)
     }
-    .padding(.horizontal, 20)
-    .coordinateSpace(name: "statusFooter")
-    .overlay(alignment: .bottomLeading) {
-      if statusHistoryPresented {
-        statusHistoryPopup
-          .frame(maxWidth: .infinity)
-          .frame(height: statusPanelHeight, alignment: .topLeading)
-          .padding(.horizontal, 14)
-          .padding(.bottom, 2)
-          .offset(y: -statusPanelFooterOffset)
-          .background {
-            GeometryReader { proxy in
-              Color.clear.preference(
-                key: StatusPopupFrameKey.self,
-                value: proxy.frame(in: .named("statusFooter"))
-              )
-            }
-          }
-      }
-    }
-    .overlay {
-      if statusHistoryPresented {
-        StatusPopupOutsideClickMonitor(
-          isActive: true,
-          excludedFrame: statusPopupFrame,
-          onOutsideClick: { statusHistoryPresented = false }
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(false)
-        EscapeKeyMonitor(onEscape: { statusHistoryPresented = false })
-          .frame(width: 0, height: 0)
-          .allowsHitTesting(false)
-      }
-    }
-    .onPreferenceChange(StatusPopupFrameKey.self) { frame in
-      statusPopupFrame = frame
-    }
+    .padding(.bottom, 20)
+    .frame(maxWidth: .infinity)
+    .background(appBackground)
+    .shadow(
+      color: statusHistoryPresented ? .black.opacity(0.42) : .clear,
+      radius: 10,
+      y: -4
+    )
   }
 
   private var statusHistoryPopup: some View {
@@ -1742,11 +1713,15 @@ struct ContentView: View {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(Array(statusHistory.enumerated()), id: \.element.id) { index, event in
             VStack(alignment: .leading, spacing: 5) {
-              HStack(alignment: .firstTextBaseline, spacing: 8) {
+              HStack(
+                alignment: .firstTextBaseline,
+                spacing: statusEventColumnSpacing
+              ) {
                 Text(event.timestamp.formatted(date: .omitted, time: .shortened))
                   .font(.caption.monospacedDigit())
-                  .foregroundStyle(.tertiary)
-                  .frame(width: 66, alignment: .leading)
+                  .foregroundStyle(.primary.opacity(0.58))
+                  .frame(width: statusTimestampColumnWidth, alignment: .leading)
+                  .textSelection(.enabled)
                 Text(event.message)
                   .font(.callout)
                   .fixedSize(horizontal: false, vertical: true)
@@ -1764,17 +1739,15 @@ struct ContentView: View {
     }
     .padding(12)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .contentShape(TopRoundedRectangle(radius: 12))
     .background(
       Color(nsColor: .controlBackgroundColor),
-      in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+      in: TopRoundedRectangle(radius: 12)
     )
     .overlay {
-      RoundedRectangle(cornerRadius: 12, style: .continuous)
+      TopRoundedRectangle(radius: 12)
         .stroke(Color.primary.opacity(0.18), lineWidth: 0.75)
     }
-    .shadow(color: .black.opacity(0.30), radius: 14, y: 6)
-    .onTapGesture {}
     .onExitCommand {
       statusHistoryPresented = false
     }
@@ -1978,7 +1951,7 @@ struct ContentView: View {
 
   private var buttonsPane: some View {
     VStack(alignment: .leading, spacing: 8) {
-      if !model.recoveryBackups.isEmpty {
+      if !model.isProvisionalMouseData && !model.recoveryBackups.isEmpty {
         HStack(spacing: 8) {
           Image(systemName: "exclamationmark.triangle.fill")
             .foregroundStyle(.orange)
@@ -1997,7 +1970,7 @@ struct ContentView: View {
         .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
         .padding(.horizontal, 20)
       }
-      if !model.currentMouseProfile.profileIO.canSave {
+      if !model.isProvisionalMouseData && !model.currentMouseProfile.profileIO.canSave {
         Text(
           "This device is cataloged for read-only inspection until its profile-specific save format is validated."
         )
@@ -2005,7 +1978,7 @@ struct ContentView: View {
         .foregroundStyle(.orange)
         .padding(.horizontal, 20)
       }
-      if !model.hasSpecificMouseProfile {
+      if !model.isProvisionalMouseData && !model.hasSpecificMouseProfile {
         HStack(spacing: 8) {
           Image(systemName: "questionmark.circle.fill")
             .foregroundStyle(.secondary)
@@ -2441,7 +2414,7 @@ struct ContentView: View {
         }
         Spacer()
         HStack(spacing: 4) {
-          if !model.pollingRateCapabilities.supportedRates.isEmpty {
+          if !model.pollingRateCapabilities.profileSupportedRates.isEmpty {
             Text("Polling rate")
               .font(.caption)
               .foregroundStyle(.secondary)
@@ -2449,13 +2422,13 @@ struct ContentView: View {
               "Polling rate",
               selection: Binding(
                 get: {
-                  model.pollingRateCapabilities.currentRate ?? model.pollingRateCapabilities
-                    .supportedRates.first ?? 0
+                  model.pollingRateDraft ?? model.pollingRateCapabilities.currentRate
+                    ?? model.pollingRateCapabilities.profileSupportedRates.first ?? 0
                 },
                 set: { model.applyPollingRate($0) }
               )
             ) {
-              ForEach(model.pollingRateCapabilities.supportedRates, id: \.self) { rate in
+              ForEach(model.pollingRateCapabilities.profileSupportedRates, id: \.self) { rate in
                 Text("\(rate) Hz").tag(rate)
               }
             }
@@ -2464,7 +2437,7 @@ struct ContentView: View {
             .frame(width: 105)
             .disabled(model.busy || model.loadingProfile)
             .pointerCursor(enabled: !model.busy && !model.loadingProfile)
-            .help("Apply a polling rate supported by the active mouse connection.")
+            .help("Choose a polling rate, then Save to write it to the selected onboard profile.")
           }
           Text("Active stages")
             .font(.caption)
@@ -2500,7 +2473,7 @@ struct ContentView: View {
       }
 
       VStack(alignment: .leading, spacing: 6) {
-        if let currentDPI = model.dpiCapabilities.currentValue {
+        if !model.isProvisionalMouseData, let currentDPI = model.dpiCapabilities.currentValue {
           HStack(spacing: 6) {
             Text("Live DPI")
               .font(.caption)

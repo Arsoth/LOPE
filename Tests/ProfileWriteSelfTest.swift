@@ -73,6 +73,25 @@ struct ProfileWriteSelfTest {
       fatalError("raw primary-click assignment was not normalized")
     }
 
+    let provisionalModel = AppModel(startInitialRefresh: false)
+    configure(provisionalModel)
+    guard provisionalModel.dpiValidationMessage != nil else {
+      fatalError("baseline DPI validation fixture unexpectedly became valid")
+    }
+    provisionalModel.loadingProfile = true
+    guard provisionalModel.isProvisionalMouseData,
+      provisionalModel.dpiValidationMessage == nil
+    else {
+      fatalError("loading-state DPI validation warning was not suppressed")
+    }
+    provisionalModel.loadingProfile = false
+    provisionalModel.waitingForKnownDevice = true
+    guard provisionalModel.isProvisionalMouseData,
+      provisionalModel.dpiValidationMessage == nil
+    else {
+      fatalError("sleeping-device DPI validation warning was not suppressed")
+    }
+
     let importedModel = AppModel(startInitialRefresh: false)
     configure(importedModel)
     let jsonURL = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -230,13 +249,15 @@ struct ProfileWriteSelfTest {
       return "Supported polling rates: 125, 500\nVerified polling rate: 500 Hz\n"
     }
     pollingModel.applyPollingRate(500)
-    guard pollingCalls == [["set-report-rate", "500"]],
-      pollingModel.pollingRateCapabilities.currentRate == 500
+    guard pollingCalls.isEmpty,
+      pollingModel.pollingRateDraft == 500,
+      pollingModel.hasPollingRateChanges,
+      pollingModel.hasPendingChanges
     else {
-      fatalError("supported polling-rate change was not applied and verified")
+      fatalError("supported polling-rate change was not staged for profile save")
     }
     pollingModel.applyPollingRate(1000)
-    guard pollingCalls.count == 1 else {
+    guard pollingCalls.isEmpty, pollingModel.pollingRateDraft == 500 else {
       fatalError("unsupported polling rate was forwarded to the write engine")
     }
 

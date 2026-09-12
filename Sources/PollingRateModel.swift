@@ -25,6 +25,13 @@ struct PollingRateCapabilities: Equatable, Sendable {
     !supportedRates.isEmpty
   }
 
+  /// The onboard profile format stores polling intervals as whole
+  /// milliseconds. Rates above 1000 Hz are connection-level HID++ settings
+  /// and cannot be represented by the profile sector.
+  var profileSupportedRates: [Int] {
+    supportedRates.filter { $0 <= 1000 }
+  }
+
   func accepts(_ rate: Int) -> Bool {
     supportedRates.contains(rate)
   }
