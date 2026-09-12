@@ -10,9 +10,8 @@ PROFILE_FILES := $(wildcard Profiles/*.json)
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
 SWIFT_MODULE_CACHE := .build/module-cache
-SWIFT_PROFILE_PARSER_TEST := .build/profile-output-parser-self-test
-SWIFT_PROFILE_WRITE_TEST := .build/profile-write-self-test
 GUI_MODEL_SRC := $(filter-out Sources/AppMain.swift Sources/ContentView.swift,$(GUI_SRC))
+C_SRC := $(SRC) $(C_MODULES)
 # A stable signing identity lets macOS recognize rebuilt versions of the app
 # as the same app for Input Monitoring. Override this when several identities
 # are installed, for example:
@@ -25,7 +24,8 @@ endif
 CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -O2
 FRAMEWORKS := -framework IOKit -framework CoreFoundation
 
-.PHONY: all build gui app test clean
+.PHONY: all build gui app test clean format format-check lint install-hooks \
+	coverage coverage-c coverage-swift coverage-check coverage-check-c coverage-check-swift
 
 all: app
 
@@ -50,18 +50,66 @@ app: build gui
 	cp -f App/Info.plist $(GUI_BUNDLE)/Contents/Info.plist
 	@codesign --force --deep --sign "$(SIGNING_IDENTITY)" $(GUI_BUNDLE) >/dev/null
 
-test: $(APP) $(SWIFT_PROFILE_PARSER_TEST) $(SWIFT_PROFILE_WRITE_TEST)
+test: $(APP)
 	./$(APP) self-test
-	./$(SWIFT_PROFILE_PARSER_TEST)
-	./$(SWIFT_PROFILE_WRITE_TEST)
+	swift test
 
-$(SWIFT_PROFILE_PARSER_TEST): Sources/AppModels.swift Sources/AppSupport.swift Sources/BackupStorage.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/PollingRateModel.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Sources/RGBModel.swift $(PROFILE_FILES) Tests/ProfileOutputParserSelfTest.swift
-	@mkdir -p .build
-	swiftc -O -target $(GUI_TARGET) Sources/AppModels.swift Sources/AppSupport.swift Sources/BackupStorage.swift Sources/DeviceClassification.swift Sources/DPIModel.swift Sources/MouseProfileCatalog.swift Sources/PollingRateModel.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Sources/RefreshGuidance.swift Sources/RGBModel.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
+SWIFT_FORMAT_CONFIG := .swift-format
+SWIFT_FORMAT_PATHS := Sources Tests Package.swift
 
-$(SWIFT_PROFILE_WRITE_TEST): $(GUI_MODEL_SRC) $(PROFILE_FILES) Tests/ProfileWriteSelfTest.swift
-	@mkdir -p .build
-	swiftc -O -parse-as-library -target $(GUI_TARGET) -module-cache-path $(SWIFT_MODULE_CACHE) -framework AppKit -framework ApplicationServices -framework IOKit $(GUI_MODEL_SRC) Tests/ProfileWriteSelfTest.swift -o $(SWIFT_PROFILE_WRITE_TEST)
+format:
+	xcrun swift-format format --configuration $(SWIFT_FORMAT_CONFIG) --in-place --recursive $(SWIFT_FORMAT_PATHS)
+	clang-format -i $(C_SRC)
+
+format-check:
+	xcrun swift-format lint --configuration $(SWIFT_FORMAT_CONFIG) --strict --recursive $(SWIFT_FORMAT_PATHS)
+	clang-format --dry-run --Werror $(C_SRC)
+
+lint: format-check
+
+install-hooks:
+	@mkdir -p .git/hooks
+	cp scripts/git-hooks/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+
+# Coverage uses Clang/LLVM source-based instrumentation (-fprofile-instr-generate
+# -fcoverage-mapping) for both languages so one toolchain (llvm-cov) reads both
+# reports. The Swift frontend does not currently emit branch-region coverage
+# mapping, so branch coverage is only meaningful for the C core; Swift is
+# judged on line/region coverage only. See docs/development-standards.md.
+COVERAGE_DIR := .build/coverage
+COVERAGE_MIN_LINE ?= 90
+COVERAGE_MIN_BRANCH ?= 90
+C_COVERAGE_BIN := $(COVERAGE_DIR)/lope-coverage
+C_COVERAGE_PROFRAW := $(COVERAGE_DIR)/lope.profraw
+C_COVERAGE_PROFDATA := $(COVERAGE_DIR)/lope.profdata
+SWIFT_BIN_PATH = $(shell swift build --show-bin-path)
+SWIFT_COVERAGE_PROFDATA = $(SWIFT_BIN_PATH)/codecov/default.profdata
+SWIFT_TEST_BINARY = $(SWIFT_BIN_PATH)/LOPEPackageTests.xctest/Contents/MacOS/LOPEPackageTests
+
+$(C_COVERAGE_PROFDATA): $(SRC) $(C_MODULES)
+	@mkdir -p $(COVERAGE_DIR)
+	clang -std=c11 -Wall -Wextra -Wpedantic -fprofile-instr-generate -fcoverage-mapping $(FRAMEWORKS) $(SRC) -o $(C_COVERAGE_BIN)
+	LLVM_PROFILE_FILE=$(C_COVERAGE_PROFRAW) $(C_COVERAGE_BIN) self-test >/dev/null
+	xcrun llvm-profdata merge -sparse $(C_COVERAGE_PROFRAW) -o $(C_COVERAGE_PROFDATA)
+
+coverage-c: $(C_COVERAGE_PROFDATA)
+	xcrun llvm-cov report $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA) --show-branch-summary
+
+coverage-swift:
+	swift test --enable-code-coverage
+	xcrun llvm-cov report "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)" --ignore-filename-regex='/Tests/|\.derived/'
+
+coverage: coverage-c coverage-swift
+
+coverage-check-c: $(C_COVERAGE_PROFDATA)
+	scripts/check-coverage.sh "C core" "Sources/" $(COVERAGE_MIN_LINE) $(COVERAGE_MIN_BRANCH) -- $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA)
+
+coverage-check-swift:
+	swift test --enable-code-coverage
+	scripts/check-coverage.sh "Swift" "/Sources/" $(COVERAGE_MIN_LINE) -1 -- "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)"
+
+coverage-check: coverage-check-c coverage-check-swift
 
 clean:
-	rm -f $(APP) bin/$(APP) $(GUI_BIN) $(SWIFT_PROFILE_PARSER_TEST) $(SWIFT_PROFILE_WRITE_TEST)
+	rm -rf $(APP) bin/$(APP) $(GUI_BIN) .build

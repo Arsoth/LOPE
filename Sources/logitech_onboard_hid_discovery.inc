@@ -1,44 +1,32 @@
-static int ping_interface(HidInterface *iface,
-                          uint8_t device_number,
-                          double timeout,
-                          double *protocol,
-                          uint8_t *resolved_device_number) {
+static int ping_interface(HidInterface *iface, uint8_t device_number, double timeout,
+                          double *protocol, uint8_t *resolved_device_number) {
     uint8_t params[3] = {0, 0, 0x5A};
     // A receiver advertises long reports, but routed slot probes follow the
     // short HID++ 1.0 path.  Try short first for receiver slots and retain a
     // long fallback for devices that require it.
     bool receiver = iface != NULL && is_receiver_product(iface->product_id);
-    bool modes[2] = {
-        receiver ? false : iface->prefer_long_reports,
-        receiver ? iface->prefer_long_reports : false
-    };
+    bool modes[2] = {receiver ? false : iface->prefer_long_reports,
+                     receiver ? iface->prefer_long_reports : false};
     size_t mode_count = modes[0] == modes[1] ? 1 : 2;
     for (size_t mode = 0; mode < mode_count; mode++) {
-        Reply reply = channel_request(&iface->channel,
-                                      device_number,
-                                      (uint16_t)(0x0010 | SW_ID),
-                                      params,
-                                      sizeof(params),
-                                      modes[mode],
-                                      timeout);
+        Reply reply = channel_request(&iface->channel, device_number, (uint16_t)(0x0010 | SW_ID),
+                                      params, sizeof(params), modes[mode], timeout);
         if (hid_debug_enabled()) {
             char line[512];
-            int written = snprintf(line, sizeof(line),
-                                   "hid-debug ping product=0x%04X location=0x%llX slot=0x%02X mode=%s status=%s error=0x%02X length=%zu reply-device=0x%02X",
-                                   iface->product_id,
-                                   (unsigned long long)iface->location_id,
-                                   device_number,
-                                   modes[mode] ? "long" : "short",
-                                   reply_status_name(reply.status),
-                                   reply.error_code,
-                                   reply.length,
-                                   reply.device_number);
+            int written =
+                snprintf(line, sizeof(line),
+                         "hid-debug ping product=0x%04X location=0x%llX slot=0x%02X mode=%s "
+                         "status=%s error=0x%02X length=%zu reply-device=0x%02X",
+                         iface->product_id, (unsigned long long)iface->location_id, device_number,
+                         modes[mode] ? "long" : "short", reply_status_name(reply.status),
+                         reply.error_code, reply.length, reply.device_number);
             if (reply.length > 0) {
                 if (written < (int)sizeof(line)) {
                     written += snprintf(line + written, sizeof(line) - (size_t)written, " bytes=");
                 }
                 for (size_t i = 0; i < reply.length && i < 8 && written < (int)sizeof(line); i++) {
-                    written += snprintf(line + written, sizeof(line) - (size_t)written, "%02X", reply.bytes[i]);
+                    written += snprintf(line + written, sizeof(line) - (size_t)written, "%02X",
+                                        reply.bytes[i]);
                 }
             }
             hid_debug_log("%s", line);
@@ -46,10 +34,10 @@ static int ping_interface(HidInterface *iface,
         if (reply.status == REPLY_OK && reply.length >= 3 && reply.bytes[2] == 0x5A) {
             *protocol = (double)reply.bytes[0] + (double)reply.bytes[1] / 10.0;
             if (resolved_device_number != NULL) {
-                *resolved_device_number = device_number == 0xFF &&
-                                          reply.device_number >= 1 && reply.device_number <= 6
-                    ? reply.device_number
-                    : device_number;
+                *resolved_device_number =
+                    device_number == 0xFF && reply.device_number >= 1 && reply.device_number <= 6
+                        ? reply.device_number
+                        : device_number;
             }
             return 1;
         }
@@ -73,37 +61,26 @@ static int ping_interface(HidInterface *iface,
     return 0;
 }
 
-static Reply receiver_register_read(HidInterface *iface,
-                                    uint16_t register_id,
-                                    bool has_subregister,
+static Reply receiver_register_read(HidInterface *iface, uint16_t register_id, bool has_subregister,
                                     uint8_t subregister) {
     uint8_t params[1] = {subregister};
-    return channel_request(&iface->channel,
-                           0xFF,
-                           (uint16_t)(0x8100 | (register_id & 0x02FF)),
-                           has_subregister ? params : NULL,
-                           has_subregister ? sizeof(params) : 0,
-                           false,
-                           1.0);
+    return channel_request(&iface->channel, 0xFF, (uint16_t)(0x8100 | (register_id & 0x02FF)),
+                           has_subregister ? params : NULL, has_subregister ? sizeof(params) : 0,
+                           false, 1.0);
 }
 
-static void log_receiver_register_reply(const HidInterface *iface,
-                                         uint16_t register_id,
-                                         uint8_t subregister,
-                                         Reply reply) {
+static void log_receiver_register_reply(const HidInterface *iface, uint16_t register_id,
+                                        uint8_t subregister, Reply reply) {
     if (!hid_debug_enabled()) {
         return;
     }
     char line[512];
-    int written = snprintf(line, sizeof(line),
-                           "hid-debug receiver-register product=0x%04X location=0x%llX register=0x%04X sub=0x%02X status=%s error=0x%02X length=%zu bytes=",
-                           iface->product_id,
-                           (unsigned long long)iface->location_id,
-                           register_id,
-                           subregister,
-                           reply_status_name(reply.status),
-                           reply.error_code,
-                           reply.length);
+    int written =
+        snprintf(line, sizeof(line),
+                 "hid-debug receiver-register product=0x%04X location=0x%llX register=0x%04X "
+                 "sub=0x%02X status=%s error=0x%02X length=%zu bytes=",
+                 iface->product_id, (unsigned long long)iface->location_id, register_id,
+                 subregister, reply_status_name(reply.status), reply.error_code, reply.length);
     for (size_t i = 0; i < reply.length && i < 16 && written < (int)sizeof(line); i++) {
         written += snprintf(line + written, sizeof(line) - (size_t)written, "%02X", reply.bytes[i]);
     }
@@ -116,13 +93,8 @@ static bool receiver_pairing_reply_is_present(Reply reply) {
     return reply.status == REPLY_OK && reply.length >= 8;
 }
 
-static int add_device(Device *devices,
-                      size_t *count,
-                      HidInterface *iface,
-                      uint8_t device_number,
-                      uint8_t request_device_number,
-                      double protocol,
-                      bool inspect_features);
+static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8_t device_number,
+                      uint8_t request_device_number, double protocol, bool inspect_features);
 
 static bool receiver_device_name(Device *device, uint8_t slot) {
     // The receiver name register can briefly time out while a sleeping
@@ -130,13 +102,10 @@ static bool receiver_device_name(Device *device, uint8_t slot) {
     // slot ping so a transient receiver response does not become the visible
     // device identity.
     for (int attempt = 0; attempt < 3; attempt++) {
-        Reply reply = receiver_register_read(device->iface,
-                                             REGISTER_RECEIVER_INFO,
-                                             true,
+        Reply reply = receiver_register_read(device->iface, REGISTER_RECEIVER_INFO, true,
                                              (uint8_t)(RECEIVER_INFO_DEVICE_NAME + slot - 1));
         if (reply.status != REPLY_OK || reply.length < 2) {
-            if (attempt < 2 && (reply.status == REPLY_TIMEOUT ||
-                                reply.status == REPLY_IO_ERROR)) {
+            if (attempt < 2 && (reply.status == REPLY_TIMEOUT || reply.status == REPLY_IO_ERROR)) {
                 usleep(50 * 1000);
                 continue;
             }
@@ -151,9 +120,9 @@ static bool receiver_device_name(Device *device, uint8_t slot) {
         }
         memcpy(device->name, reply.bytes + 2, length);
         device->name[length] = '\0';
-        while (length > 0 && (device->name[length - 1] == '\0' ||
-                              device->name[length - 1] == '\n' ||
-                              device->name[length - 1] == '\r')) {
+        while (length > 0 &&
+               (device->name[length - 1] == '\0' || device->name[length - 1] == '\n' ||
+                device->name[length - 1] == '\r')) {
             device->name[--length] = '\0';
         }
         if (length > 0) {
@@ -174,13 +143,12 @@ static const char *receiver_pairing_model_name(Reply pairing_reply) {
     if (pairing_reply.status != REPLY_OK || pairing_reply.length < 5) {
         return NULL;
     }
-    uint16_t wpid = (uint16_t)(((uint16_t)pairing_reply.bytes[3] << 8) |
-                               pairing_reply.bytes[4]);
+    uint16_t wpid = (uint16_t)(((uint16_t)pairing_reply.bytes[3] << 8) | pairing_reply.bytes[4]);
     switch (wpid) {
-        case 0x406C:
-            return "G603 LIGHTSPEED";
-        default:
-            return NULL;
+    case 0x406C:
+        return "G603 LIGHTSPEED";
+    default:
+        return NULL;
     }
 }
 
@@ -197,12 +165,8 @@ static void receiver_slot_name(Device *device, uint8_t slot, Reply pairing_reply
     }
 }
 
-static bool add_receiver_slot_device(Device *devices,
-                                     size_t *count,
-                                     HidInterface *iface,
-                                     uint8_t slot,
-                                     Reply pairing_reply,
-                                     bool inspect_features) {
+static bool add_receiver_slot_device(Device *devices, size_t *count, HidInterface *iface,
+                                     uint8_t slot, Reply pairing_reply, bool inspect_features) {
     if (!receiver_pairing_reply_is_present(pairing_reply)) {
         return false;
     }
@@ -397,11 +361,10 @@ static int hid_context_create(HidContext *context) {
             // the descriptor/usage-page check identifies the real vendor
             // interface. The fallback remains necessary for direct wireless
             // and Bluetooth devices whose HID++ descriptor is hidden by macOS.
-            bool known_device_fallback = (is_known_hidpp_product(product_id) &&
-                                          !is_receiver_product(product_id)) ||
-                                         product_id == 0xC24A;
-            bool vendor = page == HIDPP_USAGE_PAGE || hidpp_reports ||
-                          known_device_fallback;
+            bool known_device_fallback =
+                (is_known_hidpp_product(product_id) && !is_receiver_product(product_id)) ||
+                product_id == 0xC24A;
+            bool vendor = page == HIDPP_USAGE_PAGE || hidpp_reports || known_device_fallback;
             bool mouse = page == MOUSE_USAGE_PAGE && usage == MOUSE_USAGE;
             if (!vendor && !mouse) {
                 continue;
@@ -424,17 +387,13 @@ static int hid_context_create(HidContext *context) {
             item->prefer_long_reports = is_receiver_product(product_id) ||
                                         (!hidpp_reports && is_known_hidpp_product(product_id));
             string_property(device, CFSTR(kIOHIDProductKey), item->product, sizeof(item->product));
-            string_property(device, CFSTR(kIOHIDTransportKey), item->transport, sizeof(item->transport));
-            hid_debug_log("hid-debug interface product=0x%04X location=0x%llX registry=0x%llX page=0x%04X usage=0x%04X vendor=%d mouse=%d hidpp=%d product-name=%s",
-                          item->product_id,
-                          (unsigned long long)item->location_id,
-                          (unsigned long long)item->registry_id,
-                          item->usage_page,
-                          item->usage,
-                          item->is_vendor,
-                          item->is_mouse,
-                          hidpp_reports,
-                          item->product);
+            string_property(device, CFSTR(kIOHIDTransportKey), item->transport,
+                            sizeof(item->transport));
+            hid_debug_log("hid-debug interface product=0x%04X location=0x%llX registry=0x%llX "
+                          "page=0x%04X usage=0x%04X vendor=%d mouse=%d hidpp=%d product-name=%s",
+                          item->product_id, (unsigned long long)item->location_id,
+                          (unsigned long long)item->registry_id, item->usage_page, item->usage,
+                          item->is_vendor, item->is_mouse, hidpp_reports, item->product);
         }
         free(devices);
 
@@ -460,13 +419,8 @@ static int open_vendor_channels(HidContext *context) {
     return 1;
 }
 
-static int add_device(Device *devices,
-                      size_t *count,
-                      HidInterface *iface,
-                      uint8_t device_number,
-                      uint8_t request_device_number,
-                      double protocol,
-                      bool inspect_features) {
+static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8_t device_number,
+                      uint8_t request_device_number, double protocol, bool inspect_features) {
     if (*count >= MAX_DEVICES) {
         return 0;
     }
@@ -489,11 +443,10 @@ static bool is_receiver_interface(const HidInterface *iface) {
     // mice use a different product-ID range and should not be probed as if
     // they had receiver slots. A few macOS HID interfaces report product ID
     // zero, so retain the product-name fallback for those receivers.
-    return iface != NULL &&
-           (is_receiver_product(iface->product_id) ||
-            text_contains_case_insensitive(iface->product, "receiver") ||
-            text_contains_case_insensitive(iface->product, "unifying") ||
-            text_contains_case_insensitive(iface->product, "bolt"));
+    return iface != NULL && (is_receiver_product(iface->product_id) ||
+                             text_contains_case_insensitive(iface->product, "receiver") ||
+                             text_contains_case_insensitive(iface->product, "unifying") ||
+                             text_contains_case_insensitive(iface->product, "bolt"));
 }
 
 static uint8_t receiver_slot_limit(const HidInterface *iface) {
@@ -504,47 +457,43 @@ static uint8_t receiver_slot_limit(const HidInterface *iface) {
     // receivers expose up to six. Unknown C5xx receivers retain the broad
     // limit so a new receiver is not silently omitted.
     switch (iface->product_id) {
-        case 0xC539:
-        case 0xC53A:
-        case 0xC53D:
-        case 0xC53F:
-        case 0xC541:
-        case 0xC545:
-        case 0xC547:
-        case 0xC54D:
-            return 1;
-        case 0xC52B:
-        case 0xC532:
-        case 0xC548:
-            return 6;
-        default:
-            return 6;
+    case 0xC539:
+    case 0xC53A:
+    case 0xC53D:
+    case 0xC53F:
+    case 0xC541:
+    case 0xC545:
+    case 0xC547:
+    case 0xC54D:
+        return 1;
+    case 0xC52B:
+    case 0xC532:
+    case 0xC548:
+        return 6;
+    default:
+        return 6;
     }
 }
 
 static bool is_receiver_endpoint(const Device *device);
 static bool is_mouse_device(const Device *device);
-static bool is_duplicate_direct_mouse_endpoint(const Device *candidate,
-                                               const Device *devices,
+static bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
                                                size_t count);
 
 static void format_device_key(const Device *device, char *out, size_t out_size) {
-    snprintf(out, out_size, "%" PRIx64 "-%" PRIx64 "-%02X",
-             device->iface->location_id, device->iface->registry_id,
-             device->request_device_number);
+    snprintf(out, out_size, "%" PRIx64 "-%" PRIx64 "-%02X", device->iface->location_id,
+             device->iface->registry_id, device->request_device_number);
 }
 
-static bool parse_device_key(const char *text,
-                             uint64_t *location_id,
-                             uint64_t *registry_id,
+static bool parse_device_key(const char *text, uint64_t *location_id, uint64_t *registry_id,
                              uint8_t *device_number) {
     unsigned long long parsed_location = 0;
     unsigned long long parsed_registry = 0;
     unsigned int parsed_device = 0;
     char trailing = '\0';
     if (text == NULL ||
-        sscanf(text, "%llx-%llx-%x%c",
-               &parsed_location, &parsed_registry, &parsed_device, &trailing) != 3 ||
+        sscanf(text, "%llx-%llx-%x%c", &parsed_location, &parsed_registry, &parsed_device,
+               &trailing) != 3 ||
         parsed_device > UINT8_MAX) {
         return false;
     }
@@ -554,10 +503,7 @@ static bool parse_device_key(const char *text,
     return true;
 }
 
-static int discover_devices(HidContext *context,
-                            int requested_slot,
-                            Device *devices,
-                            size_t *count,
+static int discover_devices(HidContext *context, int requested_slot, Device *devices, size_t *count,
                             bool inspect_features) {
     *count = 0;
     open_vendor_channels(context);
@@ -586,20 +532,18 @@ static int discover_devices(HidContext *context,
         if (requested_slot >= 0) {
             double protocol = 0;
             uint8_t resolved_device_number = (uint8_t)requested_slot;
-            if (ping_interface(iface, (uint8_t)requested_slot,
-                               1.0,
-                               &protocol, &resolved_device_number)) {
-                add_device(devices, count, iface, resolved_device_number,
-                           (uint8_t)requested_slot, protocol, inspect_features);
+            if (ping_interface(iface, (uint8_t)requested_slot, 1.0, &protocol,
+                               &resolved_device_number)) {
+                add_device(devices, count, iface, resolved_device_number, (uint8_t)requested_slot,
+                           protocol, inspect_features);
             }
             continue;
         }
         if (is_receiver_interface(iface)) {
             for (uint8_t slot = 1; slot <= receiver_slot_limit(iface); slot++) {
-                Reply pairing_reply = receiver_register_read(iface, 0x02B5, true,
-                                                              (uint8_t)(0x20 + slot - 1));
-                log_receiver_register_reply(iface, 0x02B5,
-                                            (uint8_t)(0x20 + slot - 1),
+                Reply pairing_reply =
+                    receiver_register_read(iface, 0x02B5, true, (uint8_t)(0x20 + slot - 1));
+                log_receiver_register_reply(iface, 0x02B5, (uint8_t)(0x20 + slot - 1),
                                             pairing_reply);
                 bool pairing_present = receiver_pairing_reply_is_present(pairing_reply);
                 // The pairing table identifies the slot, but the routed ping
@@ -629,8 +573,8 @@ static int discover_devices(HidContext *context,
                 } else if (pairing_present) {
                     // Preserve the positive pairing-table result if the
                     // mouse is asleep; the profile-read retry can wake it.
-                    add_receiver_slot_device(devices, count, iface, slot,
-                                             pairing_reply, inspect_features);
+                    add_receiver_slot_device(devices, count, iface, slot, pairing_reply,
+                                             inspect_features);
                 }
             }
 
@@ -646,11 +590,10 @@ static int discover_devices(HidContext *context,
             // ping. Keep that endpoint marked as FF so the receiver itself is
             // still filtered from the mouse list; slot discovery above owns
             // the paired mouse entry.
-            uint8_t reported_device_number = is_receiver_interface(iface)
-                ? 0xFF
-                : resolved_device_number;
-            add_device(devices, count, iface, reported_device_number, 0xFF,
-                       protocol, inspect_features);
+            uint8_t reported_device_number =
+                is_receiver_interface(iface) ? 0xFF : resolved_device_number;
+            add_device(devices, count, iface, reported_device_number, 0xFF, protocol,
+                       inspect_features);
         } else if (iface->is_mouse && !is_receiver_interface(iface)) {
             // Bluetooth and some direct wireless mice expose a normal mouse
             // collection even when HID++ ping is unavailable. They remain
@@ -661,9 +604,7 @@ static int discover_devices(HidContext *context,
     return 1;
 }
 
-static int discover_device_by_key(HidContext *context,
-                                  const char *key,
-                                  Device *devices,
+static int discover_device_by_key(HidContext *context, const char *key, Device *devices,
                                   size_t *count) {
     *count = 0;
     uint64_t location_id = 0;
@@ -675,8 +616,7 @@ static int discover_device_by_key(HidContext *context,
     }
     for (size_t i = 0; i < context->count; i++) {
         HidInterface *iface = &context->items[i];
-        if (!iface->is_vendor ||
-            iface->location_id != location_id ||
+        if (!iface->is_vendor || iface->location_id != location_id ||
             iface->registry_id != registry_id) {
             continue;
         }
@@ -693,22 +633,19 @@ static int discover_device_by_key(HidContext *context,
         if (is_receiver_interface(iface) && device_number >= 1 &&
             device_number <= receiver_slot_limit(iface)) {
             Reply pairing_reply = receiver_register_read(
-                iface, 0x02B5, true,
-                (uint8_t)(RECEIVER_INFO_PAIRING + device_number - 1));
+                iface, 0x02B5, true, (uint8_t)(RECEIVER_INFO_PAIRING + device_number - 1));
             bool pairing_present = receiver_pairing_reply_is_present(pairing_reply);
-            if (ping_interface(iface, device_number, 1.0,
-                               &protocol, &resolved_device_number)) {
+            if (ping_interface(iface, device_number, 1.0, &protocol, &resolved_device_number)) {
                 if (pairing_present || protocol >= 2.0 || is_receiver_interface(iface)) {
                     size_t before = *count;
                     // This key came from a paired receiver slot. A successful
                     // slot probe can still be answered as HID++ 1.0 by the
                     // receiver, so keep the paired peripheral's 2.0 model
                     // when preparing its feature table.
-                    double device_protocol = pairing_present || is_receiver_interface(iface)
-                        ? 2.0
-                        : protocol;
-                    add_device(devices, count, iface, resolved_device_number,
-                               device_number, device_protocol, true);
+                    double device_protocol =
+                        pairing_present || is_receiver_interface(iface) ? 2.0 : protocol;
+                    add_device(devices, count, iface, resolved_device_number, device_number,
+                               device_protocol, true);
                     if (*count > before && devices[*count - 1].name[0] == '\0') {
                         receiver_slot_name(&devices[*count - 1], device_number, pairing_reply);
                     }
@@ -716,31 +653,27 @@ static int discover_device_by_key(HidContext *context,
                 return 1;
             }
             if (pairing_present) {
-                add_receiver_slot_device(devices, count, iface, device_number,
-                                         pairing_reply, true);
+                add_receiver_slot_device(devices, count, iface, device_number, pairing_reply, true);
             }
             return 1;
         }
         if (ping_interface(iface, device_number, 1.0, &protocol, &resolved_device_number)) {
-            add_device(devices, count, iface, resolved_device_number, device_number,
-                       protocol, true);
+            add_device(devices, count, iface, resolved_device_number, device_number, protocol,
+                       true);
         } else if (device_number != 0xFF && !is_receiver_interface(iface) &&
                    ping_interface(iface, 0xFF, 1.0, &protocol, &resolved_device_number)) {
             // The direct wireless HID endpoint may report its paired receiver
             // slot in response to an FF ping, while requiring FF as the
             // destination for all later feature calls.
-            add_device(devices, count, iface, resolved_device_number, 0xFF,
-                       protocol, true);
+            add_device(devices, count, iface, resolved_device_number, 0xFF, protocol, true);
         }
         return 1;
     }
     return 1;
 }
 
-static int discover_devices_for_options(HidContext *context,
-                                         const Options *options,
-                                         Device *devices,
-                                         size_t *count) {
+static int discover_devices_for_options(HidContext *context, const Options *options,
+                                        Device *devices, size_t *count) {
     if (options->device_key != NULL) {
         return discover_device_by_key(context, options->device_key, devices, count);
     }
@@ -800,11 +733,9 @@ static bool is_mouse_device(const Device *device) {
     return true;
 }
 
-static bool is_duplicate_direct_mouse_endpoint(const Device *candidate,
-                                               const Device *devices,
+static bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
                                                size_t count) {
-    if (candidate == NULL || devices == NULL ||
-        is_receiver_interface(candidate->iface) ||
+    if (candidate == NULL || devices == NULL || is_receiver_interface(candidate->iface) ||
         !is_wireless_device_product(candidate->iface->product_id)) {
         return false;
     }
@@ -826,37 +757,37 @@ static const char *receiver_connection_type(const HidInterface *iface) {
         return NULL;
     }
     switch (iface->product_id) {
-        case 0xC548:
-            return "Bolt";
-        case 0xC52B:
-        case 0xC532:
-            return "Unifying";
-        case 0xC539:
-        case 0xC53A:
-        case 0xC53D:
-        case 0xC53F:
-        case 0xC541:
-        case 0xC545:
-        case 0xC547:
-        case 0xC54D:
-            return "LIGHTSPEED";
-        case 0xC517:
-            return "EX100";
-        case 0xC518:
-        case 0xC51A:
-        case 0xC51B:
-        case 0xC521:
-        case 0xC525:
-        case 0xC526:
-        case 0xC52E:
-        case 0xC52F:
-        case 0xC531:
-        case 0xC534:
-        case 0xC535:
-        case 0xC537:
-            return "Nano";
-        default:
-            break;
+    case 0xC548:
+        return "Bolt";
+    case 0xC52B:
+    case 0xC532:
+        return "Unifying";
+    case 0xC539:
+    case 0xC53A:
+    case 0xC53D:
+    case 0xC53F:
+    case 0xC541:
+    case 0xC545:
+    case 0xC547:
+    case 0xC54D:
+        return "LIGHTSPEED";
+    case 0xC517:
+        return "EX100";
+    case 0xC518:
+    case 0xC51A:
+    case 0xC51B:
+    case 0xC521:
+    case 0xC525:
+    case 0xC526:
+    case 0xC52E:
+    case 0xC52F:
+    case 0xC531:
+    case 0xC534:
+    case 0xC535:
+    case 0xC537:
+        return "Nano";
+    default:
+        break;
     }
     // Product IDs are the reliable path, but retain a readable fallback for
     // newer receiver IDs that macOS exposes only by product name.

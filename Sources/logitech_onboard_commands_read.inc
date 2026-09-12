@@ -48,12 +48,14 @@ static int select_device(Device *devices, size_t count, const Options *options, 
                 return 1;
             }
         }
-        fprintf(stderr, "device key '%s' was not found among reachable devices\n", options->device_key);
+        fprintf(stderr, "device key '%s' was not found among reachable devices\n",
+                options->device_key);
         return 0;
     }
     if (options->device_index >= 0) {
         if ((size_t)options->device_index >= count) {
-            fprintf(stderr, "device index %d is out of range 0..%zu\n", options->device_index, count - 1);
+            fprintf(stderr, "device index %d is out of range 0..%zu\n", options->device_index,
+                    count - 1);
             return 0;
         }
         *selected = &devices[options->device_index];
@@ -83,7 +85,8 @@ static int run_info(const Options *options) {
         return 1;
     }
     printf("Device: %s\n", device_label(device));
-    printf("  vendor/product: 0x%04X / 0x%04X\n", device->iface->vendor_id, device->iface->product_id);
+    printf("  vendor/product: 0x%04X / 0x%04X\n", device->iface->vendor_id,
+           device->iface->product_id);
     printf("  connection: %s, device number: 0x%02X\n",
            device->device_number == 0xFF ? "direct or receiver" : "receiver",
            device->device_number);
@@ -103,20 +106,24 @@ static int run_info(const Options *options) {
         hid_context_release(&context);
         return 0;
     }
-    printf("  onboard descriptor: memory 0x%02X, format 0x%02X, macro format 0x%02X, shift flags 0x%02X\n",
-           profile_info.memory, profile_info.profile_format, profile_info.macro_format, profile_info.shift_flags);
+    printf("  onboard descriptor: memory 0x%02X, format 0x%02X, macro format 0x%02X, shift flags "
+           "0x%02X\n",
+           profile_info.memory, profile_info.profile_format, profile_info.macro_format,
+           profile_info.shift_flags);
     printf("  onboard counts: profiles %u, buttons %u, sectors %u, sector size %u bytes\n",
-           profile_info.profile_count, profile_info.button_count, profile_info.sector_count, profile_info.sector_size);
+           profile_info.profile_count, profile_info.button_count, profile_info.sector_count,
+           profile_info.sector_size);
     ProfileHeader headers[MAX_HEADERS];
     size_t header_count = 0;
     if (read_profile_headers(device, &profile_info, headers, &header_count)) {
         printf("  profile headers:\n");
         for (size_t i = 0; i < header_count; i++) {
-            printf("    profile %zu: sector 0x%04X, enabled=%s\n",
-                   i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
+            printf("    profile %zu: sector 0x%04X, enabled=%s\n", i + 1, headers[i].sector,
+                   headers[i].enabled ? "yes" : "no");
         }
         Profile profile;
-        if (load_profile_with_headers(device, &profile_info, headers, header_count, options->profile, &profile)) {
+        if (load_profile_with_headers(device, &profile_info, headers, header_count,
+                                      options->profile, &profile)) {
             printf("  selected profile:\n");
             print_profile_summary(&profile, true);
             free(profile.data);
@@ -185,8 +192,8 @@ static int run_profiles(const Options *options) {
     int selected_profile_number = 0;
     if (options->headers_only && !options->include_dpi && !options->include_report_rate) {
         for (size_t i = 0; i < header_count; i++) {
-            printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
-                   i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
+            printf("Profile %zu (sector 0x%04X, enabled=%s)\n", i + 1, headers[i].sector,
+                   headers[i].enabled ? "yes" : "no");
         }
         hid_context_release(&context);
         return 0;
@@ -198,8 +205,8 @@ static int run_profiles(const Options *options) {
         // for every slot before the detailed selected-profile summary so the
         // caller can populate its picker without reading every full sector.
         for (size_t i = 0; i < header_count; i++) {
-            printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
-                   i + 1, headers[i].sector, headers[i].enabled ? "yes" : "no");
+            printf("Profile %zu (sector 0x%04X, enabled=%s)\n", i + 1, headers[i].sector,
+                   headers[i].enabled ? "yes" : "no");
         }
 
         size_t selected = 0;
@@ -217,9 +224,9 @@ static int run_profiles(const Options *options) {
         Profile profile;
         if (options->summary_only
                 ? load_profile_summary_with_headers(device, &info, headers, header_count,
-                                                     (int)selected + 1, &profile)
-                : load_profile_with_headers(device, &info, headers, header_count,
-                                             (int)selected + 1, &profile)) {
+                                                    (int)selected + 1, &profile)
+                : load_profile_with_headers(device, &info, headers, header_count, (int)selected + 1,
+                                            &profile)) {
             printf("Selected profile: %zu\n", selected + 1);
             print_profile_summary(&profile, true);
             if (profile.dpi_layout_supported && profile.dpi_count <= 5) {
@@ -237,7 +244,8 @@ static int run_profiles(const Options *options) {
         size_t last = header_count;
         if (requested_profile > 0) {
             if ((size_t)requested_profile > header_count) {
-                fprintf(stderr, "profile %d is out of range 1..%zu\n", options->profile, header_count);
+                fprintf(stderr, "profile %d is out of range 1..%zu\n", options->profile,
+                        header_count);
                 hid_context_release(&context);
                 return 1;
             }
@@ -248,8 +256,10 @@ static int run_profiles(const Options *options) {
         for (size_t i = first; i < last; i++) {
             Profile profile;
             int loaded = options->summary_only
-                ? load_profile_summary_with_headers(device, &info, headers, header_count, (int)i + 1, &profile)
-                : load_profile_with_headers(device, &info, headers, header_count, (int)i + 1, &profile);
+                             ? load_profile_summary_with_headers(device, &info, headers,
+                                                                 header_count, (int)i + 1, &profile)
+                             : load_profile_with_headers(device, &info, headers, header_count,
+                                                         (int)i + 1, &profile);
             if (loaded) {
                 print_profile_summary(&profile, true);
                 free(profile.data);
@@ -261,12 +271,12 @@ static int run_profiles(const Options *options) {
         size_t value_count = 0;
         uint8_t sensor_count = 0;
         uint16_t current = 0;
-        if (adjustable_dpi_values(device, values, &value_count, MAX_DPI_VALUES,
-                                  &sensor_count, &current)) {
+        if (adjustable_dpi_values(device, values, &value_count, MAX_DPI_VALUES, &sensor_count,
+                                  &current)) {
             if (selected_stage_count > 0) {
-                if (recover_live_dpi_if_needed(device, selected_profile_number,
-                                               selected_stages, selected_stage_count,
-                                               selected_default_stage, current)) {
+                if (recover_live_dpi_if_needed(device, selected_profile_number, selected_stages,
+                                               selected_stage_count, selected_default_stage,
+                                               current)) {
                     current = selected_stages[selected_default_stage - 1];
                 }
             }
@@ -329,7 +339,8 @@ static int run_dpi(const Options *options) {
     size_t value_count = 0;
     uint8_t sensor_count = 0;
     uint16_t current = 0;
-    if (!adjustable_dpi_values(device, values, &value_count, MAX_DPI_VALUES, &sensor_count, &current)) {
+    if (!adjustable_dpi_values(device, values, &value_count, MAX_DPI_VALUES, &sensor_count,
+                               &current)) {
         fprintf(stderr, "adjustable DPI feature 0x2201 is unavailable or unreadable\n");
         hid_context_release(&context);
         return 1;
@@ -354,8 +365,7 @@ static int run_dpi(const Options *options) {
                 }
                 printf("%u", read_le16(profile.data + profile.dpi_offset + i * 2));
             }
-            printf(" (default %u, shift %u)\n",
-                   profile.dpi_default_index + 1,
+            printf(" (default %u, shift %u)\n", profile.dpi_default_index + 1,
                    profile.dpi_shift_index + 1);
         } else {
             printf("Onboard profile DPI layout: not recognized; stage editing is disabled\n");

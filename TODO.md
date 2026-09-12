@@ -1,6 +1,6 @@
 # LOPE TODO Formatting:
 
-### [ ] {task number}. Task summary
+### {task number}: Task summary
 
 - [ ] task 1
 - [ ] task 2
@@ -9,9 +9,15 @@
 
 # LOPE TODO Ingest:
 
+- FEAT: check if it's possible to detect a wired mouse the app don't have permission to pull data from (ideally if it's a logitech specifically), and pop up a (not yet created) permission request modal with a "open system preferences" button if so. this should completely replace the no mouse detected logic that does that in the device picker
+- FEAT: when refreshing a sleeping mouse, just keep the refresh button disabled, don't periodically re-enable it when timing lands on returned query and delay till next.
+- FIX: the bottom footer shadows are still a bit wonky, need to fix those
+- FIX: sometimes refresh sticks on a sleeping mouse and the app only shows that mouse with no way to move out without exiting the app completely
+- FEAT: multiple open window instance and tabs inside the app from swift are not needed, that can cause cross ownership of files and adds to complexity.
+
 # LOPE todo list
 
-### [ ] 1. Refactor the UI into smaller reusable components
+### 1: Refactor the UI into smaller reusable components
 
 - [ ] Split the large ContentView sections into focused components.
 - [ ] Extract repeated controls and layouts into reusable views.
@@ -21,7 +27,7 @@
 
 # Ignore below item(s):
 
-### [ ] 1. Detect and highlight all standard mouse buttons when possible
+### 0: Detect and highlight all standard mouse buttons when possible
 
 **Status: Deferred.** AppKit testing on G502 X and G604 exposed only buttons
 1–3, and the attempted HID report monitor did not provide a dependable

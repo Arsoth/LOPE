@@ -93,8 +93,15 @@ make
 open outputs/LOPE.app
 ```
 
-Run `make test` for the C and Swift self-tests. See [the development
-reference](docs/REFERENCE.md) for the source layout, device behavior,
-troubleshooting, and command-line details. Protocol notes are in
-[docs/PROTOCOL.md](docs/PROTOCOL.md), and descriptor maintenance is covered by
-[Profiles/README.md](Profiles/README.md).
+Run `make test` for the C self-test binary and the Swift XCTest suite (via
+`swift test`). Run `make format` to apply `swift-format`/`clang-format`, or
+`make lint` to check formatting without changing files. Run `make coverage`
+for an `llvm-cov` report, or `make coverage-check` to enforce the per-file
+minimums (see [docs/development-standards.md](docs/development-standards.md)
+for what's actually enforced and why Swift has no branch-coverage numbers).
+`make install-hooks` installs a pre-commit hook that runs the format and
+test checks. See [docs/development-setup.md](docs/development-setup.md) for
+required tooling, [the development reference](docs/REFERENCE.md) for the
+source layout, device behavior, troubleshooting, and command-line details.
+Protocol notes are in [docs/PROTOCOL.md](docs/PROTOCOL.md), and descriptor
+maintenance is covered by [Profiles/README.md](Profiles/README.md).

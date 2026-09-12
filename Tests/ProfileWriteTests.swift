@@ -2,101 +2,101 @@
 // Copyright (C) 2026
 
 import Foundation
+import XCTest
 
-@main
+@testable import LOPECore
+
 @MainActor
-struct ProfileWriteSelfTest {
-  static func main() {
-    guard ProfileWriteValidation.isPrimaryClick(raw: "80010001"),
-      ProfileWriteValidation.isPrimaryClick(raw: "80 01 00 01"),
-      ProfileWriteValidation.isPrimaryClick(raw: "80010001".lowercased()),
-      !ProfileWriteValidation.isPrimaryClick(raw: "FFFFFFFF"),
-      !ProfileWriteValidation.isPrimaryClick(raw: "80010002")
-    else {
-      fatalError("primary-click raw-record recognition failed")
-    }
+final class ProfileWriteTests: XCTestCase {
+  func testPrimaryClickRawRecordRecognition() {
+    XCTAssertTrue(ProfileWriteValidation.isPrimaryClick(raw: "80010001"))
+    XCTAssertTrue(ProfileWriteValidation.isPrimaryClick(raw: "80 01 00 01"))
+    XCTAssertTrue(ProfileWriteValidation.isPrimaryClick(raw: "80010001".lowercased()))
+    XCTAssertFalse(ProfileWriteValidation.isPrimaryClick(raw: "FFFFFFFF"))
+    XCTAssertFalse(ProfileWriteValidation.isPrimaryClick(raw: "80010002"))
+  }
 
+  func testMissingPrimaryClickMessageIsActionableAndProfileSpecific() {
     let invalidMessage = ProfileWriteValidation.missingPrimaryClickMessage(
       profileNumber: 2,
       profileName: "G502 X",
       buttonRaws: ["80010002", "FFFFFFFF"]
     )
-    guard
-      invalidMessage
-        == "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again."
-    else {
-      fatalError("primary-click validation message was not actionable or profile-specific")
-    }
+    XCTAssertEqual(
+      invalidMessage,
+      "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again."
+    )
+  }
+
+  func testInaccessibleGShiftPrimaryClickWarningIsActionable() {
     let inaccessibleGShiftMessage = ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
       profileNumber: 2,
       profileName: "G502 X",
       normalButtonRaws: ["80010002", "FFFFFFFF"],
       gShiftButtonRaws: ["80010001"]
     )
-    guard
-      inaccessibleGShiftMessage
-        == "Profile 2 on G502 X has primary click assigned only on the G-Shift layer, but no Normal-layer button activates G-Shift. Assign G-Shift to a Normal button or add a primary click to the Normal layer, then save again."
-    else {
-      fatalError("inaccessible G-Shift primary-click warning was not actionable")
-    }
-    guard
-      ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
-        profileNumber: 2,
-        profileName: "G502 X",
-        normalButtonRaws: ["900B0000"],
-        gShiftButtonRaws: ["80010001"]
-      ) == nil
-    else {
-      fatalError("bound G-Shift button was incorrectly treated as inaccessible")
-    }
+    XCTAssertEqual(
+      inaccessibleGShiftMessage,
+      "Profile 2 on G502 X has primary click assigned only on the G-Shift layer, but no Normal-layer button activates G-Shift. Assign G-Shift to a Normal button or add a primary click to the Normal layer, then save again."
+    )
 
+    let boundGShiftMessage = ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
+      profileNumber: 2,
+      profileName: "G502 X",
+      normalButtonRaws: ["900B0000"],
+      gShiftButtonRaws: ["80010001"]
+    )
+    XCTAssertNil(boundGShiftMessage, "bound G-Shift button was incorrectly treated as inaccessible")
+  }
+
+  func testPrimaryClickValidationPrefersRuntimeMouseName() {
     let presetModel = AppModel(startInitialRefresh: false)
-    configure(presetModel)
-    guard
-      presetModel.primaryClickValidationMessage
-        == "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again."
-    else {
-      fatalError("primary-click validation did not prefer the runtime mouse name")
-    }
+    Self.configure(presetModel)
+    XCTAssertEqual(
+      presetModel.primaryClickValidationMessage,
+      "Profile 2 on G502 X has no primary click assigned. Choose “Left click” for one of its buttons, then save again."
+    )
+
     guard let leftClick = presetModel.presets.first(where: { $0.label == "Left click" }) else {
-      fatalError("Left click preset is missing")
+      XCTFail("Left click preset is missing")
+      return
     }
     presetModel.selectOutput(buttonIndex: 0, choice: leftClick.raw)
-    guard presetModel.buttons[0].draftRaw == ProfileWriteValidation.primaryClickRaw else {
-      fatalError("preset primary-click assignment was not normalized")
-    }
+    XCTAssertEqual(presetModel.buttons[0].draftRaw, ProfileWriteValidation.primaryClickRaw)
+  }
 
+  func testRawPrimaryClickAssignmentIsNormalized() {
     let rawModel = AppModel(startInitialRefresh: false)
-    configure(rawModel)
+    Self.configure(rawModel)
     rawModel.setRaw(buttonIndex: 0, raw: "80 01 00 01")
-    guard rawModel.buttons[0].draftRaw == ProfileWriteValidation.primaryClickRaw else {
-      fatalError("raw primary-click assignment was not normalized")
-    }
+    XCTAssertEqual(rawModel.buttons[0].draftRaw, ProfileWriteValidation.primaryClickRaw)
+  }
 
+  func testProvisionalMouseDataSuppressesDPIValidationWarning() {
     let provisionalModel = AppModel(startInitialRefresh: false)
-    configure(provisionalModel)
-    guard provisionalModel.dpiValidationMessage != nil else {
-      fatalError("baseline DPI validation fixture unexpectedly became valid")
-    }
+    Self.configure(provisionalModel)
+    XCTAssertNotNil(
+      provisionalModel.dpiValidationMessage,
+      "baseline DPI validation fixture unexpectedly became valid")
+
     provisionalModel.loadingProfile = true
-    guard provisionalModel.isProvisionalMouseData,
-      provisionalModel.dpiValidationMessage == nil
-    else {
-      fatalError("loading-state DPI validation warning was not suppressed")
-    }
+    XCTAssertTrue(provisionalModel.isProvisionalMouseData)
+    XCTAssertNil(provisionalModel.dpiValidationMessage)
+
     provisionalModel.loadingProfile = false
     provisionalModel.waitingForKnownDevice = true
-    guard provisionalModel.isProvisionalMouseData,
-      provisionalModel.dpiValidationMessage == nil
-    else {
-      fatalError("sleeping-device DPI validation warning was not suppressed")
-    }
+    XCTAssertTrue(provisionalModel.isProvisionalMouseData)
+    XCTAssertNil(provisionalModel.dpiValidationMessage)
+  }
 
+  func testImportedJSONPrimaryClickOutputIsResolved() throws {
     let importedModel = AppModel(startInitialRefresh: false)
-    configure(importedModel)
+    Self.configure(importedModel)
     let jsonURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-      "lope-profile-write-self-test-" + String(ProcessInfo.processInfo.processIdentifier) + ".json"
+      "lope-profile-write-test-" + String(ProcessInfo.processInfo.processIdentifier) + ".json"
     )
+    defer { try? FileManager.default.removeItem(at: jsonURL) }
+
     let imported = EditableBackup(
       formatVersion: 1,
       createdAt: "2026-01-01T00:00:00Z",
@@ -119,19 +119,16 @@ struct ProfileWriteSelfTest {
       ),
       exactBinaryBackup: nil
     )
-    do {
-      let data = try JSONEncoder().encode(imported)
-      try data.write(to: jsonURL, options: .atomic)
-    } catch {
-      fatalError("could not create imported JSON fixture: \(error)")
-    }
-    importedModel.loadEditableBackup(jsonURL)
-    guard importedModel.buttons[0].draftRaw == ProfileWriteValidation.primaryClickRaw else {
-      fatalError("imported JSON primary-click output was not resolved")
-    }
+    let data = try JSONEncoder().encode(imported)
+    try data.write(to: jsonURL, options: .atomic)
 
+    importedModel.loadEditableBackup(jsonURL)
+    XCTAssertEqual(importedModel.buttons[0].draftRaw, ProfileWriteValidation.primaryClickRaw)
+  }
+
+  func testContinuousDPIStageDragTracksSnappedValue() {
     let dpiDragModel = AppModel(startInitialRefresh: false)
-    configure(dpiDragModel)
+    Self.configure(dpiDragModel)
     dpiDragModel.dpiCapabilities = DPICapabilities(
       supportedValues: [400, 800, 1200, 1600, 2400, 3200, 4000],
       minimum: 400,
@@ -143,42 +140,57 @@ struct ProfileWriteSelfTest {
     dpiDragModel.shiftStage = 1
 
     let firstDragIndex = dpiDragModel.moveDPIStageDuringDrag(index: 1, value: 1600)
-    guard firstDragIndex == 1,
-      dpiDragModel.dpiStages.prefix(3).map({ Int($0) }) == [400, 1600, 2400]
-    else {
-      fatalError("continuous DPI drag update did not track the snapped value")
-    }
+    XCTAssertEqual(firstDragIndex, 1)
+    XCTAssertEqual(dpiDragModel.dpiStages.prefix(3).map({ Int($0) }), [400, 1600, 2400])
+  }
 
+  func testDPIStageCrossingPreservesOrderAndDefaultShiftAssignment() {
+    let dpiDragModel = AppModel(startInitialRefresh: false)
+    Self.configure(dpiDragModel)
+    dpiDragModel.dpiCapabilities = DPICapabilities(
+      supportedValues: [400, 800, 1200, 1600, 2400, 3200, 4000],
+      minimum: 400,
+      maximum: 4000
+    )
+    dpiDragModel.dpiCount = 3
+    dpiDragModel.dpiStages = ["400", "1200", "2400", "", ""]
+    dpiDragModel.defaultStage = 2
+    dpiDragModel.shiftStage = 1
+
+    let firstDragIndex = dpiDragModel.moveDPIStageDuringDrag(index: 1, value: 1600)
     let crossedForwardIndex = dpiDragModel.moveDPIStageDuringDrag(
       index: firstDragIndex, value: 3200)
-    guard crossedForwardIndex == 2,
-      dpiDragModel.dpiStages.prefix(3).map({ Int($0) }) == [400, 2400, 3200],
-      dpiDragModel.defaultStage == 3,
-      dpiDragModel.shiftStage == 1
-    else {
-      fatalError("DPI stage crossing did not preserve order or default/shift assignment")
-    }
+    XCTAssertEqual(crossedForwardIndex, 2)
+    XCTAssertEqual(dpiDragModel.dpiStages.prefix(3).map({ Int($0) }), [400, 2400, 3200])
+    XCTAssertEqual(dpiDragModel.defaultStage, 3)
+    XCTAssertEqual(dpiDragModel.shiftStage, 1)
 
     let crossedBackwardIndex = dpiDragModel.moveDPIStageDuringDrag(
       index: crossedForwardIndex, value: 800)
-    guard crossedBackwardIndex == 1,
-      dpiDragModel.dpiStages.prefix(3).map({ Int($0) }) == [400, 800, 2400],
-      dpiDragModel.defaultStage == 2
-    else {
-      fatalError("reverse DPI stage crossing did not keep the dragged stage active")
-    }
+    XCTAssertEqual(crossedBackwardIndex, 1)
+    XCTAssertEqual(dpiDragModel.dpiStages.prefix(3).map({ Int($0) }), [400, 800, 2400])
+    XCTAssertEqual(dpiDragModel.defaultStage, 2)
+  }
 
+  func testDPIDragCompletionRepairsStrictStageOrdering() {
+    let dpiDragModel = AppModel(startInitialRefresh: false)
+    Self.configure(dpiDragModel)
+    dpiDragModel.dpiCapabilities = DPICapabilities(
+      supportedValues: [400, 800, 1200, 1600, 2400, 3200, 4000],
+      minimum: 400,
+      maximum: 4000
+    )
+    dpiDragModel.dpiCount = 3
     dpiDragModel.dpiStages = ["400", "800", "800", "", ""]
     dpiDragModel.finishDPIStageDrag()
     let finishedDPIValues = dpiDragModel.dpiStages.prefix(3).compactMap(Int.init)
-    guard finishedDPIValues == [400, 800, 1200],
-      zip(finishedDPIValues, finishedDPIValues.dropFirst()).allSatisfy({ $0 < $1 })
-    else {
-      fatalError("DPI drag completion did not repair strict stage ordering")
-    }
+    XCTAssertEqual(finishedDPIValues, [400, 800, 1200])
+    XCTAssertTrue(zip(finishedDPIValues, finishedDPIValues.dropFirst()).allSatisfy({ $0 < $1 }))
+  }
 
+  func testButtonOnlySaveRejectsBeforeInvokingWriteEngine() {
     let rejectedButtonsModel = AppModel(startInitialRefresh: false)
-    configure(rejectedButtonsModel)
+    Self.configure(rejectedButtonsModel)
     var rejectedButtonCalls = [[String]]()
     rejectedButtonsModel.engineRunnerOverride = { arguments in
       rejectedButtonCalls.append(arguments)
@@ -186,15 +198,14 @@ struct ProfileWriteSelfTest {
     }
     rejectedButtonsModel.buttons[0].draftRaw = "FFFFFFFF"
     rejectedButtonsModel.applyButtons()
-    guard rejectedButtonCalls.isEmpty,
-      rejectedButtonsModel.status.contains("Profile 2"),
-      rejectedButtonsModel.status.contains("Left click")
-    else {
-      fatalError("button-only save did not reject before invoking the write engine")
-    }
+    XCTAssertTrue(rejectedButtonCalls.isEmpty)
+    XCTAssertTrue(rejectedButtonsModel.status.contains("Profile 2"))
+    XCTAssertTrue(rejectedButtonsModel.status.contains("Left click"))
+  }
 
+  func testDPIOnlySaveRejectsBeforeInvokingWriteEngine() {
     let rejectedDPIModel = AppModel(startInitialRefresh: false)
-    configure(rejectedDPIModel)
+    Self.configure(rejectedDPIModel)
     rejectedDPIModel.dpiCount = 1
     rejectedDPIModel.dpiStages = ["800", "", "", "", ""]
     rejectedDPIModel.baselineDPICount = 5
@@ -205,12 +216,12 @@ struct ProfileWriteSelfTest {
       return ""
     }
     rejectedDPIModel.applyDPI()
-    guard rejectedDPICalls.isEmpty else {
-      fatalError("DPI-only save did not reject before invoking the write engine")
-    }
+    XCTAssertTrue(rejectedDPICalls.isEmpty)
+  }
 
+  func testCombinedSaveRejectsBeforeInvokingWriteEngine() {
     let rejectedCombinedModel = AppModel(startInitialRefresh: false)
-    configure(rejectedCombinedModel)
+    Self.configure(rejectedCombinedModel)
     rejectedCombinedModel.buttons[0].draftRaw = "FFFFFFFF"
     rejectedCombinedModel.profiles[0].enabled = false
     rejectedCombinedModel.baselineProfileEnabled = [2: true]
@@ -220,12 +231,12 @@ struct ProfileWriteSelfTest {
       return ""
     }
     rejectedCombinedModel.applyAll()
-    guard rejectedCombinedCalls.isEmpty else {
-      fatalError("combined save did not reject before invoking the write engine")
-    }
+    XCTAssertTrue(rejectedCombinedCalls.isEmpty)
+  }
 
+  func testValidPrimaryClickAssignmentInvokesWriteEngine() {
     let validModel = AppModel(startInitialRefresh: false)
-    configure(validModel)
+    Self.configure(validModel)
     validModel.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
     var validCalls = [[String]]()
     validModel.engineRunnerOverride = { arguments in
@@ -233,12 +244,12 @@ struct ProfileWriteSelfTest {
       return "Verified sector 0x0100"
     }
     validModel.applyButtons()
-    guard validCalls.contains(where: { $0.contains("apply") }) else {
-      fatalError("valid primary-click assignment did not invoke the write engine")
-    }
+    XCTAssertTrue(validCalls.contains(where: { $0.contains("apply") }))
+  }
 
+  func testSupportedPollingRateChangeIsStagedForProfileSave() {
     let pollingModel = AppModel(startInitialRefresh: false)
-    configure(pollingModel)
+    Self.configure(pollingModel)
     pollingModel.pollingRateCapabilities = PollingRateCapabilities(
       supportedRates: [125, 500],
       currentRate: 125
@@ -249,31 +260,33 @@ struct ProfileWriteSelfTest {
       return "Supported polling rates: 125, 500\nVerified polling rate: 500 Hz\n"
     }
     pollingModel.applyPollingRate(500)
-    guard pollingCalls.isEmpty,
-      pollingModel.pollingRateDraft == 500,
-      pollingModel.hasPollingRateChanges,
-      pollingModel.hasPendingChanges
-    else {
-      fatalError("supported polling-rate change was not staged for profile save")
-    }
-    pollingModel.applyPollingRate(1000)
-    guard pollingCalls.isEmpty, pollingModel.pollingRateDraft == 500 else {
-      fatalError("unsupported polling rate was forwarded to the write engine")
-    }
+    XCTAssertTrue(pollingCalls.isEmpty)
+    XCTAssertEqual(pollingModel.pollingRateDraft, 500)
+    XCTAssertTrue(pollingModel.hasPollingRateChanges)
+    XCTAssertTrue(pollingModel.hasPendingChanges)
 
+    pollingModel.applyPollingRate(1000)
+    XCTAssertTrue(
+      pollingCalls.isEmpty, "unsupported polling rate was forwarded to the write engine")
+    XCTAssertEqual(pollingModel.pollingRateDraft, 500)
+  }
+
+  func testNormalAndGShiftProfileOutputLayersParseSeparately() {
     let layeredModel = AppModel(startInitialRefresh: false)
-    configure(layeredModel)
+    Self.configure(layeredModel)
     let layeredText = """
       Profile 2 (sector 0x0100, enabled=yes)
         button 1: Left click [80010001]
         G-Shift button 1: Right click [80010002]
       """
     let parsedLayers = layeredModel.parseProfiles(layeredText)
-    guard parsedLayers.rowsByProfile[2]?.first?.layer == .normal,
-      parsedLayers.gShiftRowsByProfile[2]?.first?.layer == .gShift
-    else {
-      fatalError("normal/G-Shift profile-output layers were not parsed separately")
-    }
+    XCTAssertEqual(parsedLayers.rowsByProfile[2]?.first?.layer, .normal)
+    XCTAssertEqual(parsedLayers.gShiftRowsByProfile[2]?.first?.layer, .gShift)
+  }
+
+  func testGShiftEditsAreRetainedAcrossLayerSwitchingAndForwardedToWriteEngine() {
+    let layeredModel = AppModel(startInitialRefresh: false)
+    Self.configure(layeredModel)
     let normalRows = layeredModel.buttons
     let gShiftRows = [
       ButtonRow(
@@ -290,21 +303,19 @@ struct ProfileWriteSelfTest {
     layeredModel.selectButtonLayer(.gShift)
     layeredModel.setRaw(buttonIndex: 0, raw: "80010004")
     layeredModel.selectButtonLayer(.normal)
-    guard layeredModel.gShiftButtonRows[0].draftRaw == "80010004",
-      layeredModel.buttons[0].draftRaw == ProfileWriteValidation.primaryClickRaw
-    else {
-      fatalError("G-Shift edits were not retained across layer switching")
-    }
+    XCTAssertEqual(layeredModel.gShiftButtonRows[0].draftRaw, "80010004")
+    XCTAssertEqual(layeredModel.buttons[0].draftRaw, ProfileWriteValidation.primaryClickRaw)
+
     var layeredCalls = [[String]]()
     layeredModel.engineRunnerOverride = { arguments in
       layeredCalls.append(arguments)
       return "Verified sector 0x0100"
     }
     layeredModel.applyButtons()
-    guard layeredCalls.contains(where: { $0.contains("gshift:1:80010004") }) else {
-      fatalError("G-Shift button edits were not forwarded to the write engine")
-    }
+    XCTAssertTrue(layeredCalls.contains(where: { $0.contains("gshift:1:80010004") }))
+  }
 
+  func testSleepingDeviceTransitionKeepsUnderlyingProfileSurface() {
     let sleepingModel = AppModel(startInitialRefresh: false)
     sleepingModel.devices = [
       DeviceChoice(
@@ -347,16 +358,10 @@ struct ProfileWriteSelfTest {
         errorMessage: nil,
         accessWarning: false
       ))
-    guard sleepingModel.waitingForKnownDevice,
-      !sleepingModel.buttons.isEmpty,
-      !sleepingModel.profiles.isEmpty
-    else {
-      fatalError("sleeping-device transition discarded the underlying profile surface")
-    }
+    XCTAssertTrue(sleepingModel.waitingForKnownDevice)
+    XCTAssertFalse(sleepingModel.buttons.isEmpty)
+    XCTAssertFalse(sleepingModel.profiles.isEmpty)
     sleepingModel.knownDevicePollTask?.cancel()
-
-    try? FileManager.default.removeItem(at: jsonURL)
-    print("profile write self-test: primary-click validation and save guards passed")
   }
 
   private static func configure(_ model: AppModel) {

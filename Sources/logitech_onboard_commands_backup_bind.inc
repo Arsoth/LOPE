@@ -26,15 +26,13 @@ static int run_dump(const Options *options) {
         return 1;
     }
     if (!profile.crc_ok) {
-        fprintf(stderr, "warning: dumping a sector with an invalid CRC; it cannot be used for restore until repaired by the vendor software\n");
+        fprintf(stderr, "warning: dumping a sector with an invalid CRC; it cannot be used for "
+                        "restore until repaired by the vendor software\n");
     }
     int ok = package_write(options->path, device, &profile, profile.data, false);
     if (ok) {
-        printf("dumped profile %zu sector 0x%04X (%zu bytes) to %s\n",
-               profile.selected_header + 1,
-               profile.headers[profile.selected_header].sector,
-               profile.data_length,
-               options->path);
+        printf("dumped profile %zu sector 0x%04X (%zu bytes) to %s\n", profile.selected_header + 1,
+               profile.headers[profile.selected_header].sector, profile.data_length, options->path);
     }
     free(profile.data);
     hid_context_release(&context);
@@ -86,59 +84,101 @@ static int parse_target(const char *target, uint8_t spec[4]) {
         lower[i] = c;
     }
     uint16_t mouse_mask = 0;
-    if (strcmp(lower, "left") == 0 || strcmp(lower, "left-click") == 0) mouse_mask = 0x0001;
-    else if (strcmp(lower, "right") == 0 || strcmp(lower, "right-click") == 0) mouse_mask = 0x0002;
-    else if (strcmp(lower, "middle") == 0 || strcmp(lower, "middle-click") == 0) mouse_mask = 0x0004;
-    else if (strcmp(lower, "back") == 0) mouse_mask = 0x0008;
-    else if (strcmp(lower, "forward") == 0) mouse_mask = 0x0010;
-    else if (strcmp(lower, "button6") == 0) mouse_mask = 0x0020;
-    else if (strcmp(lower, "button7") == 0) mouse_mask = 0x0040;
-    else if (strcmp(lower, "button8") == 0) mouse_mask = 0x0080;
+    if (strcmp(lower, "left") == 0 || strcmp(lower, "left-click") == 0)
+        mouse_mask = 0x0001;
+    else if (strcmp(lower, "right") == 0 || strcmp(lower, "right-click") == 0)
+        mouse_mask = 0x0002;
+    else if (strcmp(lower, "middle") == 0 || strcmp(lower, "middle-click") == 0)
+        mouse_mask = 0x0004;
+    else if (strcmp(lower, "back") == 0)
+        mouse_mask = 0x0008;
+    else if (strcmp(lower, "forward") == 0)
+        mouse_mask = 0x0010;
+    else if (strcmp(lower, "button6") == 0)
+        mouse_mask = 0x0020;
+    else if (strcmp(lower, "button7") == 0)
+        mouse_mask = 0x0040;
+    else if (strcmp(lower, "button8") == 0)
+        mouse_mask = 0x0080;
     if (mouse_mask != 0) {
-        spec[0] = 0x80; spec[1] = 0x01;
-        spec[2] = (uint8_t)(mouse_mask >> 8); spec[3] = (uint8_t)mouse_mask;
+        spec[0] = 0x80;
+        spec[1] = 0x01;
+        spec[2] = (uint8_t)(mouse_mask >> 8);
+        spec[3] = (uint8_t)mouse_mask;
         return 1;
     }
-    if (strcmp(lower, "alt-tab") == 0 || strcmp(lower, "alt+tab") == 0 || strcmp(lower, "alt_tab") == 0) {
-        spec[0] = 0x80; spec[1] = 0x02; spec[2] = 0x04; spec[3] = 0x2B;
+    if (strcmp(lower, "alt-tab") == 0 || strcmp(lower, "alt+tab") == 0 ||
+        strcmp(lower, "alt_tab") == 0) {
+        spec[0] = 0x80;
+        spec[1] = 0x02;
+        spec[2] = 0x04;
+        spec[3] = 0x2B;
         return 1;
     }
     if (strcmp(lower, "dpi-up") == 0 || strcmp(lower, "next-dpi") == 0) {
-        spec[0] = 0x90; spec[1] = 0x03; spec[2] = 0x00; spec[3] = 0x00;
+        spec[0] = 0x90;
+        spec[1] = 0x03;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
         return 1;
     }
     if (strcmp(lower, "dpi-down") == 0 || strcmp(lower, "previous-dpi") == 0) {
-        spec[0] = 0x90; spec[1] = 0x04; spec[2] = 0x00; spec[3] = 0x00;
+        spec[0] = 0x90;
+        spec[1] = 0x04;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
         return 1;
     }
     if (strcmp(lower, "dpi-cycle") == 0 || strcmp(lower, "cycle-dpi") == 0) {
-        spec[0] = 0x90; spec[1] = 0x05; spec[2] = 0x00; spec[3] = 0x00;
+        spec[0] = 0x90;
+        spec[1] = 0x05;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
         return 1;
     }
     if (strcmp(lower, "dpi-default") == 0) {
-        spec[0] = 0x90; spec[1] = 0x06; spec[2] = 0x00; spec[3] = 0x00;
+        spec[0] = 0x90;
+        spec[1] = 0x06;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
         return 1;
     }
     if (strcmp(lower, "dpi-shift") == 0) {
-        spec[0] = 0x90; spec[1] = 0x07; spec[2] = 0x00; spec[3] = 0x00;
+        spec[0] = 0x90;
+        spec[1] = 0x07;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
         return 1;
     }
     if (strcmp(lower, "next-profile") == 0 || strcmp(lower, "previous-profile") == 0 ||
         strcmp(lower, "cycle-profile") == 0 || strcmp(lower, "g-shift") == 0) {
         uint8_t function = 0x00;
-        if (strcmp(lower, "next-profile") == 0) function = 0x08;
-        else if (strcmp(lower, "previous-profile") == 0) function = 0x09;
-        else if (strcmp(lower, "cycle-profile") == 0) function = 0x0A;
-        else function = 0x0B;
-        spec[0] = 0x90; spec[1] = function; spec[2] = 0x00; spec[3] = 0x00;
+        if (strcmp(lower, "next-profile") == 0)
+            function = 0x08;
+        else if (strcmp(lower, "previous-profile") == 0)
+            function = 0x09;
+        else if (strcmp(lower, "cycle-profile") == 0)
+            function = 0x0A;
+        else
+            function = 0x0B;
+        spec[0] = 0x90;
+        spec[1] = function;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
         return 1;
     }
     if (strcmp(lower, "nav-back") == 0 || strcmp(lower, "cmd-[") == 0) {
-        spec[0] = 0x80; spec[1] = 0x02; spec[2] = 0x08; spec[3] = 0x2F;
+        spec[0] = 0x80;
+        spec[1] = 0x02;
+        spec[2] = 0x08;
+        spec[3] = 0x2F;
         return 1;
     }
     if (strcmp(lower, "nav-forward") == 0 || strcmp(lower, "cmd-]") == 0) {
-        spec[0] = 0x80; spec[1] = 0x02; spec[2] = 0x08; spec[3] = 0x30;
+        spec[0] = 0x80;
+        spec[1] = 0x02;
+        spec[2] = 0x08;
+        spec[3] = 0x30;
         return 1;
     }
     if (strcmp(lower, "disable") == 0 || strcmp(lower, "none") == 0 || strcmp(lower, "off") == 0) {
@@ -153,7 +193,8 @@ static int parse_target(const char *target, uint8_t spec[4]) {
         char modifier_text[16];
         char key_text[16];
         size_t modifier_length = (size_t)(colon - (lower + 4));
-        if (modifier_length == 0 || modifier_length >= sizeof(modifier_text) || strlen(colon + 1) >= sizeof(key_text)) {
+        if (modifier_length == 0 || modifier_length >= sizeof(modifier_text) ||
+            strlen(colon + 1) >= sizeof(key_text)) {
             return 0;
         }
         memcpy(modifier_text, lower + 4, modifier_length);
@@ -164,7 +205,10 @@ static int parse_target(const char *target, uint8_t spec[4]) {
         if (!parse_hex_byte(modifier_text, &modifier) || !parse_hex_byte(key_text, &key)) {
             return 0;
         }
-        spec[0] = 0x80; spec[1] = 0x02; spec[2] = modifier; spec[3] = key;
+        spec[0] = 0x80;
+        spec[1] = 0x02;
+        spec[2] = modifier;
+        spec[3] = key;
         return 1;
     }
     if (strncmp(lower, "consumer:", 9) == 0) {
@@ -172,8 +216,10 @@ static int parse_target(const char *target, uint8_t spec[4]) {
         if (!parse_hex_word(lower + 9, &consumer)) {
             return 0;
         }
-        spec[0] = 0x80; spec[1] = 0x03;
-        spec[2] = (uint8_t)(consumer >> 8); spec[3] = (uint8_t)consumer;
+        spec[0] = 0x80;
+        spec[1] = 0x03;
+        spec[2] = (uint8_t)(consumer >> 8);
+        spec[3] = (uint8_t)consumer;
         return 1;
     }
     if (strlen(lower) == 8) {
@@ -217,7 +263,9 @@ static int run_bind(const Options *options) {
         return 1;
     }
     if (options->profile == 0 && profile.header_count > 1) {
-        fprintf(stderr, "refusing to choose a profile implicitly: this device has %zu profile slots. Use `--profile N` after reviewing `profiles`.\n",
+        fprintf(stderr,
+                "refusing to choose a profile implicitly: this device has %zu profile slots. Use "
+                "`--profile N` after reviewing `profiles`.\n",
                 profile.header_count);
         free(profile.data);
         hid_context_release(&context);
@@ -232,7 +280,8 @@ static int run_bind(const Options *options) {
     if (button == 0) {
         button = find_rear_thumb_button(&profile);
         if (button == 0) {
-            fprintf(stderr, "could not identify one rear-thumb profile record. Run `profiles` and `watch`, then use `--button N`.\n");
+            fprintf(stderr, "could not identify one rear-thumb profile record. Run `profiles` and "
+                            "`watch`, then use `--button N`.\n");
             free(profile.data);
             hid_context_release(&context);
             return 1;
@@ -251,8 +300,8 @@ static int run_bind(const Options *options) {
     char new_description[160];
     describe_spec(old_spec, old_description, sizeof(old_description));
     describe_spec(requested_spec, new_description, sizeof(new_description));
-    printf("Device: %s, profile %d, sector 0x%04X\n", device_label(device), (int)profile.selected_header + 1,
-           profile.headers[profile.selected_header].sector);
+    printf("Device: %s, profile %d, sector 0x%04X\n", device_label(device),
+           (int)profile.selected_header + 1, profile.headers[profile.selected_header].sector);
     printf("Planned change: button %d: %s -> %s\n", button, old_description, new_description);
     printf("Raw change: ");
     print_hex4(old_spec);
@@ -306,15 +355,16 @@ static int run_bind(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
-    if (!write_sector(device, profile.headers[profile.selected_header].sector, new_data, profile.data_length)) {
-        fprintf(stderr, "write failed; restore from %s if the device reports a partial change\n", backup_path);
+    if (!write_sector(device, profile.headers[profile.selected_header].sector, new_data,
+                      profile.data_length)) {
+        fprintf(stderr, "write failed; restore from %s if the device reports a partial change\n",
+                backup_path);
         free(new_data);
         free(profile.data);
         hid_context_release(&context);
         return 1;
     }
-    bool verified = verify_sector_readback(device,
-                                           profile.headers[profile.selected_header].sector,
+    bool verified = verify_sector_readback(device, profile.headers[profile.selected_header].sector,
                                            new_data, profile.data_length);
     if (!verified) {
         fprintf(stderr, "read-back verification failed; restore from %s\n", backup_path);
@@ -368,7 +418,8 @@ static int run_restore(const Options *options) {
         goto done;
     }
     if (package.product_id != 0 && package.product_id != device->iface->product_id) {
-        fprintf(stderr, "refusing restore: backup product 0x%04X does not match connected product 0x%04X\n",
+        fprintf(stderr,
+                "refusing restore: backup product 0x%04X does not match connected product 0x%04X\n",
                 package.product_id, device->iface->product_id);
         goto done;
     }
@@ -380,8 +431,11 @@ static int run_restore(const Options *options) {
         goto done;
     }
     for (size_t i = 0; i < package.sector_count; i++) {
-        if (package.sectors[i].size != info.sector_size || package.profile_format != info.profile_format) {
-            fprintf(stderr, "refusing restore: backup sector 0x%04X format/size (0x%02X/%u) does not match device (0x%02X/%u)\n",
+        if (package.sectors[i].size != info.sector_size ||
+            package.profile_format != info.profile_format) {
+            fprintf(stderr,
+                    "refusing restore: backup sector 0x%04X format/size (0x%02X/%u) does not match "
+                    "device (0x%02X/%u)\n",
                     package.sectors[i].sector, package.profile_format, package.sectors[i].size,
                     info.profile_format, info.sector_size);
             goto done;
@@ -389,7 +443,8 @@ static int run_restore(const Options *options) {
     }
 
     control = (uint8_t *)malloc(info.sector_size);
-    if (control == NULL || !read_profile_control(device, &info, &control_sector, control, info.sector_size)) {
+    if (control == NULL ||
+        !read_profile_control(device, &info, &control_sector, control, info.sector_size)) {
         fprintf(stderr, "could not read the current profile control sector before restore\n");
         goto done;
     }
@@ -400,7 +455,9 @@ static int run_restore(const Options *options) {
     if (needs_headers &&
         (!sector_crc_ok(control, info.sector_size) ||
          !parse_profile_headers(&info, control, info.sector_size, headers, &header_count))) {
-        fprintf(stderr, "refusing restore: the current control sector or profile headers were not validated\n");
+        fprintf(
+            stderr,
+            "refusing restore: the current control sector or profile headers were not validated\n");
         goto done;
     }
     for (size_t i = 0; i < package.sector_count; i++) {
@@ -414,27 +471,34 @@ static int run_restore(const Options *options) {
             }
         }
         if (!found) {
-            fprintf(stderr, "refusing restore: sector 0x%04X is not present in the connected device's profile headers\n",
+            fprintf(stderr,
+                    "refusing restore: sector 0x%04X is not present in the connected device's "
+                    "profile headers\n",
                     package.sectors[i].sector);
             goto done;
         }
         current[i] = (uint8_t *)malloc(package.sectors[i].size);
         if (current[i] == NULL ||
             !read_sector(device, package.sectors[i].sector, package.sectors[i].size, current[i])) {
-            fprintf(stderr, "could not read current sector 0x%04X before restore\n", package.sectors[i].sector);
+            fprintf(stderr, "could not read current sector 0x%04X before restore\n",
+                    package.sectors[i].sector);
             goto done;
         }
-        has_changes = has_changes || memcmp(current[i], package.sectors[i].data, package.sectors[i].size) != 0;
+        has_changes = has_changes ||
+                      memcmp(current[i], package.sectors[i].data, package.sectors[i].size) != 0;
     }
 
     printf("Restore target: %s, %zu sector(s)\n", device_label(device), package.sector_count);
-    printf("The backup was made for device 0x%04X via device number 0x%02X; connected product is 0x%04X via 0x%02X.\n",
-           package.product_id, package.device_number, device->iface->product_id, device->device_number);
+    printf("The backup was made for device 0x%04X via device number 0x%02X; connected product is "
+           "0x%04X via 0x%02X.\n",
+           package.product_id, package.device_number, device->iface->product_id,
+           device->device_number);
     for (size_t i = 0; i < package.sector_count; i++) {
-        printf("  Sector 0x%04X: backup CRC OK; current CRC: %s; %s\n",
-               package.sectors[i].sector,
+        printf("  Sector 0x%04X: backup CRC OK; current CRC: %s; %s\n", package.sectors[i].sector,
                sector_crc_ok(current[i], package.sectors[i].size) ? "OK" : "INVALID",
-               memcmp(current[i], package.sectors[i].data, package.sectors[i].size) == 0 ? "already matches" : "will be restored");
+               memcmp(current[i], package.sectors[i].data, package.sectors[i].size) == 0
+                   ? "already matches"
+                   : "will be restored");
     }
     if (!has_changes) {
         printf("Nothing to do; all connected sectors already match the backup.\n");
@@ -450,43 +514,46 @@ static int run_restore(const Options *options) {
     }
 
     for (size_t i = 0; i < package.sector_count; i++) {
-        pre_restore_sectors[i] = (BackupSectorSource){
-            .sector = package.sectors[i].sector,
-            .size = package.sectors[i].size,
-            .data = current[i]
-        };
+        pre_restore_sectors[i] = (BackupSectorSource){.sector = package.sectors[i].sector,
+                                                      .size = package.sectors[i].size,
+                                                      .data = current[i]};
     }
     char pre_restore_path[512];
-    int pre_restore_length = snprintf(pre_restore_path, sizeof(pre_restore_path), "%s.pre-restore.logiob", options->path);
+    int pre_restore_length = snprintf(pre_restore_path, sizeof(pre_restore_path),
+                                      "%s.pre-restore.logiob", options->path);
     if (pre_restore_length <= 0 || pre_restore_length >= (int)sizeof(pre_restore_path) ||
-        !package_write_multi(pre_restore_path, device, info.profile_format,
-                             pre_restore_sectors, package.sector_count, false)) {
-        fprintf(stderr, "could not save the combined pre-restore state; no mouse write was attempted\n");
+        !package_write_multi(pre_restore_path, device, info.profile_format, pre_restore_sectors,
+                             package.sector_count, false)) {
+        fprintf(stderr,
+                "could not save the combined pre-restore state; no mouse write was attempted\n");
         goto done;
     }
-    printf("Saved pre-restore state for %zu sector(s) to %s\n", package.sector_count, pre_restore_path);
+    printf("Saved pre-restore state for %zu sector(s) to %s\n", package.sector_count,
+           pre_restore_path);
     size_t restored_count = 0;
     for (size_t i = 0; i < package.sector_count; i++) {
         if (memcmp(current[i], package.sectors[i].data, package.sectors[i].size) == 0) {
             continue;
         }
         printf("Restoring sector 0x%04X\n", package.sectors[i].sector);
-        if (!write_sector(device, package.sectors[i].sector,
-                          package.sectors[i].data, package.sectors[i].size)) {
+        if (!write_sector(device, package.sectors[i].sector, package.sectors[i].data,
+                          package.sectors[i].size)) {
             fprintf(stderr, "restore failed after %zu sector(s); pre-restore state is at %s\n",
                     restored_count, pre_restore_path);
             goto done;
         }
         bool verified = verify_sector_readback(device, package.sectors[i].sector,
-                                               package.sectors[i].data,
-                                               package.sectors[i].size);
+                                               package.sectors[i].data, package.sectors[i].size);
         if (!verified) {
-            fprintf(stderr, "restore read-back verification failed after %zu sector(s); pre-restore state is at %s\n",
+            fprintf(stderr,
+                    "restore read-back verification failed after %zu sector(s); pre-restore state "
+                    "is at %s\n",
                     restored_count, pre_restore_path);
             goto done;
         }
         restored_count++;
-        printf("Restored sector 0x%04X and verified an exact read-back match.\n", package.sectors[i].sector);
+        printf("Restored sector 0x%04X and verified an exact read-back match.\n",
+               package.sectors[i].sector);
     }
     printf("Restored and verified %zu sector(s).\n", restored_count);
     result = 0;

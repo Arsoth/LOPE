@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Installed via `make install-hooks`. Blocks commits that fail formatting,
+# linting, or the self-test suite.
+
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$script_dir"
+
+echo "pre-commit: checking formatting and lint..."
+make format-check
+
+echo "pre-commit: running tests..."
+make test

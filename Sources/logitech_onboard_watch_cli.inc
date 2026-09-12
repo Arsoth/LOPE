@@ -7,24 +7,29 @@ typedef struct {
 
 static const char *mouse_button_name(uint8_t bit) {
     switch (bit) {
-        case 0: return "Left";
-        case 1: return "Right";
-        case 2: return "Middle";
-        case 3: return "Back / rear thumb";
-        case 4: return "Forward";
-        case 5: return "Button 6";
-        case 6: return "Button 7";
-        case 7: return "Button 8";
-        default: return "unknown";
+    case 0:
+        return "Left";
+    case 1:
+        return "Right";
+    case 2:
+        return "Middle";
+    case 3:
+        return "Back / rear thumb";
+    case 4:
+        return "Forward";
+    case 5:
+        return "Button 6";
+    case 6:
+        return "Button 7";
+    case 7:
+        return "Button 8";
+    default:
+        return "unknown";
     }
 }
 
-static void watch_report_callback(void *context,
-                                  IOReturn result,
-                                  void *sender,
-                                  IOHIDReportType type,
-                                  uint32_t report_id,
-                                  uint8_t *report,
+static void watch_report_callback(void *context, IOReturn result, void *sender,
+                                  IOHIDReportType type, uint32_t report_id, uint8_t *report,
                                   CFIndex report_length) {
     (void)result;
     (void)sender;
@@ -47,8 +52,8 @@ static void watch_report_callback(void *context,
     state->previous_buttons = buttons;
     for (uint8_t bit = 0; bit < 8; bit++) {
         if ((pressed & (uint8_t)(1u << bit)) != 0) {
-            printf("[%s] press: HID button %u (%s), report 0x%02X\n",
-                   state->label, bit + 1, mouse_button_name(bit), report_id);
+            printf("[%s] press: HID button %u (%s), report 0x%02X\n", state->label, bit + 1,
+                   mouse_button_name(bit), report_id);
             fflush(stdout);
         }
     }
@@ -85,21 +90,20 @@ static int run_watch(const Options *options) {
     WatchState state;
     memset(&state, 0, sizeof(state));
     state.callback_buffer = (uint8_t *)calloc(MAX_REPORT_BYTES, 1);
-    snprintf(state.label, sizeof(state.label), "%s", mouse->product[0] ? mouse->product : "Logitech mouse");
+    snprintf(state.label, sizeof(state.label), "%s",
+             mouse->product[0] ? mouse->product : "Logitech mouse");
     if (state.callback_buffer == NULL) {
         IOHIDDeviceClose(mouse->device, kIOHIDOptionsTypeNone);
         hid_context_release(&context);
         return 1;
     }
-    IOHIDDeviceRegisterInputReportCallback(mouse->device,
-                                           state.callback_buffer,
-                                           MAX_REPORT_BYTES,
-                                           watch_report_callback,
-                                           &state);
+    IOHIDDeviceRegisterInputReportCallback(mouse->device, state.callback_buffer, MAX_REPORT_BYTES,
+                                           watch_report_callback, &state);
     IOHIDDeviceScheduleWithRunLoop(mouse->device, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
     signal(SIGINT, on_sigint);
     printf("Watching %s. Press the rear thumb button once; Ctrl-C stops.\n", state.label);
-    printf("A standard Logitech mouse report commonly identifies the rear thumb as HID button 4 / Back (bit 3).\n");
+    printf("A standard Logitech mouse report commonly identifies the rear thumb as HID button 4 / "
+           "Back (bit 3).\n");
     while (!g_stop_watch) {
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.10, true);
     }
@@ -117,16 +121,19 @@ static void print_usage(const char *program) {
     printf("  list                                  enumerate Logitech HID++ devices\n");
     printf("  info                                  show capabilities and a selected profile\n");
     printf("  profiles                             inspect profile headers and button records\n");
-    printf("  dpi                                  show supported/current and onboard DPI stages\n");
+    printf(
+        "  dpi                                  show supported/current and onboard DPI stages\n");
     printf("  current-dpi                          read only the current sensor 1 DPI\n");
     printf("  set-report-rate HZ                   set and verify the active polling rate\n");
     printf("  dump FILE                            save active profile as a backup package\n");
     printf("  watch                                identify physical mouse button reports\n");
     printf("  self-test                            run local CRC/layout tests\n\n");
     printf("Write commands (preview-only unless --yes is supplied):\n");
-    printf("  bind rear-thumb alt-tab              preview the rear thumb -> Left Alt+Tab change\n");
+    printf(
+        "  bind rear-thumb alt-tab              preview the rear thumb -> Left Alt+Tab change\n");
     printf("  bind --button N alt-tab              preview an explicit profile button change\n");
-    printf("  set-dpi 800,1600                       preview a one-to-five-stage onboard DPI change\n");
+    printf("  set-dpi 800,1600                       preview a one-to-five-stage onboard DPI "
+           "change\n");
     printf("  set-profile-state N enable|disable   preview enabling or disabling profile N\n");
     printf("  apply                                 apply a single GUI save operation\n");
     printf("  restore FILE                         preview restoring a backup package\n\n");
@@ -141,9 +148,11 @@ static void print_usage(const char *program) {
     printf("  --default N                          onboard default DPI stage, 1..5\n");
     printf("  --shift N                            onboard DPI-shift stage, 1..5\n");
     printf("  --backup FILE                        backup path for bind\n");
-    printf("  --button-change normal:N:RAW         batch normal-layer record (apply; RAW is 8 hex digits)\n");
+    printf("  --button-change normal:N:RAW         batch normal-layer record (apply; RAW is 8 hex "
+           "digits)\n");
     printf("  --button-change gshift:N:RAW         batch G-Shift-layer record (apply)\n");
-    printf("  --rgb-change N:RRGGBB                batch RGB zone color (apply; zone is 1-based)\n");
+    printf(
+        "  --rgb-change N:RRGGBB                batch RGB zone color (apply; zone is 1-based)\n");
     printf("  --dpi VALUES                         batch DPI stages, comma-separated\n");
     printf("  --report-rate HZ                     batch profile polling rate (apply)\n");
     printf("  --profile-state-change N:STATE       batch profile state (enable or disable)\n");
@@ -168,7 +177,8 @@ static int parse_decimal(const char *text, int *value) {
 }
 
 static int parse_slot(const char *text, int *slot) {
-    if (strcmp(text, "ff") == 0 || strcmp(text, "FF") == 0 || strcmp(text, "0xff") == 0 || strcmp(text, "0xFF") == 0) {
+    if (strcmp(text, "ff") == 0 || strcmp(text, "FF") == 0 || strcmp(text, "0xff") == 0 ||
+        strcmp(text, "0xFF") == 0) {
         *slot = 0xFF;
         return 1;
     }
@@ -216,14 +226,14 @@ static int parse_options(int argc, char **argv, Options *options) {
             options->include_report_rate = true;
             continue;
         }
-        if (strcmp(arg, "--device") == 0 || strcmp(arg, "--device-key") == 0 || strcmp(arg, "--slot") == 0 ||
-            strcmp(arg, "--profile") == 0 || strcmp(arg, "--button") == 0 ||
-            strcmp(arg, "--backup") == 0 || strcmp(arg, "--default") == 0 ||
-            strcmp(arg, "--shift") == 0 || strcmp(arg, "--dpi") == 0 ||
-            strcmp(arg, "--report-rate") == 0 ||
+        if (strcmp(arg, "--device") == 0 || strcmp(arg, "--device-key") == 0 ||
+            strcmp(arg, "--slot") == 0 || strcmp(arg, "--profile") == 0 ||
+            strcmp(arg, "--button") == 0 || strcmp(arg, "--backup") == 0 ||
+            strcmp(arg, "--default") == 0 || strcmp(arg, "--shift") == 0 ||
+            strcmp(arg, "--dpi") == 0 || strcmp(arg, "--report-rate") == 0 ||
             strcmp(arg, "--button-change") == 0 || strcmp(arg, "--rgb-change") == 0 ||
-            strcmp(arg, "--profile-state-change") == 0 ||
-            strcmp(arg, "--backup-directory") == 0 || strcmp(arg, "--operation-id") == 0) {
+            strcmp(arg, "--profile-state-change") == 0 || strcmp(arg, "--backup-directory") == 0 ||
+            strcmp(arg, "--operation-id") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "%s requires a value\n", arg);
                 return 0;
@@ -252,12 +262,14 @@ static int parse_options(int argc, char **argv, Options *options) {
                     return 0;
                 }
             } else if (strcmp(arg, "--default") == 0) {
-                if (!parse_decimal(value, &options->dpi_default) || options->dpi_default < 1 || options->dpi_default > 5) {
+                if (!parse_decimal(value, &options->dpi_default) || options->dpi_default < 1 ||
+                    options->dpi_default > 5) {
                     fprintf(stderr, "invalid --default value '%s'\n", value);
                     return 0;
                 }
             } else if (strcmp(arg, "--shift") == 0) {
-                if (!parse_decimal(value, &options->dpi_shift) || options->dpi_shift < 1 || options->dpi_shift > 5) {
+                if (!parse_decimal(value, &options->dpi_shift) || options->dpi_shift < 1 ||
+                    options->dpi_shift > 5) {
                     fprintf(stderr, "invalid --shift value '%s'\n", value);
                     return 0;
                 }

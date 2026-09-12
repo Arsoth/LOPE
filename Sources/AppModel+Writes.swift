@@ -78,7 +78,9 @@ extension AppModel {
       status = "Profile enable-state editing is unavailable for this legacy profile path."
       return
     }
-    guard !buttonChanges.isEmpty || dpiChanged || pollingRateChanged || !rgbChanges.isEmpty || !profileChanges.isEmpty
+    guard
+      !buttonChanges.isEmpty || dpiChanged || pollingRateChanged || !rgbChanges.isEmpty
+        || !profileChanges.isEmpty
     else {
       status = "No changes to apply."
       return

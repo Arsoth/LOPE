@@ -263,11 +263,22 @@ Run the repository checks from its root:
 ```sh
 make
 make test
+make lint             # swift-format + clang-format, check only
+make format           # swift-format + clang-format, writes changes
+make coverage         # llvm-cov report for the C core and Swift tests
+make coverage-check   # fails, listing every file below threshold
 ```
 
-`make test` runs the C engine self-test and the Swift metadata/parser test. The
-Swift test also validates profile metadata, device classification, appearance
-choices, sleep guidance, and the wired-access helper behavior.
+`make test` runs the C engine self-test (`./lope self-test`) and the Swift
+XCTest suite (`swift test`, defined by `Package.swift` and
+`Tests/*.swift`). The Swift tests validate profile metadata, device
+classification, appearance choices, sleep guidance, DPI/polling-rate
+parsing, backup-storage paths, RGB handling, and the write-validation guards
+in `AppModel`.
+
+`make install-hooks` installs a pre-commit hook (from
+`scripts/git-hooks/pre-commit`) that runs `make lint` and `make test`
+before every commit; run it once per clone.
 
 For descriptor additions, follow [Profiles/README.md](../Profiles/README.md)
 and add a focused test before enabling a new write path.

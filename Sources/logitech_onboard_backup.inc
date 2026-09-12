@@ -37,32 +37,21 @@ static uint16_t get_be16(const uint8_t *bytes) {
     return (uint16_t)(((uint16_t)bytes[0] << 8) | bytes[1]);
 }
 
-static int package_write_multi(const char *path,
-                               const Device *device,
-                               uint8_t profile_format,
-                               const BackupSectorSource *sectors,
-                               size_t sector_count,
+static int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
+                               const BackupSectorSource *sectors, size_t sector_count,
                                bool refuse_overwrite);
 
-static int package_write(const char *path,
-                         const Device *device,
-                         const Profile *profile,
-                         const uint8_t *data,
-                         bool refuse_overwrite) {
-    BackupSectorSource sector = {
-        .sector = profile->headers[profile->selected_header].sector,
-        .size = profile->data_length,
-        .data = data
-    };
-    return package_write_multi(path, device, profile->info.profile_format,
-                               &sector, 1, refuse_overwrite);
+static int package_write(const char *path, const Device *device, const Profile *profile,
+                         const uint8_t *data, bool refuse_overwrite) {
+    BackupSectorSource sector = {.sector = profile->headers[profile->selected_header].sector,
+                                 .size = profile->data_length,
+                                 .data = data};
+    return package_write_multi(path, device, profile->info.profile_format, &sector, 1,
+                               refuse_overwrite);
 }
 
-static int package_write_multi(const char *path,
-                               const Device *device,
-                               uint8_t profile_format,
-                               const BackupSectorSource *sectors,
-                               size_t sector_count,
+static int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
+                               const BackupSectorSource *sectors, size_t sector_count,
                                bool refuse_overwrite) {
     if (sector_count == 0 || sector_count > MAX_BACKUP_SECTORS) {
         fprintf(stderr, "cannot create a backup package with %zu sectors\n", sector_count);
@@ -82,9 +71,9 @@ static int package_write_multi(const char *path,
     memset(table, 0, sizeof(table));
     size_t table_length = sector_count * 4;
     for (size_t i = 0; i < sector_count; i++) {
-        if (sectors[i].data == NULL || sectors[i].size < 32 ||
-            sectors[i].size > MAX_SECTOR_BYTES) {
-            fprintf(stderr, "cannot create a backup package with invalid sector %zu metadata\n", i + 1);
+        if (sectors[i].data == NULL || sectors[i].size < 32 || sectors[i].size > MAX_SECTOR_BYTES) {
+            fprintf(stderr, "cannot create a backup package with invalid sector %zu metadata\n",
+                    i + 1);
             return 0;
         }
         put_be16(table + i * 4, sectors[i].sector);
@@ -166,7 +155,8 @@ static int package_read(const char *path, BackupPackage *package) {
         }
         for (size_t previous = 0; previous < i; previous++) {
             if (package->sectors[previous].sector == package->sectors[i].sector) {
-                fprintf(stderr, "backup %s contains duplicate sector 0x%04X\n", path, package->sectors[i].sector);
+                fprintf(stderr, "backup %s contains duplicate sector 0x%04X\n", path,
+                        package->sectors[i].sector);
                 close(fd);
                 package_release(package);
                 return 0;
@@ -190,8 +180,7 @@ static int package_read(const char *path, BackupPackage *package) {
             package_release(package);
             return 0;
         }
-        bool legacy_g600 = package->profile_format == 0xFF &&
-                           package->product_id == 0xC24A;
+        bool legacy_g600 = package->profile_format == 0xFF && package->product_id == 0xC24A;
         if (!legacy_g600 && !sector_crc_ok(package->sectors[i].data, package->sectors[i].size)) {
             fprintf(stderr, "backup %s has an invalid CRC in sector %zu\n", path, i + 1);
             close(fd);
@@ -222,7 +211,9 @@ static void default_backup_path(char *path, size_t path_size, const char *prefix
 }
 
 static int ensure_write_confirmation(const char *operation) {
-    fprintf(stderr, "%s is preview-only by default. Add --yes after reviewing the output to permit the mouse write.\n",
+    fprintf(stderr,
+            "%s is preview-only by default. Add --yes after reviewing the output to permit the "
+            "mouse write.\n",
             operation);
     return 0;
 }
@@ -233,10 +224,12 @@ static int validate_profile_for_write(const Profile *profile) {
         return 0;
     }
     if (!profile->layout_supported) {
-        fprintf(stderr, "refusing to write: the reported profile format/layout was not validated\n");
+        fprintf(stderr,
+                "refusing to write: the reported profile format/layout was not validated\n");
         return 0;
     }
-    if (profile->button_offset + (size_t)profile->info.button_count * 4 > profile->data_length - 2) {
+    if (profile->button_offset + (size_t)profile->info.button_count * 4 >
+        profile->data_length - 2) {
         fprintf(stderr, "refusing to write: validated button array would exceed the sector\n");
         return 0;
     }

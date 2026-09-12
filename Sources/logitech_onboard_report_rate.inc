@@ -15,19 +15,16 @@ static uint32_t report_rate_hertz_from_interval(uint8_t milliseconds) {
     return (1000u + milliseconds / 2u) / milliseconds;
 }
 
-static size_t report_rate_entries_from_mask(uint16_t feature_id,
-                                            uint16_t mask,
-                                            ReportRateEntry *entries,
-                                            size_t capacity) {
+static size_t report_rate_entries_from_mask(uint16_t feature_id, uint16_t mask,
+                                            ReportRateEntry *entries, size_t capacity) {
     if (entries == NULL || capacity == 0) {
         return 0;
     }
 
     size_t count = 0;
     if (feature_id == FEATURE_EXTENDED_REPORT_RATE) {
-        static const uint32_t extended_rates[MAX_REPORT_RATES] = {
-            125, 250, 500, 1000, 2000, 4000, 8000, 0
-        };
+        static const uint32_t extended_rates[MAX_REPORT_RATES] = {125,  250,  500,  1000,
+                                                                  2000, 4000, 8000, 0};
         for (uint8_t index = 0; index < 7 && count < capacity; index++) {
             if ((mask & (uint16_t)(1u << index)) != 0) {
                 entries[count++] = (ReportRateEntry){extended_rates[index], index};
@@ -43,9 +40,7 @@ static size_t report_rate_entries_from_mask(uint16_t feature_id,
             uint16_t bit = (uint16_t)(1u << (milliseconds - 1));
             if ((mask & bit) != 0) {
                 entries[count++] = (ReportRateEntry){
-                    report_rate_hertz_from_interval((uint8_t)milliseconds),
-                    (uint8_t)milliseconds
-                };
+                    report_rate_hertz_from_interval((uint8_t)milliseconds), (uint8_t)milliseconds};
             }
         }
     }
@@ -59,14 +54,12 @@ static uint8_t report_rate_connection_type(const Device *device) {
     // since 0x8061's active-list query remains authoritative for visibility.
     const char *connection = device_connection(device);
     return connection != NULL &&
-                   (strcmp(connection, "LIGHTSPEED") == 0 ||
-                    strcmp(connection, "Wireless") == 0)
-        ? 1
-        : 0;
+                   (strcmp(connection, "LIGHTSPEED") == 0 || strcmp(connection, "Wireless") == 0)
+               ? 1
+               : 0;
 }
 
-static bool read_report_rate_capabilities(Device *device,
-                                          ReportRateCapabilities *capabilities) {
+static bool read_report_rate_capabilities(Device *device, ReportRateCapabilities *capabilities) {
     if (device == NULL || capabilities == NULL) {
         return false;
     }
@@ -76,28 +69,22 @@ static bool read_report_rate_capabilities(Device *device,
     if (device_feature_index(device, FEATURE_EXTENDED_REPORT_RATE, &unused_index)) {
         capabilities->feature_id = FEATURE_EXTENDED_REPORT_RATE;
         const uint8_t params[3] = {0, 0, 0};
-        Reply reply = device_call(device, FEATURE_EXTENDED_REPORT_RATE, 0x10,
-                                  params, sizeof(params), 1.0);
+        Reply reply =
+            device_call(device, FEATURE_EXTENDED_REPORT_RATE, 0x10, params, sizeof(params), 1.0);
         if (reply.status != REPLY_OK || reply.length < 2) {
             return false;
         }
-        capabilities->supported_mask = (uint16_t)(((uint16_t)reply.bytes[0] << 8) |
-                                                  reply.bytes[1]);
-        capabilities->rate_count = report_rate_entries_from_mask(
-            capabilities->feature_id,
-            capabilities->supported_mask,
-            capabilities->rates,
-            MAX_REPORT_RATES
-        );
+        capabilities->supported_mask = (uint16_t)(((uint16_t)reply.bytes[0] << 8) | reply.bytes[1]);
+        capabilities->rate_count =
+            report_rate_entries_from_mask(capabilities->feature_id, capabilities->supported_mask,
+                                          capabilities->rates, MAX_REPORT_RATES);
         if (capabilities->rate_count == 0) {
             return false;
         }
 
-        const uint8_t connection_params[3] = {
-            report_rate_connection_type(device), 0, 0
-        };
-        reply = device_call(device, FEATURE_EXTENDED_REPORT_RATE, 0x20,
-                            connection_params, sizeof(connection_params), 1.0);
+        const uint8_t connection_params[3] = {report_rate_connection_type(device), 0, 0};
+        reply = device_call(device, FEATURE_EXTENDED_REPORT_RATE, 0x20, connection_params,
+                            sizeof(connection_params), 1.0);
         if (reply.status == REPLY_OK && reply.length >= 1 && reply.bytes[0] < 7) {
             // The response is the enum/bit position, while rates is compacted
             // to only the set bits. Find the matching entry rather than using
@@ -116,26 +103,23 @@ static bool read_report_rate_capabilities(Device *device,
     if (device_feature_index(device, FEATURE_ADJUSTABLE_REPORT_RATE, &unused_index)) {
         capabilities->feature_id = FEATURE_ADJUSTABLE_REPORT_RATE;
         const uint8_t params[3] = {0, 0, 0};
-        Reply reply = device_call(device, FEATURE_ADJUSTABLE_REPORT_RATE, 0x00,
-                                  params, sizeof(params), 1.0);
+        Reply reply =
+            device_call(device, FEATURE_ADJUSTABLE_REPORT_RATE, 0x00, params, sizeof(params), 1.0);
         if (reply.status != REPLY_OK || reply.length < 1) {
             return false;
         }
         capabilities->supported_mask = reply.bytes[0];
-        capabilities->rate_count = report_rate_entries_from_mask(
-            capabilities->feature_id,
-            capabilities->supported_mask,
-            capabilities->rates,
-            MAX_REPORT_RATES
-        );
+        capabilities->rate_count =
+            report_rate_entries_from_mask(capabilities->feature_id, capabilities->supported_mask,
+                                          capabilities->rates, MAX_REPORT_RATES);
         if (capabilities->rate_count == 0) {
             return false;
         }
 
-        reply = device_call(device, FEATURE_ADJUSTABLE_REPORT_RATE, 0x10,
-                            params, sizeof(params), 1.0);
-        if (reply.status == REPLY_OK && reply.length >= 1 &&
-            reply.bytes[0] >= 1 && reply.bytes[0] <= 8) {
+        reply =
+            device_call(device, FEATURE_ADJUSTABLE_REPORT_RATE, 0x10, params, sizeof(params), 1.0);
+        if (reply.status == REPLY_OK && reply.length >= 1 && reply.bytes[0] >= 1 &&
+            reply.bytes[0] <= 8) {
             capabilities->current_hertz = report_rate_hertz_from_interval(reply.bytes[0]);
             capabilities->current_valid =
                 (capabilities->supported_mask & (uint16_t)(1u << (reply.bytes[0] - 1))) != 0;
@@ -184,15 +168,15 @@ static bool parse_report_rate_hertz(const char *text, uint32_t *hertz) {
 // byte zero. The first four 0x8061 values are the same 8/4/2/1 ms intervals;
 // the 2000/4000/8000 Hz values are connection-level only and cannot be saved
 // in this profile field without changing the profile format.
-static bool report_rate_profile_interval(Device *device,
-                                         uint32_t requested_hertz,
+static bool report_rate_profile_interval(Device *device, uint32_t requested_hertz,
                                          uint8_t *milliseconds) {
     if (device == NULL || milliseconds == NULL) {
         return false;
     }
     ReportRateCapabilities capabilities;
     if (!read_report_rate_capabilities(device, &capabilities)) {
-        fprintf(stderr, "refusing to save profile polling rate: no readable HID++ report-rate feature\n");
+        fprintf(stderr,
+                "refusing to save profile polling rate: no readable HID++ report-rate feature\n");
         return false;
     }
     for (size_t i = 0; i < capabilities.rate_count; i++) {
@@ -200,24 +184,26 @@ static bool report_rate_profile_interval(Device *device,
         if (entry.hertz != requested_hertz) {
             continue;
         }
-        if (capabilities.feature_id == FEATURE_ADJUSTABLE_REPORT_RATE &&
-            entry.wire_value >= 1 && entry.wire_value <= 8) {
+        if (capabilities.feature_id == FEATURE_ADJUSTABLE_REPORT_RATE && entry.wire_value >= 1 &&
+            entry.wire_value <= 8) {
             *milliseconds = entry.wire_value;
             return true;
         }
-        if (capabilities.feature_id == FEATURE_EXTENDED_REPORT_RATE &&
-            entry.wire_value <= 3) {
+        if (capabilities.feature_id == FEATURE_EXTENDED_REPORT_RATE && entry.wire_value <= 3) {
             static const uint8_t extended_intervals[] = {8, 4, 2, 1};
             *milliseconds = extended_intervals[entry.wire_value];
             return true;
         }
         fprintf(stderr,
-                "refusing to save profile polling rate: %u Hz is not representable in the onboard profile format\n",
+                "refusing to save profile polling rate: %u Hz is not representable in the onboard "
+                "profile format\n",
                 requested_hertz);
         return false;
     }
-    fprintf(stderr, "refusing to save profile polling rate: %u Hz is not supported on the active connection\n",
-            requested_hertz);
+    fprintf(
+        stderr,
+        "refusing to save profile polling rate: %u Hz is not supported on the active connection\n",
+        requested_hertz);
     return false;
 }
 
@@ -258,7 +244,8 @@ static int run_set_report_rate(const Options *options) {
         }
     }
     if (selected == NULL) {
-        fprintf(stderr, "refusing to set polling rate: %u Hz is not supported on the active connection\n",
+        fprintf(stderr,
+                "refusing to set polling rate: %u Hz is not supported on the active connection\n",
                 requested_hertz);
         hid_context_release(&context);
         return 1;
@@ -266,8 +253,8 @@ static int run_set_report_rate(const Options *options) {
 
     uint8_t params[3] = {selected->wire_value, 0, 0};
     uint8_t function = capabilities.feature_id == FEATURE_EXTENDED_REPORT_RATE ? 0x30 : 0x20;
-    Reply reply = device_call(device, capabilities.feature_id, function,
-                              params, sizeof(params), 1.0);
+    Reply reply =
+        device_call(device, capabilities.feature_id, function, params, sizeof(params), 1.0);
     if (reply.status != REPLY_OK) {
         print_reply_error("set polling rate", reply);
         hid_context_release(&context);
@@ -275,8 +262,8 @@ static int run_set_report_rate(const Options *options) {
     }
 
     ReportRateCapabilities verified;
-    if (!read_report_rate_capabilities(device, &verified) ||
-        !verified.current_valid || verified.current_hertz != requested_hertz) {
+    if (!read_report_rate_capabilities(device, &verified) || !verified.current_valid ||
+        verified.current_hertz != requested_hertz) {
         fprintf(stderr, "polling-rate write was not verified by a current-rate read-back\n");
         hid_context_release(&context);
         return 1;

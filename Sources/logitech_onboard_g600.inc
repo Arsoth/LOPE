@@ -13,11 +13,8 @@
 #define G600_FIRST_PROFILE_REPORT 0xF3
 #define G600_BACKUP_PROFILE_FORMAT 0xFF
 
-static int package_write_multi(const char *path,
-                               const Device *device,
-                               uint8_t profile_format,
-                               const BackupSectorSource *sectors,
-                               size_t sector_count,
+static int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
+                               const BackupSectorSource *sectors, size_t sector_count,
                                bool refuse_overwrite);
 static void package_release(BackupPackage *package);
 static int ensure_write_confirmation(const char *operation);
@@ -50,11 +47,11 @@ static bool g600_read_profile(Device *device, int profile_number,
         return false;
     }
     size_t length = 0;
-    if (!channel_get_feature_report(&device->iface->channel, report_id,
-                                    report, G600_REPORT_BYTES, &length) ||
+    if (!channel_get_feature_report(&device->iface->channel, report_id, report, G600_REPORT_BYTES,
+                                    &length) ||
         length < G600_REPORT_BYTES || report[0] != report_id) {
-        fprintf(stderr, "could not read G600 profile %d feature report 0x%02X\n",
-                profile_number, report_id);
+        fprintf(stderr, "could not read G600 profile %d feature report 0x%02X\n", profile_number,
+                report_id);
         return false;
     }
     return true;
@@ -67,8 +64,8 @@ static bool g600_write_profile(Device *device, int profile_number,
         report[0] != report_id) {
         return false;
     }
-    return channel_set_feature_report(&device->iface->channel, report_id,
-                                      report, G600_REPORT_BYTES);
+    return channel_set_feature_report(&device->iface->channel, report_id, report,
+                                      G600_REPORT_BYTES);
 }
 
 static void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {
@@ -92,21 +89,51 @@ static void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {
         return;
     }
     switch (code) {
-        case 0x11: spec[0] = 0x90; spec[1] = 0x03; spec[2] = 0x00; spec[3] = 0x00; return;
-        case 0x12: spec[0] = 0x90; spec[1] = 0x04; spec[2] = 0x00; spec[3] = 0x00; return;
-        case 0x13: spec[0] = 0x90; spec[1] = 0x05; spec[2] = 0x00; spec[3] = 0x00; return;
-        case 0x14: spec[0] = 0x90; spec[1] = 0x0A; spec[2] = 0x00; spec[3] = 0x00; return;
-        case 0x15: spec[0] = 0x90; spec[1] = 0x07; spec[2] = 0x00; spec[3] = 0x00; return;
-        case 0x17: spec[0] = 0x90; spec[1] = 0x0B; spec[2] = 0x00; spec[3] = 0x00; return;
-        default:
-            // Preserve an otherwise unknown legacy function as a consumer-like
-            // extension that this writer can round-trip without guessing its
-            // meaning. The UI still presents the raw record for that case.
-            spec[0] = 0x80;
-            spec[1] = 0x03;
-            spec[2] = 0x00;
-            spec[3] = code;
-            return;
+    case 0x11:
+        spec[0] = 0x90;
+        spec[1] = 0x03;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
+        return;
+    case 0x12:
+        spec[0] = 0x90;
+        spec[1] = 0x04;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
+        return;
+    case 0x13:
+        spec[0] = 0x90;
+        spec[1] = 0x05;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
+        return;
+    case 0x14:
+        spec[0] = 0x90;
+        spec[1] = 0x0A;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
+        return;
+    case 0x15:
+        spec[0] = 0x90;
+        spec[1] = 0x07;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
+        return;
+    case 0x17:
+        spec[0] = 0x90;
+        spec[1] = 0x0B;
+        spec[2] = 0x00;
+        spec[3] = 0x00;
+        return;
+    default:
+        // Preserve an otherwise unknown legacy function as a consumer-like
+        // extension that this writer can round-trip without guessing its
+        // meaning. The UI still presents the raw record for that case.
+        spec[0] = 0x80;
+        spec[1] = 0x03;
+        spec[2] = 0x00;
+        spec[3] = code;
+        return;
     }
 }
 
@@ -123,12 +150,23 @@ static bool g600_spec_to_native(const uint8_t spec[4], uint8_t native[3]) {
     }
     if (spec[0] == 0x80 && spec[1] == 0x01 && spec[2] == 0x00) {
         switch (spec[3]) {
-            case 0x01: native[0] = 1; break;
-            case 0x02: native[0] = 2; break;
-            case 0x04: native[0] = 3; break;
-            case 0x08: native[0] = 4; break;
-            case 0x10: native[0] = 5; break;
-            default: return false;
+        case 0x01:
+            native[0] = 1;
+            break;
+        case 0x02:
+            native[0] = 2;
+            break;
+        case 0x04:
+            native[0] = 3;
+            break;
+        case 0x08:
+            native[0] = 4;
+            break;
+        case 0x10:
+            native[0] = 5;
+            break;
+        default:
+            return false;
         }
         native[1] = 0;
         native[2] = 0;
@@ -136,25 +174,42 @@ static bool g600_spec_to_native(const uint8_t spec[4], uint8_t native[3]) {
     }
     if (spec[0] == 0x80 && spec[1] == 0x03 && spec[2] == 0x00) {
         switch (spec[3]) {
-            case 0x11: case 0x12: case 0x13: case 0x14:
-            case 0x15: case 0x17:
-                native[0] = spec[3];
-                native[1] = 0;
-                native[2] = 0;
-                return true;
-            default:
-                return false;
+        case 0x11:
+        case 0x12:
+        case 0x13:
+        case 0x14:
+        case 0x15:
+        case 0x17:
+            native[0] = spec[3];
+            native[1] = 0;
+            native[2] = 0;
+            return true;
+        default:
+            return false;
         }
     }
     if (spec[0] == 0x90 && spec[2] == 0x00 && spec[3] == 0x00) {
         switch (spec[1]) {
-            case 0x03: native[0] = 0x11; break;
-            case 0x04: native[0] = 0x12; break;
-            case 0x05: native[0] = 0x13; break;
-            case 0x0A: native[0] = 0x14; break;
-            case 0x07: native[0] = 0x15; break;
-            case 0x0B: native[0] = 0x17; break;
-            default: return false;
+        case 0x03:
+            native[0] = 0x11;
+            break;
+        case 0x04:
+            native[0] = 0x12;
+            break;
+        case 0x05:
+            native[0] = 0x13;
+            break;
+        case 0x0A:
+            native[0] = 0x14;
+            break;
+        case 0x07:
+            native[0] = 0x15;
+            break;
+        case 0x0B:
+            native[0] = 0x17;
+            break;
+        default:
+            return false;
         }
         native[1] = 0;
         native[2] = 0;
@@ -173,18 +228,42 @@ static void g600_describe_native(const uint8_t native[3], char *out, size_t out_
         return;
     }
     switch (native[0]) {
-        case 1: snprintf(out, out_size, "Left click"); return;
-        case 2: snprintf(out, out_size, "Right click"); return;
-        case 3: snprintf(out, out_size, "Middle click"); return;
-        case 4: snprintf(out, out_size, "Back / rear thumb"); return;
-        case 5: snprintf(out, out_size, "Forward"); return;
-        case 0x11: snprintf(out, out_size, "next DPI"); return;
-        case 0x12: snprintf(out, out_size, "previous DPI"); return;
-        case 0x13: snprintf(out, out_size, "cycle DPI"); return;
-        case 0x14: snprintf(out, out_size, "cycle profile"); return;
-        case 0x15: snprintf(out, out_size, "shift DPI"); return;
-        case 0x17: snprintf(out, out_size, "G-Shift"); return;
-        default: snprintf(out, out_size, "G600 function 0x%02X", native[0]); return;
+    case 1:
+        snprintf(out, out_size, "Left click");
+        return;
+    case 2:
+        snprintf(out, out_size, "Right click");
+        return;
+    case 3:
+        snprintf(out, out_size, "Middle click");
+        return;
+    case 4:
+        snprintf(out, out_size, "Back / rear thumb");
+        return;
+    case 5:
+        snprintf(out, out_size, "Forward");
+        return;
+    case 0x11:
+        snprintf(out, out_size, "next DPI");
+        return;
+    case 0x12:
+        snprintf(out, out_size, "previous DPI");
+        return;
+    case 0x13:
+        snprintf(out, out_size, "cycle DPI");
+        return;
+    case 0x14:
+        snprintf(out, out_size, "cycle profile");
+        return;
+    case 0x15:
+        snprintf(out, out_size, "shift DPI");
+        return;
+    case 0x17:
+        snprintf(out, out_size, "G-Shift");
+        return;
+    default:
+        snprintf(out, out_size, "G600 function 0x%02X", native[0]);
+        return;
     }
 }
 
@@ -192,20 +271,21 @@ static void g600_print_hex4(const uint8_t bytes[4]) {
     printf("%02X %02X %02X %02X", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-static void g600_print_profile_summary(int profile_number,
-                                       const uint8_t report[G600_REPORT_BYTES],
+static void g600_print_profile_summary(int profile_number, const uint8_t report[G600_REPORT_BYTES],
                                        bool show_buttons) {
     uint8_t report_id = report[0];
-    printf("Profile %d (sector 0x%04X, enabled=yes)\n",
-           profile_number, g600_profile_sector(profile_number));
-    printf("  format: 0x%02X, macro format: 0x00, profiles: %d, buttons: %d, sectors: %d, sector bytes: %d\n",
-           G600_BACKUP_PROFILE_FORMAT, G600_PROFILE_COUNT, G600_BUTTON_COUNT,
-           G600_PROFILE_COUNT, G600_REPORT_BYTES);
+    printf("Profile %d (sector 0x%04X, enabled=yes)\n", profile_number,
+           g600_profile_sector(profile_number));
+    printf("  format: 0x%02X, macro format: 0x00, profiles: %d, buttons: %d, sectors: %d, sector "
+           "bytes: %d\n",
+           G600_BACKUP_PROFILE_FORMAT, G600_PROFILE_COUNT, G600_BUTTON_COUNT, G600_PROFILE_COUNT,
+           G600_REPORT_BYTES);
     printf("  CRC: NOT_APPLICABLE (legacy feature report)\n");
     printf("  DPI stages: not recognized; stage editing is disabled\n");
     printf("  button array: offset %d (20/20 structurally valid, 20 recognized)\n",
            G600_NORMAL_BUTTON_OFFSET);
-    printf("  G-Shift layout: supported (legacy feature report 0x%02X; offset %d; 20/20 structurally valid, 20 recognized)\n",
+    printf("  G-Shift layout: supported (legacy feature report 0x%02X; offset %d; 20/20 "
+           "structurally valid, 20 recognized)\n",
            report_id, G600_GSHIFT_BUTTON_OFFSET);
     if (!show_buttons) {
         return;
@@ -214,15 +294,15 @@ static void g600_print_profile_summary(int profile_number,
         uint8_t spec[4];
         char description[160];
         g600_native_to_spec(report + G600_NORMAL_BUTTON_OFFSET + i * 3, spec);
-        g600_describe_native(report + G600_NORMAL_BUTTON_OFFSET + i * 3,
-                             description, sizeof(description));
+        g600_describe_native(report + G600_NORMAL_BUTTON_OFFSET + i * 3, description,
+                             sizeof(description));
         printf("  button %zu: %-30s [", i + 1, description);
         g600_print_hex4(spec);
         printf("]\n");
 
         g600_native_to_spec(report + G600_GSHIFT_BUTTON_OFFSET + i * 3, spec);
-        g600_describe_native(report + G600_GSHIFT_BUTTON_OFFSET + i * 3,
-                             description, sizeof(description));
+        g600_describe_native(report + G600_GSHIFT_BUTTON_OFFSET + i * 3, description,
+                             sizeof(description));
         printf("  G-Shift button %zu: %-24s [", i + 1, description);
         g600_print_hex4(spec);
         printf("]\n");
@@ -232,8 +312,8 @@ static void g600_print_profile_summary(int profile_number,
 static int run_g600_info(const Options *options, Device *device) {
     int profile_number = options->profile > 0 ? options->profile : 1;
     if (!g600_profile_report_id(profile_number, NULL)) {
-        fprintf(stderr, "G600 profile %d is out of range 1..%d\n",
-                profile_number, G600_PROFILE_COUNT);
+        fprintf(stderr, "G600 profile %d is out of range 1..%d\n", profile_number,
+                G600_PROFILE_COUNT);
         return 1;
     }
     uint8_t report[G600_REPORT_BYTES];
@@ -249,15 +329,13 @@ static int run_g600_info(const Options *options, Device *device) {
 
 static int run_g600_profiles(const Options *options, Device *device) {
     if (options->profile > G600_PROFILE_COUNT) {
-        fprintf(stderr, "profile %d is out of range 1..%d\n",
-                options->profile, G600_PROFILE_COUNT);
+        fprintf(stderr, "profile %d is out of range 1..%d\n", options->profile, G600_PROFILE_COUNT);
         return 1;
     }
     printf("Onboard profiles for %s:\n", device_label(device));
     printf("Profile capacity: %d\n", G600_PROFILE_COUNT);
     for (int profile = 1; profile <= G600_PROFILE_COUNT; profile++) {
-        printf("Profile %d (sector 0x%04X, enabled=yes)\n",
-               profile, g600_profile_sector(profile));
+        printf("Profile %d (sector 0x%04X, enabled=yes)\n", profile, g600_profile_sector(profile));
     }
     if (options->headers_only && !options->include_dpi) {
         return 0;
@@ -290,22 +368,21 @@ static int run_g600_profiles(const Options *options, Device *device) {
 static bool g600_make_backup_path(const Options *options, const char *operation_id,
                                   char path[512]) {
     const char *base = options->backup_directory == NULL || *options->backup_directory == '\0'
-        ? "." : options->backup_directory;
+                           ? "."
+                           : options->backup_directory;
     int length = snprintf(path, 512, "%s/%s.logiob", base,
                           operation_id == NULL ? "g600-save" : operation_id);
     return length > 0 && length < 512;
 }
 
-static int run_g600_apply(const Options *options,
-                          Device *device,
-                          const int *requested_buttons,
-                          const bool *requested_gshift,
-                          const uint8_t requested_specs[][4],
-                          size_t requested_count,
-                          const char *operation_id) {
+static int run_g600_apply(const Options *options, Device *device, const int *requested_buttons,
+                          const bool *requested_gshift, const uint8_t requested_specs[][4],
+                          size_t requested_count, const char *operation_id) {
     if (options->rgb_change_count > 0 || options->dpi_values != NULL ||
         options->profile_state_change_count > 0) {
-        fprintf(stderr, "G600 apply currently supports button and G-Shift assignments only; DPI, RGB, and profile-state writes are not part of its legacy feature reports\n");
+        fprintf(stderr,
+                "G600 apply currently supports button and G-Shift assignments only; DPI, RGB, and "
+                "profile-state writes are not part of its legacy feature reports\n");
         return 1;
     }
     uint8_t report[G600_REPORT_BYTES];
@@ -322,7 +399,9 @@ static int run_g600_apply(const Options *options,
         }
         uint8_t native[3];
         if (!g600_spec_to_native(requested_specs[i], native)) {
-            fprintf(stderr, "refusing to apply: raw record for G600 button %d is not supported by its native mapping\n",
+            fprintf(stderr,
+                    "refusing to apply: raw record for G600 button %d is not supported by its "
+                    "native mapping\n",
                     requested_buttons[i]);
             return 1;
         }
@@ -349,33 +428,36 @@ static int run_g600_apply(const Options *options,
         return 1;
     }
     BackupSectorSource backup = {
-        .sector = g600_profile_sector(options->profile),
-        .size = G600_REPORT_BYTES,
-        .data = report
-    };
-    if (!package_write_multi(backup_path, device, G600_BACKUP_PROFILE_FORMAT,
-                             &backup, 1, true)) {
-        fprintf(stderr, "save operation %s stopped before any G600 write; the exact backup could not be created\n",
+        .sector = g600_profile_sector(options->profile), .size = G600_REPORT_BYTES, .data = report};
+    if (!package_write_multi(backup_path, device, G600_BACKUP_PROFILE_FORMAT, &backup, 1, true)) {
+        fprintf(stderr,
+                "save operation %s stopped before any G600 write; the exact backup could not be "
+                "created\n",
                 operation_id);
         return 1;
     }
     printf("Backup saved: %s (1 exact G600 profile snapshot)\n", backup_path);
     printf("Writing G600 profile report 0x%02X\n", report[0]);
     if (!g600_write_profile(device, options->profile, updated)) {
-        fprintf(stderr, "save operation %s failed while writing G600 profile report 0x%02X; backup is at %s\n",
-                operation_id, report[0], backup_path);
+        fprintf(
+            stderr,
+            "save operation %s failed while writing G600 profile report 0x%02X; backup is at %s\n",
+            operation_id, report[0], backup_path);
         return 1;
     }
     uint8_t verified[G600_REPORT_BYTES];
     if (!g600_read_profile(device, options->profile, verified) ||
         memcmp(updated, verified, sizeof(updated)) != 0) {
-        fprintf(stderr, "save operation %s failed: G600 profile report 0x%02X was not verified; backup is at %s\n",
+        fprintf(stderr,
+                "save operation %s failed: G600 profile report 0x%02X was not verified; backup is "
+                "at %s\n",
                 operation_id, report[0], backup_path);
         return 1;
     }
     printf("Verified sector 0x%04X (G600 profile): complete feature report matches.\n",
            g600_profile_sector(options->profile));
-    printf("Save operation %s complete: wrote 1 sector(s); the complete G600 feature report was read back and verified.\n",
+    printf("Save operation %s complete: wrote 1 sector(s); the complete G600 feature report was "
+           "read back and verified.\n",
            operation_id);
     return 0;
 }
@@ -387,23 +469,19 @@ static int run_g600_dump(const Options *options, Device *device) {
         return 1;
     }
     BackupSectorSource source = {
-        .sector = g600_profile_sector(profile_number),
-        .size = G600_REPORT_BYTES,
-        .data = report
-    };
-    int ok = package_write_multi(options->path, device, G600_BACKUP_PROFILE_FORMAT,
-                                 &source, 1, false);
+        .sector = g600_profile_sector(profile_number), .size = G600_REPORT_BYTES, .data = report};
+    int ok =
+        package_write_multi(options->path, device, G600_BACKUP_PROFILE_FORMAT, &source, 1, false);
     if (ok) {
-        printf("dumped G600 profile %d report 0x%02X (%d bytes) to %s\n",
-               profile_number, report[0], G600_REPORT_BYTES, options->path);
+        printf("dumped G600 profile %d report 0x%02X (%d bytes) to %s\n", profile_number, report[0],
+               G600_REPORT_BYTES, options->path);
     }
     return ok ? 0 : 1;
 }
 
-static int run_g600_restore(const Options *options, Device *device,
-                            const BackupPackage *package) {
-    if (package->profile_format != G600_BACKUP_PROFILE_FORMAT ||
-        package->sector_count != 1 || package->sectors[0].size != G600_REPORT_BYTES) {
+static int run_g600_restore(const Options *options, Device *device, const BackupPackage *package) {
+    if (package->profile_format != G600_BACKUP_PROFILE_FORMAT || package->sector_count != 1 ||
+        package->sectors[0].size != G600_REPORT_BYTES) {
         fprintf(stderr, "refusing G600 restore: expected one 154-byte legacy profile report\n");
         return 1;
     }
@@ -411,7 +489,8 @@ static int run_g600_restore(const Options *options, Device *device,
     uint8_t report_id = 0;
     if (!g600_profile_report_id(profile_number, &report_id) ||
         package->sectors[0].data[0] != report_id) {
-        fprintf(stderr, "refusing G600 restore: backup report ID does not match a G600 profile slot\n");
+        fprintf(stderr,
+                "refusing G600 restore: backup report ID does not match a G600 profile slot\n");
         return 1;
     }
     uint8_t current[G600_REPORT_BYTES];
@@ -420,8 +499,8 @@ static int run_g600_restore(const Options *options, Device *device,
     }
     bool matches = memcmp(current, package->sectors[0].data, G600_REPORT_BYTES) == 0;
     printf("Restore target: %s, 1 G600 profile report\n", device_label(device));
-    printf("  Profile %d report 0x%02X: backup is exact; current report: %s\n",
-           profile_number, report_id, matches ? "already matches" : "will be restored");
+    printf("  Profile %d report 0x%02X: backup is exact; current report: %s\n", profile_number,
+           report_id, matches ? "already matches" : "will be restored");
     if (matches) {
         printf("Nothing to do; the connected G600 profile already matches the backup.\n");
         return 0;
@@ -434,14 +513,12 @@ static int run_g600_restore(const Options *options, Device *device,
     int pre_restore_length = snprintf(pre_restore_path, sizeof(pre_restore_path),
                                       "%s.pre-restore.logiob", options->path);
     BackupSectorSource current_source = {
-        .sector = g600_profile_sector(profile_number),
-        .size = G600_REPORT_BYTES,
-        .data = current
-    };
+        .sector = g600_profile_sector(profile_number), .size = G600_REPORT_BYTES, .data = current};
     if (pre_restore_length <= 0 || pre_restore_length >= (int)sizeof(pre_restore_path) ||
-        !package_write_multi(pre_restore_path, device, G600_BACKUP_PROFILE_FORMAT,
-                             &current_source, 1, false)) {
-        fprintf(stderr, "could not save the G600 pre-restore state; no mouse write was attempted\n");
+        !package_write_multi(pre_restore_path, device, G600_BACKUP_PROFILE_FORMAT, &current_source,
+                             1, false)) {
+        fprintf(stderr,
+                "could not save the G600 pre-restore state; no mouse write was attempted\n");
         return 1;
     }
     printf("Saved G600 pre-restore state to %s\n", pre_restore_path);
@@ -456,6 +533,7 @@ static int run_g600_restore(const Options *options, Device *device,
                 pre_restore_path);
         return 1;
     }
-    printf("Restored G600 profile %d and verified an exact feature-report match.\n", profile_number);
+    printf("Restored G600 profile %d and verified an exact feature-report match.\n",
+           profile_number);
     return 0;
 }
