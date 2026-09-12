@@ -2,6 +2,7 @@
 // Copyright (C) 2026
 
 import AppKit
+import CoreVideo
 import SwiftUI
 
 private struct DPIStageTriangle: Shape {
@@ -60,8 +61,9 @@ private struct DPIStagePentagon: Shape {
 
 private enum DPIStagePalette {
     static let shift = Color(red: 0.20, green: 0.52, blue: 0.94)
-    static let defaultStage = Color(red: 0.72, green: 0.83, blue: 0.20)
-    static let other = Color(red: 0.91, green: 0.24, blue: 0.25)
+    static let defaultStage = Color(red: 0.91, green: 0.24, blue: 0.25)
+    //static let other = Color(red: 0.72, green: 0.83, blue: 0.20)
+    static let other = Color(red: 0.95, green: 0.70, blue: 0.15)
     static let bar = Color(red: 0.42, green: 0.45, blue: 0.50)
 }
 
@@ -71,10 +73,87 @@ private enum DPILegendRole: Hashable {
     case other
 }
 
+private struct DPIStageDragUpdate: Equatable {
+    let index: Int
+    let value: Int
+}
+
 private struct DPIStageSelection: Identifiable, Equatable {
     let index: Int
 
     var id: Int { index }
+}
+
+private struct DPIStagePopupFrameKey: PreferenceKey {
+    static var defaultValue: CGRect? = nil
+
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = nextValue() ?? value
+    }
+}
+
+private struct DPIStageOutsideClickMonitor: NSViewRepresentable {
+    let isActive: Bool
+    let excludedFrame: CGRect?
+    let onOutsideClick: () -> Void
+
+    final class Coordinator {
+        weak var view: NSView?
+        var isActive = false
+        var excludedFrame: CGRect?
+        var onOutsideClick: () -> Void = {}
+        var monitor: Any?
+
+        func install() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+            ) { [weak self] event in
+                guard let self, self.isActive, let view = self.view else { return event }
+                let point = view.convert(event.locationInWindow, from: nil)
+                if let excludedFrame = self.excludedFrame, excludedFrame.contains(point) {
+                    return event
+                }
+                self.onOutsideClick()
+                return event
+            }
+        }
+
+        func remove() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        deinit { remove() }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        update(view, coordinator: context.coordinator)
+        context.coordinator.install()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        update(nsView, coordinator: context.coordinator)
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.remove()
+    }
+
+    private func update(_ view: NSView, coordinator: Coordinator) {
+        coordinator.view = view
+        coordinator.isActive = isActive
+        coordinator.excludedFrame = excludedFrame
+        coordinator.onOutsideClick = onOutsideClick
+    }
 }
 
 private struct PointerCursorModifier: ViewModifier {
@@ -145,13 +224,224 @@ private struct EscapeKeyMonitor: NSViewRepresentable {
     }
 }
 
+private struct DPIStageHitTarget: Equatable {
+    let index: Int
+    let x: CGFloat
+}
+
+/// Owns pointer interaction for the entire stage bar. Keeping click arbitration,
+/// drag thresholding, and display-linked cursor sampling in one native view avoids
+/// competing SwiftUI tap/drag recognizers and keeps the active handle under the
+/// physical pointer even while the stage model is being reordered.
+private struct DPIStageInteractionLayer: NSViewRepresentable {
+    let isActive: Bool
+    let targets: [DPIStageHitTarget]
+    let onTap: (Int) -> Void
+    let onBackgroundClick: () -> Void
+    let onDragBegan: (Int, CGFloat) -> Void
+    let onDragChanged: (CGFloat) -> Void
+    let onDragEnded: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> InteractionView {
+        let view = InteractionView()
+        update(view)
+        view.setSamplingActive(isActive)
+        return view
+    }
+
+    func updateNSView(_ nsView: InteractionView, context: Context) {
+        update(nsView)
+    }
+
+    static func dismantleNSView(_ nsView: InteractionView, coordinator: ()) {
+        nsView.cancelInteraction()
+    }
+
+    private func update(_ view: InteractionView) {
+        view.targets = targets
+        view.onTap = onTap
+        view.onBackgroundClick = onBackgroundClick
+        view.onDragBegan = onDragBegan
+        view.onDragChanged = onDragChanged
+        view.onDragEnded = onDragEnded
+        view.setSamplingActive(isActive)
+    }
+
+    final class InteractionView: NSView {
+        var targets: [DPIStageHitTarget] = [] {
+            didSet { window?.invalidateCursorRects(for: self) }
+        }
+        var onTap: ((Int) -> Void)?
+        var onBackgroundClick: (() -> Void)?
+        var onDragBegan: ((Int, CGFloat) -> Void)?
+        var onDragChanged: ((CGFloat) -> Void)?
+        var onDragEnded: ((CGFloat) -> Void)?
+
+        private let dragThreshold: CGFloat = 5
+        private let handleSize = CGSize(width: 84, height: 62)
+        private let handleCenterY: CGFloat = 70
+        private let trackRange: ClosedRange<CGFloat> = 35...75
+        private var mouseDownPoint: CGPoint?
+        private var pendingStage: Int?
+        private var pendingStageWasHandle = false
+        private var isDraggingStage = false
+        private var isSamplingActive = false
+        private var displayLink: CVDisplayLink?
+        private let tickLock = NSLock()
+        private var tickQueued = false
+
+        override var isFlipped: Bool { true }
+
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func resetCursorRects() {
+            super.resetCursorRects()
+            for target in targets {
+                addCursorRect(handleRect(for: target.x), cursor: .pointingHand)
+            }
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            let point = convert(event.locationInWindow, from: nil)
+            mouseDownPoint = point
+            pendingStageWasHandle = target(at: point) != nil
+            pendingStage = target(at: point)?.index ?? nearestTarget(to: point.x)?.index
+            isDraggingStage = false
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let mouseDownPoint, let pendingStage else { return }
+            let point = convert(event.locationInWindow, from: nil)
+            let distance = hypot(point.x - mouseDownPoint.x, point.y - mouseDownPoint.y)
+            guard isDraggingStage || distance >= dragThreshold else { return }
+
+            if !isDraggingStage {
+                isDraggingStage = true
+                onDragBegan?(pendingStage, point.x)
+                startDisplayLink()
+            }
+            // This gives immediate feedback between display-link callbacks and
+            // is also the fallback on systems where a display link is unavailable.
+            onDragChanged?(point.x)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            let point = convert(event.locationInWindow, from: nil)
+            if isDraggingStage {
+                onDragChanged?(point.x)
+                onDragEnded?(point.x)
+            } else if pendingStageWasHandle, let pendingStage {
+                onTap?(pendingStage)
+            } else {
+                onBackgroundClick?()
+            }
+            cancelInteraction()
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard !isHidden, alphaValue > 0 else { return nil }
+            let hit = target(at: point) != nil || trackRange.contains(point.y)
+            return hit ? self : nil
+        }
+
+        func cancelInteraction() {
+            stopDisplayLink()
+            isSamplingActive = false
+            mouseDownPoint = nil
+            pendingStage = nil
+            pendingStageWasHandle = false
+            isDraggingStage = false
+        }
+
+        func setSamplingActive(_ active: Bool) {
+            guard active != isSamplingActive else { return }
+            isSamplingActive = active
+            if active {
+                startDisplayLink()
+            } else {
+                stopDisplayLink()
+            }
+        }
+
+        private func target(at point: CGPoint) -> DPIStageHitTarget? {
+            targets.last { handleRect(for: $0.x).contains(point) }
+        }
+
+        private func nearestTarget(to x: CGFloat) -> DPIStageHitTarget? {
+            targets.min { abs($0.x - x) < abs($1.x - x) }
+        }
+
+        private func handleRect(for x: CGFloat) -> CGRect {
+            CGRect(
+                x: x - handleSize.width / 2,
+                y: handleCenterY - handleSize.height / 2,
+                width: handleSize.width,
+                height: handleSize.height
+            )
+        }
+
+        private func startDisplayLink() {
+            guard displayLink == nil else { return }
+            var link: CVDisplayLink?
+            guard CVDisplayLinkCreateWithActiveCGDisplays(&link) == kCVReturnSuccess,
+                  let link else { return }
+            displayLink = link
+            CVDisplayLinkSetOutputCallback(
+                link,
+                { _, _, _, _, _, context in
+                    guard let context else { return kCVReturnSuccess }
+                    let view = Unmanaged<InteractionView>
+                        .fromOpaque(context)
+                        .takeUnretainedValue()
+                    view.queueTick()
+                    return kCVReturnSuccess
+                },
+                Unmanaged.passUnretained(self).toOpaque()
+            )
+            CVDisplayLinkStart(link)
+        }
+
+        private func stopDisplayLink() {
+            if let displayLink {
+                CVDisplayLinkStop(displayLink)
+                self.displayLink = nil
+            }
+        }
+
+        private func queueTick() {
+            tickLock.lock()
+            guard !tickQueued else {
+                tickLock.unlock()
+                return
+            }
+            tickQueued = true
+            tickLock.unlock()
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.tickLock.lock()
+                self.tickQueued = false
+                self.tickLock.unlock()
+                guard self.isSamplingActive, let window = self.window else { return }
+                let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+                self.onDragChanged?(self.convert(windowPoint, from: nil).x)
+            }
+        }
+
+        deinit {
+            stopDisplayLink()
+        }
+    }
+}
+
 private struct DPIStageBar: View {
     let stages: [String]
     let defaultStage: Int
     let shiftStage: Int
     let capabilities: DPICapabilities
     let isLoading: Bool
-    let onDragValue: (Int, Int) -> Void
+    let onDragValue: (Int, Int) -> Int
+    let onDragEnded: () -> Void
     let onAdjust: (Int, DPICapabilities.AdjustmentDirection) -> Void
     let onTextChange: (Int, String) -> Void
     let onCommitText: (Int) -> Void
@@ -160,24 +450,21 @@ private struct DPIStageBar: View {
     let onDelete: (Int) -> Void
 
     @State private var editingStage: DPIStageSelection?
-    @State private var stageInteractionStart: TimeInterval?
     @State private var presentedStage: DPIStageSelection?
     @State private var fadingStage: DPIStageSelection?
+    @State private var draggingStage: Int?
+    @State private var activeDragX: CGFloat?
+    @State private var lastDragUpdate: DPIStageDragUpdate?
+    @State private var popupFrame: CGRect?
     @State private var popoverContentOpacity = 1.0
     @FocusState private var focusedStageIndex: Int?
 
-    private let clickDurationLimit: TimeInterval = 0.3
     private let stageSwitchDuration: TimeInterval = 0.08
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 if editingStage != nil {
-                    Rectangle()
-                        .fill(Color.black.opacity(0.001))
-                        .contentShape(Rectangle())
-                        .onTapGesture { dismissStageEditor() }
-                        .zIndex(1)
                     EscapeKeyMonitor(onEscape: dismissStageEditor)
                         .frame(width: 0, height: 0)
                         .allowsHitTesting(false)
@@ -204,6 +491,37 @@ private struct DPIStageBar: View {
                     stageHandle(index: item.offset, text: item.element, width: proxy.size.width)
                 }
 
+                DPIStageInteractionLayer(
+                    isActive: draggingStage != nil,
+                    targets: interactionTargets(width: proxy.size.width),
+                    onTap: { index in
+                        presentStageEditor(index)
+                    },
+                    onBackgroundClick: {
+                        if editingStage != nil {
+                            dismissStageEditor()
+                        }
+                    },
+                    onDragBegan: { index, x in
+                        if editingStage != nil {
+                            dismissStageEditor()
+                        }
+                        draggingStage = index
+                        lastDragUpdate = nil
+                        updateDrag(at: x, width: proxy.size.width)
+                    },
+                    onDragChanged: { x in
+                        updateDrag(at: x, width: proxy.size.width)
+                    },
+                    onDragEnded: { x in
+                        updateDrag(at: x, width: proxy.size.width)
+                        finishDrag()
+                    }
+                )
+                .frame(width: proxy.size.width, height: 100)
+                .position(x: proxy.size.width / 2, y: 50)
+                .zIndex(30)
+
                 ZStack {
                     HStack {
                         Text(capabilities.minimum.map(String.init) ?? "100")
@@ -226,6 +544,12 @@ private struct DPIStageBar: View {
                    let editingStage,
                    stages.indices.contains(editingStage.index) {
                     let value = Int(stages[editingStage.index]) ?? capabilities.minimum ?? 800
+                    let popoverWidth: CGFloat = 230
+                    let markerX = position(for: value, width: proxy.size.width)
+                    let popoverX = min(
+                        max(markerX - popoverWidth / 2, 0),
+                        max(proxy.size.width - popoverWidth, 0)
+                    )
                     VStack(spacing: -1) {
                         ZStack(alignment: .topLeading) {
                             if let fadingStage,
@@ -245,11 +569,20 @@ private struct DPIStageBar: View {
                             .fill(Color.black.opacity(0.86))
                             .frame(width: 22, height: 11)
                             .rotationEffect(.degrees(180))
+                            .offset(x: markerX - popoverX - popoverWidth / 2)
                     }
                     .frame(width: 230)
+                    .background {
+                        GeometryReader { popupProxy in
+                            Color.clear.preference(
+                                key: DPIStagePopupFrameKey.self,
+                                value: popupProxy.frame(in: .named("dpiBar"))
+                            )
+                        }
+                    }
                     .compositingGroup()
                     .offset(
-                        x: position(for: value, width: proxy.size.width) - 115,
+                        x: popoverX,
                         y: -(proxy.size.height - 30)
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .bottom)))
@@ -257,6 +590,18 @@ private struct DPIStageBar: View {
                 }
             }
             .coordinateSpace(name: "dpiBar")
+            .overlay {
+                DPIStageOutsideClickMonitor(
+                    isActive: editingStage != nil,
+                    excludedFrame: popupFrame,
+                    onOutsideClick: dismissStageEditor
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .allowsHitTesting(false)
+            }
+            .onPreferenceChange(DPIStagePopupFrameKey.self) { frame in
+                popupFrame = frame
+            }
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("DPI stage bar")
@@ -279,64 +624,53 @@ private struct DPIStageBar: View {
         let positionValue = parsedValue ?? capabilities.minimum ?? 800
         let isDefault = defaultStage == index + 1
         let isShift = shiftStage == index + 1
-        let x = position(for: positionValue, width: width)
+        let x = draggingStage == index
+            ? (activeDragX ?? position(for: positionValue, width: width))
+            : position(for: positionValue, width: width)
 
-        return ZStack(alignment: .topLeading) {
-            ZStack {
-                stageShape(isDefault: isDefault, isShift: isShift)
-                    .frame(width: 30, height: 30)
-                Text("\(index + 1)")
-                    .font(.callout.weight(.bold))
-                    .foregroundStyle(.black)
-            }
-            .frame(width: 34, height: 34)
-            .position(x: 42, y: 16)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .named("dpiBar"))
-                    .onChanged { drag in
-                        if stageInteractionStart == nil {
-                            stageInteractionStart = ProcessInfo.processInfo.systemUptime
-                        }
-                        guard let candidate = value(at: drag.location.x, width: width, index: index) else { return }
-                        if drag.translation != .zero {
-                            onDragValue(index, candidate)
-                        }
-                    }
-                    .onEnded { drag in
-                        let now = ProcessInfo.processInfo.systemUptime
-                        let duration = now - (stageInteractionStart ?? now)
-                        stageInteractionStart = nil
-                        guard duration < clickDurationLimit else { return }
-                        presentStageEditor(index)
-                    }
-            )
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { presentStageEditor(index) }
-            .accessibilityLabel("DPI stage \(index + 1)")
-            .accessibilityValue(parsedValue.map { "\($0) DPI" } ?? "Invalid value")
-            .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
-            .accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment:
-                    onAdjust(index, .increase)
-                case .decrement:
-                    onAdjust(index, .decrease)
-                @unknown default:
-                    break
+        return Button {
+            guard draggingStage == nil else { return }
+            presentStageEditor(index)
+        } label: {
+            ZStack(alignment: .topLeading) {
+                ZStack {
+                    stageShape(isDefault: isDefault, isShift: isShift)
+                        .frame(width: 30, height: 30)
+                    Text("\(index + 1)")
+                        .font(.callout.weight(.bold))
+                        .foregroundStyle(.black)
                 }
+                .frame(width: 34, height: 34)
+                .position(x: 42, y: 16)
+                Text(displayValue)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(parsedValue == nil ? .orange : .primary)
+                    .lineLimit(1)
+                    .frame(width: 84)
+                    .position(x: 42, y: 45)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.04), value: displayValue)
+                    .allowsHitTesting(false)
             }
-            Text(displayValue)
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(parsedValue == nil ? .orange : .primary)
-                .lineLimit(1)
-                .frame(width: 84)
-                .position(x: 42, y: 45)
-                .allowsHitTesting(false)
         }
         .frame(width: 84, height: 62)
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel("DPI stage \(index + 1)")
+        .accessibilityValue(parsedValue.map { "\($0) DPI" } ?? "Invalid value")
+        .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                onAdjust(index, .increase)
+            case .decrement:
+                onAdjust(index, .decrease)
+            @unknown default:
+                break
+            }
+        }
         .position(x: x, y: 70)
-        .zIndex(2)
+        .zIndex(draggingStage == index ? 20 : 2)
     }
 
     @ViewBuilder
@@ -488,36 +822,79 @@ private struct DPIStageBar: View {
     }
 
     private var legendOrder: [DPILegendRole] {
-        let otherWeights = stages.enumerated().compactMap { index, text -> CGFloat? in
-            guard let value = Int(text), index + 1 != defaultStage, index + 1 != shiftStage else {
-                return nil
+        let lowerRole: DPILegendRole = defaultStage <= shiftStage ? .defaultStage : .shift
+        let upperRole: DPILegendRole = defaultStage <= shiftStage ? .shift : .defaultStage
+        let lowerStage = min(defaultStage, shiftStage)
+        let upperStage = max(defaultStage, shiftStage)
+        var beforeCount = 0
+        var betweenCount = 0
+        var afterCount = 0
+
+        for (index, text) in stages.enumerated() where Int(text) != nil {
+            let stage = index + 1
+            guard stage != defaultStage, stage != shiftStage else { continue }
+            if stage < lowerStage {
+                beforeCount += 1
+            } else if stage > upperStage {
+                afterCount += 1
+            } else {
+                betweenCount += 1
             }
-            return position(for: value, width: 100)
         }
 
-        guard let otherWeight = otherWeights.isEmpty ? nil : otherWeights.reduce(0, +) / CGFloat(otherWeights.count) else {
-            return defaultStage <= shiftStage ? [.defaultStage, .shift, .other] : [.shift, .defaultStage, .other]
+        if betweenCount > beforeCount, betweenCount > afterCount {
+            return [lowerRole, .other, upperRole]
         }
-
-        let weightedRoles: [(role: DPILegendRole, weight: CGFloat, stage: Int)] = [
-            (.defaultStage, positionForLegend(stage: defaultStage), defaultStage),
-            (.shift, positionForLegend(stage: shiftStage), shiftStage),
-            (.other, otherWeight, Int.max)
-        ]
-
-        return weightedRoles
-            .sorted {
-                if $0.weight != $1.weight { return $0.weight < $1.weight }
-                return $0.stage < $1.stage
-            }
-            .map(\.role)
+        if beforeCount > betweenCount, beforeCount > afterCount {
+            return [.other, lowerRole, upperRole]
+        }
+        // After is the fallback for ties, including one Other stage on each
+        // outside of the two role stages.
+        return [lowerRole, upperRole, .other]
     }
 
-    private func positionForLegend(stage: Int) -> CGFloat {
-        guard stages.indices.contains(stage - 1), let value = Int(stages[stage - 1]) else {
-            return CGFloat(stage)
+    private func interactionTargets(width: CGFloat) -> [DPIStageHitTarget] {
+        stages.enumerated().compactMap { index, text in
+            guard let value = Int(text) else { return nil }
+            let x = draggingStage == index
+                ? (activeDragX ?? position(for: value, width: width))
+                : position(for: value, width: width)
+            return DPIStageHitTarget(index: index, x: x)
         }
-        return position(for: value, width: 100)
+    }
+
+    private func setActiveDragX(_ x: CGFloat, width: CGFloat) {
+        let inset: CGFloat = 14
+        let rightEdge = max(width - inset, inset)
+        let clampedX = min(max(x, inset), rightEdge)
+        guard activeDragX != clampedX else { return }
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            activeDragX = clampedX
+        }
+    }
+
+    private func updateDrag(at x: CGFloat, width: CGFloat) {
+        guard let index = draggingStage,
+              let candidate = value(at: x, width: width) else {
+            return
+        }
+        setActiveDragX(x, width: width)
+        let update = DPIStageDragUpdate(index: index, value: candidate)
+        guard lastDragUpdate != update else { return }
+        let updatedIndex = onDragValue(index, candidate)
+        draggingStage = updatedIndex
+        lastDragUpdate = DPIStageDragUpdate(index: updatedIndex, value: candidate)
+    }
+
+    private func finishDrag() {
+        onDragEnded()
+        withAnimation(.easeOut(duration: 0.08)) {
+            draggingStage = nil
+            activeDragX = nil
+        }
+        lastDragUpdate = nil
     }
 
     @ViewBuilder
@@ -611,16 +988,14 @@ private struct DPIStageBar: View {
         return 14 + fraction * max(width - 28, 1)
     }
 
-    private func value(at x: CGFloat, width: CGFloat, index: Int) -> Int? {
+    private func value(at x: CGFloat, width: CGFloat) -> Int? {
         let minimum = capabilities.minimum ?? 100
         let maximum = capabilities.maximum ?? Int(UInt16.max)
         let fraction = min(max((x - 14) / max(width - 28, 1), 0), 1)
         let logMinimum = log(Double(minimum))
         let logMaximum = log(Double(maximum))
         let raw = Int(exp(logMinimum + Double(fraction) * (logMaximum - logMinimum)).rounded())
-        let lowerBound = index > 0 ? Int(stages[index - 1]).map { $0 + 1 } : nil
-        let upperBound = index + 1 < stages.count ? Int(stages[index + 1]).map { $0 - 1 } : nil
-        return capabilities.snappedValue(for: raw, lowerBound: lowerBound, upperBound: upperBound)
+        return capabilities.snappedValue(for: raw)
     }
 }
 
@@ -1165,6 +1540,19 @@ struct ContentView: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
+                if let currentDPI = model.dpiCapabilities.currentValue {
+                    HStack(spacing: 6) {
+                        Text("Live sensor DPI")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(currentDPI)")
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                        Text("(the mouse’s current speed)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 DPIStageBar(
                     stages: Array(model.dpiStages.prefix(model.dpiCount)),
                     defaultStage: model.defaultStage,
@@ -1172,7 +1560,10 @@ struct ContentView: View {
                     capabilities: model.dpiCapabilities,
                     isLoading: model.loadingProfile,
                     onDragValue: { index, value in
-                        model.setDPIStageValue(index: index, value: value)
+                        model.moveDPIStageDuringDrag(index: index, value: value)
+                    },
+                    onDragEnded: {
+                        model.finishDPIStageDrag()
                     },
                     onAdjust: { index, direction in
                         model.adjustDPIStage(index: index, direction: direction)

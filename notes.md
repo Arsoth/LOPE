@@ -27,17 +27,6 @@ firmware’s logical profile-record number.
 highlighted correctly; unsupported or ambiguous controls are reported clearly
 and never mapped by guesswork.
 
-### [ ] 8. Overhaul the README and documentation split
-
-- [ ] Rewrite the README around user usability and day-to-day app usage.
-- [ ] Keep build instructions in the README only as far as needed to build the app.
-- [ ] Move all other material—architecture, implementation details, troubleshooting,
-      and device-specific behavior—into the documentation.
-- [ ] Review both after the rewrite to remove duplicated or contradictory guidance.
-
-**Done when:** the README is a concise user and build guide, while the docs are the
-complete reference for everything else.
-
 ### [ ] 9. Rework keyboard-output selection and custom key recording
 
 - [ ] Combine function keys and special keys into one keyboard-output dropdown.
@@ -107,3 +96,26 @@ changing the behavior for other devices.
 - [ ] add a button that opens the backups directory in Finder
 
 **Done when:** there's a button that opens the backups directory in finder in the backups page
+
+### [ ] 16. create an initial backup of each mouses onboard profiles if one doesn't already exist
+
+- [ ] create an initial backup of each mouses onboard profiles if one doesn't already exist
+
+**Done when:** an initial connection of a mouse creates a profile backup
+
+### [ ] 17. mice with known onboard profile capabilities should not say there isn't one if the mouse isn't connected
+
+- [ ] display an indicator to wake the mouse my turning it on or giving it a little shake, run a refresh on that mouse once a second until it's detected or 60 seconds have passed (or they switch to a different mouse)
+
+**Done when:** see checkbox.
+
+### [ ] 18. Overhaul the README and documentation split
+
+- [ ] Rewrite the README around user usability and day-to-day app usage.
+- [ ] Keep build instructions in the README only as far as needed to build the app.
+- [ ] Move all other material—architecture, implementation details, troubleshooting,
+      and device-specific behavior—into the documentation.
+- [ ] Review both after the rewrite to remove duplicated or contradictory guidance.
+
+**Done when:** the README is a concise user and build guide, while the docs are the
+complete reference for everything else.

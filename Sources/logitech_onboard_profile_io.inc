@@ -100,8 +100,11 @@ static int write_sector(Device *device, uint16_t sector, const uint8_t *bytes, s
         (uint8_t)(sector >> 8), (uint8_t)(sector & 0xFF), 0, 0,
         (uint8_t)(length >> 8), (uint8_t)(length & 0xFF),
     };
-    Reply reply = device_call(device, FEATURE_ONBOARD_PROFILES, ONBOARD_START_WRITE,
-                              start_params, sizeof(start_params), 4.0);
+    // The payload-bearing memory commands are explicitly long reports. The
+    // commit command has no payload and must use the normal short/long choice;
+    // G502 X firmware rejects a forced long endWrite frame on some revisions.
+    Reply reply = device_call_long(device, FEATURE_ONBOARD_PROFILES, ONBOARD_START_WRITE,
+                                   start_params, sizeof(start_params), 4.0);
     if (reply.status != REPLY_OK) {
         print_reply_error("ONBOARD_PROFILES.startWrite", reply);
         return 0;
@@ -112,8 +115,8 @@ static int write_sector(Device *device, uint16_t sector, const uint8_t *bytes, s
         if (take > 16) {
             take = 16;
         }
-        reply = device_call(device, FEATURE_ONBOARD_PROFILES, ONBOARD_WRITE_DATA,
-                            bytes + offset, take, 4.0);
+        reply = device_call_long(device, FEATURE_ONBOARD_PROFILES, ONBOARD_WRITE_DATA,
+                                 bytes + offset, take, 4.0);
         if (reply.status != REPLY_OK) {
             print_reply_error("ONBOARD_PROFILES.writeData", reply);
             return 0;
@@ -125,7 +128,146 @@ static int write_sector(Device *device, uint16_t sector, const uint8_t *bytes, s
         print_reply_error("ONBOARD_PROFILES.endWrite", reply);
         return 0;
     }
+    // endWrite acknowledges the transfer before flash commit is necessarily
+    // visible to readSector. Give the device a short settle window; callers
+    // also retry exact readback without repeating the write transaction.
+    usleep(100000);
     return 1;
+}
+
+#define SECTOR_VERIFY_ATTEMPTS 5
+#define SECTOR_VERIFY_RETRY_DELAY_US 100000
+
+static bool verify_sector_readback(Device *device,
+                                   uint16_t sector,
+                                   const uint8_t *expected,
+                                   size_t length) {
+    for (size_t attempt = 0; attempt < SECTOR_VERIFY_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+            usleep(SECTOR_VERIFY_RETRY_DELAY_US);
+        }
+        uint8_t *readback = (uint8_t *)malloc(length);
+        if (readback == NULL) {
+            return false;
+        }
+        bool verified = read_sector(device, sector, length, readback) &&
+                        sector_crc_ok(readback, length) &&
+                        memcmp(readback, expected, length) == 0;
+        free(readback);
+        if (verified) {
+            if (attempt > 0) {
+                printf("Exact sector readback succeeded after retry %zu.\n", attempt);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool get_onboard_mode(Device *device, uint8_t *mode_out) {
+    Reply reply = device_call(device, FEATURE_ONBOARD_PROFILES, ONBOARD_GET_MODE,
+                              NULL, 0, 2.0);
+    if (reply.status != REPLY_OK || reply.length < 1) {
+        print_reply_error("ONBOARD_PROFILES.getMode", reply);
+        return false;
+    }
+    *mode_out = reply.bytes[0];
+    return true;
+}
+
+static bool set_onboard_mode(Device *device, uint8_t mode) {
+    uint8_t params[1] = {mode};
+    Reply reply = device_call(device, FEATURE_ONBOARD_PROFILES, ONBOARD_SET_MODE,
+                              params, sizeof(params), 2.0);
+    if (reply.status != REPLY_OK) {
+        print_reply_error("ONBOARD_PROFILES.setMode", reply);
+        return false;
+    }
+    return true;
+}
+
+static bool ensure_onboard_mode_for_write(Device *device) {
+    uint8_t mode = 0;
+    if (!get_onboard_mode(device, &mode)) {
+        // Some older profile implementations expose the storage commands but
+        // not the mode query. Preserve their existing write path.
+        fprintf(stderr, "warning: could not query onboard mode; continuing without changing it\n");
+        return true;
+    }
+    if (mode == ONBOARD_MODE_ONBOARD) {
+        return true;
+    }
+    printf("Device is in host-controlled mode; switching to onboard mode before writing.\n");
+    if (!set_onboard_mode(device, ONBOARD_MODE_ONBOARD) ||
+        !get_onboard_mode(device, &mode) || mode != ONBOARD_MODE_ONBOARD) {
+        fprintf(stderr, "could not switch the mouse to onboard mode; no profile write was attempted\n");
+        return false;
+    }
+    return true;
+}
+
+static bool get_current_onboard_profile(Device *device, uint8_t *profile_index_out) {
+    Reply reply = device_call(device, FEATURE_ONBOARD_PROFILES, ONBOARD_GET_CURRENT_PROFILE,
+                              NULL, 0, 2.0);
+    if (reply.status != REPLY_OK || reply.length < 2) {
+        print_reply_error("ONBOARD_PROFILES.getCurrentProfile", reply);
+        return false;
+    }
+    // The profile index is returned in the second parameter and is zero-based
+    // on the G502 X family. Keep this raw so the caller can compare it to the
+    // editor's one-based profile number explicitly.
+    *profile_index_out = reply.bytes[1];
+    return true;
+}
+
+static bool set_current_onboard_dpi_index(Device *device, uint8_t index) {
+    uint8_t params[1] = {index};
+    Reply reply = device_call(device, FEATURE_ONBOARD_PROFILES,
+                              ONBOARD_SET_CURRENT_DPI_INDEX,
+                              params, sizeof(params), 2.0);
+    if (reply.status != REPLY_OK) {
+        print_reply_error("ONBOARD_PROFILES.setCurrentDpiIndex", reply);
+        return false;
+    }
+    return true;
+}
+
+static bool get_current_onboard_dpi_index(Device *device, uint8_t *index_out) {
+    Reply reply = device_call(device, FEATURE_ONBOARD_PROFILES,
+                              ONBOARD_GET_CURRENT_DPI_INDEX,
+                              NULL, 0, 2.0);
+    if (reply.status != REPLY_OK || reply.length < 1) {
+        print_reply_error("ONBOARD_PROFILES.getCurrentDpiIndex", reply);
+        return false;
+    }
+    *index_out = reply.bytes[0];
+    return true;
+}
+
+static void sync_active_profile_default_dpi(Device *device,
+                                             int profile_number,
+                                             int default_stage,
+                                             uint16_t default_dpi) {
+    uint8_t active_profile = 0;
+    if (!get_current_onboard_profile(device, &active_profile)) {
+        fprintf(stderr, "warning: saved DPI profile, but could not identify the active profile for live DPI sync\n");
+        return;
+    }
+    if ((int)active_profile + 1 != profile_number) {
+        printf("Live DPI unchanged: active onboard profile is %u; saved profile %d is not active.\n",
+               (unsigned)active_profile + 1, profile_number);
+        return;
+    }
+    uint8_t desired_index = (uint8_t)(default_stage - 1);
+    uint8_t current_index = 0;
+    if (!set_current_onboard_dpi_index(device, desired_index) ||
+        !get_current_onboard_dpi_index(device, &current_index) ||
+        current_index != desired_index) {
+        fprintf(stderr, "warning: profile sector is saved, but the live default DPI index could not be verified\n");
+        return;
+    }
+    printf("Live default DPI: %u (stage %d; current index verified).\n",
+           default_dpi, default_stage);
 }
 
 static int read_profile_control(Device *device,

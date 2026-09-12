@@ -179,6 +179,76 @@ extension AppModel {
         dpiStages[index] = String(snapped)
     }
 
+    /// Moves a stage freely while dragging. When it crosses another stage,
+    /// swap their ordered positions so the active stage can continue moving
+    /// without leaving the profile in an invalid order.
+    @discardableResult
+    func moveDPIStageDuringDrag(index: Int, value: Int) -> Int {
+        guard dpiStages.indices.contains(index), index < dpiCount,
+              let snapped = dpiCapabilities.snappedValue(for: value) else {
+            return index
+        }
+        if Int(dpiStages[index]) == snapped {
+            return index
+        }
+
+        dpiStages[index] = String(snapped)
+        var currentIndex = index
+
+        while currentIndex > 0,
+              let currentValue = Int(dpiStages[currentIndex]),
+              let previousValue = Int(dpiStages[currentIndex - 1]),
+              currentValue < previousValue {
+            swapDPIStages(at: currentIndex, and: currentIndex - 1)
+            currentIndex -= 1
+        }
+
+        while currentIndex + 1 < dpiCount,
+              let currentValue = Int(dpiStages[currentIndex]),
+              let nextValue = Int(dpiStages[currentIndex + 1]),
+              currentValue > nextValue {
+            swapDPIStages(at: currentIndex, and: currentIndex + 1)
+            currentIndex += 1
+        }
+
+        return currentIndex
+    }
+
+    /// Resolves the rare case where a drag ends with two handles on the same
+    /// supported value, keeping the saved stage list strictly increasing.
+    func finishDPIStageDrag() {
+        guard dpiCount > 0 else { return }
+        var previousValue: Int?
+        for index in 0..<dpiCount {
+            guard let value = Int(dpiStages[index]),
+                  let adjusted = dpiCapabilities.snappedValue(
+                      for: value,
+                      lowerBound: previousValue.map { $0 + 1 }
+                  ) else {
+                return
+            }
+            dpiStages[index] = String(adjusted)
+            previousValue = adjusted
+        }
+    }
+
+    private func swapDPIStages(at firstIndex: Int, and secondIndex: Int) {
+        dpiStages.swapAt(firstIndex, secondIndex)
+        let firstStage = firstIndex + 1
+        let secondStage = secondIndex + 1
+
+        if defaultStage == firstStage {
+            defaultStage = secondStage
+        } else if defaultStage == secondStage {
+            defaultStage = firstStage
+        }
+        if shiftStage == firstStage {
+            shiftStage = secondStage
+        } else if shiftStage == secondStage {
+            shiftStage = firstStage
+        }
+    }
+
     func adjustDPIStage(index: Int, direction: DPICapabilities.AdjustmentDirection) {
         guard dpiStages.indices.contains(index), index < dpiCount,
               let current = Int(dpiStages[index]) else { return }

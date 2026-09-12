@@ -91,7 +91,10 @@ extension AppModel {
             let verified = output.components(separatedBy: "\n")
                 .filter { $0.hasPrefix("Verified sector ") }
                 .count
-            status = "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back."
+            let liveDPI = output.components(separatedBy: "\n")
+                .first { $0.hasPrefix("Live default DPI:") }
+            let liveSuffix = liveDPI.map { " \($0)" } ?? ""
+            status = "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back.\(liveSuffix)"
         } catch {
             let details = error.localizedDescription
             recoveryBackups = batchRecoveryBackups(from: details)

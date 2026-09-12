@@ -272,6 +272,11 @@ static int run_bind(const Options *options) {
         hid_context_release(&context);
         return ensure_write_confirmation("bind");
     }
+    if (!ensure_onboard_mode_for_write(device)) {
+        free(profile.data);
+        hid_context_release(&context);
+        return 1;
+    }
     if (!package_write(backup_path, device, &profile, profile.data, true)) {
         free(profile.data);
         hid_context_release(&context);
@@ -303,20 +308,11 @@ static int run_bind(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
-    uint8_t *readback = (uint8_t *)malloc(profile.data_length);
-    if (readback == NULL || !read_sector(device, profile.headers[profile.selected_header].sector,
-                                         profile.data_length, readback)) {
-        fprintf(stderr, "could not read back the sector; restore from %s\n", backup_path);
-        free(readback);
-        free(new_data);
-        free(profile.data);
-        hid_context_release(&context);
-        return 1;
-    }
-    bool verified = sector_crc_ok(readback, profile.data_length) && memcmp(readback, new_data, profile.data_length) == 0;
+    bool verified = verify_sector_readback(device,
+                                           profile.headers[profile.selected_header].sector,
+                                           new_data, profile.data_length);
     if (!verified) {
         fprintf(stderr, "read-back verification failed; restore from %s\n", backup_path);
-        free(readback);
         free(new_data);
         free(profile.data);
         hid_context_release(&context);
@@ -324,7 +320,6 @@ static int run_bind(const Options *options) {
     }
     printf("Verified: read-back CRC is OK and the complete sector matches.\n");
     printf("The mouse now stores %s on button %d.\n", new_description, button);
-    free(readback);
     free(new_data);
     free(profile.data);
     hid_context_release(&context);
@@ -441,6 +436,9 @@ static int run_restore(const Options *options) {
         result = ensure_write_confirmation("restore");
         goto done;
     }
+    if (!ensure_onboard_mode_for_write(device)) {
+        goto done;
+    }
 
     for (size_t i = 0; i < package.sector_count; i++) {
         pre_restore_sectors[i] = (BackupSectorSource){
@@ -470,12 +468,9 @@ static int run_restore(const Options *options) {
                     restored_count, pre_restore_path);
             goto done;
         }
-        uint8_t *readback = (uint8_t *)malloc(package.sectors[i].size);
-        bool verified = readback != NULL &&
-                        read_sector(device, package.sectors[i].sector, package.sectors[i].size, readback) &&
-                        sector_crc_ok(readback, package.sectors[i].size) &&
-                        memcmp(readback, package.sectors[i].data, package.sectors[i].size) == 0;
-        free(readback);
+        bool verified = verify_sector_readback(device, package.sectors[i].sector,
+                                               package.sectors[i].data,
+                                               package.sectors[i].size);
         if (!verified) {
             fprintf(stderr, "restore read-back verification failed after %zu sector(s); pre-restore state is at %s\n",
                     restored_count, pre_restore_path);

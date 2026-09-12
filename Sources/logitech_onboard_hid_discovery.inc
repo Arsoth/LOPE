@@ -423,7 +423,13 @@ static int hid_context_create(HidContext *context) {
             item->registry_id = registry_id_property(device);
             item->is_vendor = vendor;
             item->is_mouse = mouse;
-            item->prefer_long_reports = hidpp_reports || is_known_hidpp_product(product_id);
+            // Direct HID++ interfaces advertise both report sizes and need
+            // the normal payload-size selection: short control calls such as
+            // 0x8100.endWrite must remain short. Receiver-backed devices (or
+            // known devices whose HID++ descriptor is hidden) keep the long
+            // report preference because their routed path needs it.
+            item->prefer_long_reports = is_receiver_product(product_id) ||
+                                        (!hidpp_reports && is_known_hidpp_product(product_id));
             string_property(device, CFSTR(kIOHIDProductKey), item->product, sizeof(item->product));
             string_property(device, CFSTR(kIOHIDTransportKey), item->transport, sizeof(item->transport));
             hid_debug_log("hid-debug interface product=0x%04X location=0x%llX registry=0x%llX page=0x%04X usage=0x%04X vendor=%d mouse=%d hidpp=%d product-name=%s",

@@ -100,6 +100,11 @@ static int run_set_dpi(const Options *options) {
         hid_context_release(&context);
         return ensure_write_confirmation("set-dpi");
     }
+    if (!ensure_onboard_mode_for_write(device)) {
+        free(profile.data);
+        hid_context_release(&context);
+        return 1;
+    }
 
     char backup_path[512];
     if (options->backup_path != NULL) {
@@ -132,21 +137,19 @@ static int run_set_dpi(const Options *options) {
     sector_put_crc(new_data, profile.data_length);
     bool written = write_sector(device, profile.headers[profile.selected_header].sector,
                                 new_data, profile.data_length);
-    uint8_t *readback = written ? (uint8_t *)malloc(profile.data_length) : NULL;
-    bool verified = readback != NULL && read_sector(device, profile.headers[profile.selected_header].sector,
-                                                    profile.data_length, readback) &&
-                    sector_crc_ok(readback, profile.data_length) &&
-                    memcmp(readback, new_data, profile.data_length) == 0;
+    bool verified = written && verify_sector_readback(device,
+                                                      profile.headers[profile.selected_header].sector,
+                                                      new_data, profile.data_length);
     if (!verified) {
         fprintf(stderr, "DPI write/readback verification failed; restore from %s\n", backup_path);
-        free(readback);
         free(new_data);
         free(profile.data);
         hid_context_release(&context);
         return 1;
     }
     printf("Verified: DPI profile readback CRC is OK and the complete sector matches.\n");
-    free(readback);
+    sync_active_profile_default_dpi(device, (int)profile.selected_header + 1,
+                                    default_index, requested[default_index - 1]);
     free(new_data);
     free(profile.data);
     hid_context_release(&context);
@@ -254,6 +257,11 @@ static int run_set_profile_state(const Options *options) {
         hid_context_release(&context);
         return ensure_write_confirmation("set-profile-state");
     }
+    if (!ensure_onboard_mode_for_write(device)) {
+        free(control);
+        hid_context_release(&context);
+        return 1;
+    }
 
     Profile control_profile;
     memset(&control_profile, 0, sizeof(control_profile));
@@ -296,20 +304,16 @@ static int run_set_profile_state(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
-    uint8_t *readback = (uint8_t *)malloc(info.sector_size);
-    bool verified = readback != NULL && read_sector(device, control_sector, info.sector_size, readback) &&
-                    sector_crc_ok(readback, info.sector_size) &&
-                    memcmp(readback, new_control, info.sector_size) == 0;
+    bool verified = verify_sector_readback(device, control_sector,
+                                           new_control, info.sector_size);
     if (!verified) {
         fprintf(stderr, "profile-state read-back verification failed; restore from %s\n", backup_path);
-        free(readback);
         free(new_control);
         free(control);
         hid_context_release(&context);
         return 1;
     }
     printf("Verified: profile control-sector CRC is OK and the complete sector matches.\n");
-    free(readback);
     free(new_control);
     free(control);
     hid_context_release(&context);
@@ -472,10 +476,7 @@ static bool write_batch_sector_and_verify(Device *device,
     if (!write_sector(device, sector, data, length)) {
         return false;
     }
-    uint8_t *readback = (uint8_t *)malloc(length);
-    bool verified = readback != NULL && read_sector(device, sector, length, readback) &&
-                    sector_crc_ok(readback, length) && memcmp(readback, data, length) == 0;
-    free(readback);
+    bool verified = verify_sector_readback(device, sector, data, length);
     if (!verified) {
         return false;
     }
@@ -583,6 +584,8 @@ static int run_apply(const Options *options) {
     uint8_t *new_profile = NULL;
     bool profile_affected = false;
     bool control_affected = false;
+    int dpi_default_stage = -1;
+    uint16_t dpi_default_value = 0;
     bool has_backup = false;
     char backup_path[512] = {0};
     BackupSectorSource backup_sectors[2];
@@ -700,6 +703,8 @@ static int run_apply(const Options *options) {
             }
             new_profile[1] = (uint8_t)(default_index - 1);
             new_profile[2] = (uint8_t)(shift_index - 1);
+            dpi_default_stage = default_index;
+            dpi_default_value = requested_dpi[default_index - 1];
         }
         sector_put_crc(new_profile, profile.data_length);
         if (!sector_crc_ok(new_profile, profile.data_length)) {
@@ -766,6 +771,9 @@ static int run_apply(const Options *options) {
         result = ensure_write_confirmation("apply");
         goto done;
     }
+    if (!ensure_onboard_mode_for_write(device)) {
+        goto done;
+    }
 
     if (profile_affected) {
         backup_sectors[backup_sector_count++] = (BackupSectorSource){
@@ -815,6 +823,10 @@ static int run_apply(const Options *options) {
         print_batch_recovery(operation_id, verified_count, plan[failed_index].kind,
                              plan[failed_index].sector, backup_path, has_backup);
         goto done;
+    }
+    if (profile_affected && options->dpi_values != NULL && dpi_default_stage > 0) {
+        sync_active_profile_default_dpi(device, options->profile,
+                                        dpi_default_stage, dpi_default_value);
     }
     printf("Save operation %s complete: wrote %zu sector(s); every write was read back and verified.\n",
            operation_id, verified_count);
