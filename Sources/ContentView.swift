@@ -69,6 +69,16 @@ private enum DPIStagePalette {
     static let bar = Color(red: 0.42, green: 0.45, blue: 0.50)
 }
 
+private func formattedDPIValue(_ value: Int) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.locale = .current
+    formatter.usesGroupingSeparator = true
+    formatter.minimumFractionDigits = 0
+    formatter.maximumFractionDigits = 0
+    return formatter.string(from: NSNumber(value: value)) ?? String(value)
+}
+
 private enum DPILegendRole: Hashable {
     case defaultStage
     case shift
@@ -650,6 +660,14 @@ private struct DPIStageBar: View {
     @FocusState private var focusedStageIndex: Int?
 
     private let stageSwitchDuration: TimeInterval = 0.08
+    // Reserve symmetric space for localized endpoint values up to 999,999.
+    private let endpointLabelWidth: CGFloat = 56
+    private let trackToEndpointSpacing: CGFloat = 12
+    private let endpointCenterAdjustment: CGFloat = 4.5
+
+    private var trackInset: CGFloat {
+        endpointLabelWidth + trackToEndpointSpacing
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -667,7 +685,7 @@ private struct DPIStageBar: View {
                         Capsule()
                             .stroke(.white.opacity(0.12), lineWidth: 0.5)
                     }
-                    .frame(width: max(proxy.size.width - 28, 1))
+                    .frame(width: max(proxy.size.width - trackInset * 2, 1))
                     .position(x: proxy.size.width / 2, y: 43)
 
                 ForEach(tickValues, id: \.self) { value in
@@ -713,17 +731,23 @@ private struct DPIStageBar: View {
                 .zIndex(30)
 
                 ZStack {
-                    HStack {
-                        Text(capabilities.minimum.map(String.init) ?? "100")
+                    HStack(spacing: 0) {
+                        Text(capabilities.minimum.map(formattedDPIValue) ?? formattedDPIValue(100))
+                            .frame(width: trackInset, alignment: .center)
+                            .offset(x: -endpointCenterAdjustment)
                         Spacer()
-                        Text(capabilities.maximum.map(String.init) ?? "65535")
+                        Text(capabilities.maximum.map(formattedDPIValue) ?? formattedDPIValue(65535))
+                            .frame(width: trackInset, alignment: .center)
+                            .offset(x: endpointCenterAdjustment)
                     }
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .frame(width: proxy.size.width)
-                    dpiLegend
+                    .position(x: proxy.size.width / 2, y: 43)
                 }
-                .position(x: proxy.size.width / 2, y: 88)
+
+                dpiLegend
+                    .position(x: proxy.size.width / 2, y: 93)
 
             }
             // Keep one bubble alive while moving between stages. Replacing
@@ -819,7 +843,7 @@ private struct DPIStageBar: View {
 
     private func stageHandle(index: Int, text: String, width: CGFloat) -> some View {
         let parsedValue = Int(text)
-        let displayValue = parsedValue.map(String.init) ?? "Enter DPI"
+        let displayValue = parsedValue.map(formattedDPIValue) ?? "Enter DPI"
         let positionValue = parsedValue ?? capabilities.minimum ?? 800
         let isDefault = defaultStage == index + 1
         let isShift = shiftStage == index + 1
@@ -856,7 +880,7 @@ private struct DPIStageBar: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .accessibilityLabel("DPI stage \(index + 1)")
-        .accessibilityValue(parsedValue.map { "\($0) DPI" } ?? "Invalid value")
+        .accessibilityValue(parsedValue.map { "\(formattedDPIValue($0)) DPI" } ?? "Invalid value")
         .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
         .accessibilityAdjustableAction { direction in
             switch direction {
@@ -1063,7 +1087,7 @@ private struct DPIStageBar: View {
     }
 
     private func setActiveDragX(_ x: CGFloat, width: CGFloat) {
-        let inset: CGFloat = 14
+        let inset = trackInset
         let rightEdge = max(width - inset, inset)
         let clampedX = min(max(x, inset), rightEdge)
         guard activeDragX != clampedX else { return }
@@ -1184,13 +1208,13 @@ private struct DPIStageBar: View {
             max(CGFloat((log(Double(max(value, minimum))) - logMinimum) / (logMaximum - logMinimum)), 0),
             1
         )
-        return 14 + fraction * max(width - 28, 1)
+        return trackInset + fraction * max(width - trackInset * 2, 1)
     }
 
     private func value(at x: CGFloat, width: CGFloat) -> Int? {
         let minimum = capabilities.minimum ?? 100
         let maximum = capabilities.maximum ?? Int(UInt16.max)
-        let fraction = min(max((x - 14) / max(width - 28, 1), 0), 1)
+        let fraction = min(max((x - trackInset) / max(width - trackInset * 2, 1), 0), 1)
         let logMinimum = log(Double(minimum))
         let logMaximum = log(Double(maximum))
         let raw = Int(exp(logMinimum + Double(fraction) * (logMaximum - logMinimum)).rounded())
@@ -1603,6 +1627,10 @@ struct ContentView: View {
                     .labelsHidden()
                     .frame(width: 150)
                     .disabled(model.busy)
+                    // Keep the profile picker aligned with the recorded-key
+                    // column in each button row.
+                    Spacer(minLength: 0)
+                        .frame(width: 24)
                     Text("Enable:")
                         .font(.callout.weight(.medium))
                     ForEach(model.profiles) { profile in
@@ -1851,7 +1879,7 @@ struct ContentView: View {
                         Text("Live DPI")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("\(currentDPI)")
+                        Text(formattedDPIValue(currentDPI))
                             .font(.caption.monospacedDigit().weight(.semibold))
                     }
                 }
@@ -1887,7 +1915,7 @@ struct ContentView: View {
                         model.deleteDPIStage(index: index)
                     }
                 )
-                .frame(height: 100)
+                .frame(height: 105)
                 .zIndex(10)
 
                 if let validation = model.dpiValidationMessage {
