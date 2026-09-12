@@ -22,6 +22,11 @@ struct ButtonRow: Identifiable {
     let currentRaw: String
     var draftRaw: String
     var draftChoice: String
+
+    var displayLabel: String {
+        let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedLabel.isEmpty ? "Button \(id)" : trimmedLabel
+    }
 }
 
 struct OutputPreset: Identifiable, Hashable {

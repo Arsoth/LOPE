@@ -245,18 +245,6 @@ extension AppModel {
         return UInt8(hexText, radix: 16)
     }
 
-    func physicalButtonLabel(_ number: Int) -> String {
-        if let known = currentMouseProfile.button(for: number) {
-            return known.label
-        }
-        switch number {
-        case 1: return "Primary click"
-        case 2: return "Secondary click"
-        case 3: return "Middle click"
-        default: return "Button \(number)"
-        }
-    }
-
     func setDPIStageText(index: Int, text: String) {
         guard dpiStages.indices.contains(index), index < dpiCount else { return }
         dpiStages[index] = text.filter { $0.isNumber }

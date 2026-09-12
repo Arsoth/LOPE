@@ -165,7 +165,7 @@ extension AppModel {
             let label = currentMouseProfile.button(for: number)?.label
                 ?? currentMouseProfile.scrollWheelButtonLabel(for: number)
                 ?? ProfileOutputParser.scrollWheelOutputLabel(raw)
-                ?? physicalButtonLabel(number)
+                ?? "Button \(number)"
             rows[profile, default: []].append(ButtonRow(
                 id: number,
                 label: label,

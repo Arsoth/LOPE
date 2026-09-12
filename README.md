@@ -1,4 +1,6 @@
-# Logitech Onboard Profile Editor (LOPE)
+# LOPE — an open-source Logitech G-series onboard profile editor for macOS
+
+LOPE is an independent open-source project and is not affiliated with, sponsored by, or endorsed by Logitech.
 
 LOPE is a native macOS app for editing the onboard button, keyboard, DPI, and
 profile settings exposed by compatible Logitech mice. It talks directly to the

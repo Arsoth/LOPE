@@ -517,12 +517,9 @@ extension AppModel {
                       self.knownDisconnectedDevice == device else { return }
 
                 self.knownDevicePollAttempts = attempt
+                self.status = self.knownDeviceRefreshStatus(for: device, expired: false)
                 guard !self.busy else { continue }
-                self.startRefresh(
-                    preferredDeviceIndex: device.id,
-                    preferredProfileNumber: self.profileNumber,
-                    expectedDevice: device
-                )
+                self.startKnownDeviceProbe(device)
             }
 
             guard let self, !Task.isCancelled,
@@ -531,6 +528,84 @@ extension AppModel {
             self.knownDevicePollTask = nil
             self.status = self.knownDeviceRefreshStatus(for: device, expired: true)
         }
+    }
+
+    private func startKnownDeviceProbe(_ device: DeviceChoice) {
+        refreshTask?.cancel()
+        stopLiveDPIPolling()
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        let currentDirectory = backupDirectory
+
+        // Keep the wake screen visible while the sleeping mouse is probed.
+        // This probe intentionally does not set loadingProfile or replace the
+        // editor with loading placeholders; the profile read happens silently
+        // until the mouse responds.
+        busy = true
+        guard let engine else {
+            busy = false
+            return
+        }
+
+        let preferredProfileNumber = profileNumber
+        refreshTask = Task { [weak self] in
+            let enumeration = await Task.detached(priority: .utility) {
+                Self.makeDeviceEnumerationSnapshot(
+                    executable: engine,
+                    currentDirectory: currentDirectory,
+                    preferredDeviceIndex: device.id,
+                    preferredDeviceKey: device.deviceKey
+                )
+            }.value
+
+            guard !Task.isCancelled, let self,
+                  self.refreshGeneration == generation,
+                  self.knownDisconnectedDevice == device else { return }
+
+            guard enumeration.errorMessage == nil,
+                  let selectedIndex = enumeration.selectedDeviceIndex,
+                  let selected = enumeration.devices.first(where: { $0.id == selectedIndex }),
+                  selected.deviceKey == device.deviceKey else {
+                self.finishKnownDeviceProbe(generation: generation)
+                return
+            }
+
+            self.devices = enumeration.devices
+            self.selectedDeviceIndex = selected.id
+            self.currentDeviceName = selected.name
+            self.deviceSummary = "\(selected.title) — waiting for the mouse"
+            self.rememberSelectedDevice(selected)
+            let profileReadProgress = self.profileReadProgressHandler(generation: generation)
+
+            let snapshot = await Task.detached(priority: .utility) {
+                Self.makeProfileSnapshot(
+                    executable: engine,
+                    currentDirectory: currentDirectory,
+                    devices: enumeration.devices,
+                    selectedDeviceKey: selected.deviceKey,
+                    selectedDeviceIndex: selected.id,
+                    preferredProfileNumber: preferredProfileNumber,
+                    onLine: profileReadProgress,
+                    accessWarning: enumeration.accessWarning
+                )
+            }.value
+
+            guard !Task.isCancelled,
+                  self.refreshGeneration == generation,
+                  self.knownDisconnectedDevice == device else { return }
+
+            guard snapshot.profileText != nil else {
+                self.finishKnownDeviceProbe(generation: generation)
+                return
+            }
+            self.applyRefreshSnapshot(snapshot)
+        }
+    }
+
+    private func finishKnownDeviceProbe(generation: Int) {
+        guard refreshGeneration == generation else { return }
+        busy = false
+        refreshTask = nil
     }
 
     private func stopKnownDevicePolling(clearDevice: Bool) {
@@ -582,10 +657,7 @@ extension AppModel {
         if expired {
             return "Still waiting for \(device.name). \(guidance.wakeInstructions)"
         }
-        let checked = knownDevicePollAttempts == 0
-            ? "LOPE will check once per second for up to 60 seconds."
-            : "Checking once per second (\(knownDevicePollAttempts)/60)."
-        return "\(guidance.sleepDescription) \(guidance.wakeInstructions) \(checked)"
+        return "\(guidance.sleepDescription) \(guidance.wakeInstructions) LOPE will keep checking in the background."
     }
 
     private func profileReadStatus(for deviceName: String, accessWarning: Bool) -> String {

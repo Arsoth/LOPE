@@ -366,7 +366,7 @@ extension AppModel {
             let raw = normalize(useDrafts ? button.draftRaw : button.currentRaw)
             return EditableBackup.Button(
                 number: button.id,
-                physicalControl: button.label,
+                physicalControl: button.displayLabel,
                 output: outputLabel(for: raw),
                 raw: raw
             )

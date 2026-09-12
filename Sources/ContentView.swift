@@ -469,8 +469,8 @@ private struct DPIStageInteractionLayer: NSViewRepresentable {
 
         private let dragThreshold: CGFloat = 5
         private let handleSize = CGSize(width: 84, height: 62)
-        private let handleCenterY: CGFloat = 70
-        private let trackRange: ClosedRange<CGFloat> = 35...75
+        private let handleCenterY: CGFloat = 58
+        private let trackRange: ClosedRange<CGFloat> = 24...65
         private var mouseDownPoint: CGPoint?
         private var pendingStage: Int?
         private var pendingStageWasHandle = false
@@ -668,13 +668,13 @@ private struct DPIStageBar: View {
                             .stroke(.white.opacity(0.12), lineWidth: 0.5)
                     }
                     .frame(width: max(proxy.size.width - 28, 1))
-                    .position(x: proxy.size.width / 2, y: 55)
+                    .position(x: proxy.size.width / 2, y: 43)
 
                 ForEach(tickValues, id: \.self) { value in
                     Rectangle()
                         .fill(.secondary.opacity(0.52))
                         .frame(width: 1, height: 10)
-                        .position(x: position(for: value, width: proxy.size.width), y: 55)
+                        .position(x: position(for: value, width: proxy.size.width), y: 43)
                 }
 
                 ForEach(Array(stages.enumerated()).filter { Int($0.element) != nil }, id: \.offset) { item in
@@ -708,8 +708,8 @@ private struct DPIStageBar: View {
                         finishDrag()
                     }
                 )
-                .frame(width: proxy.size.width, height: 100)
-                .position(x: proxy.size.width / 2, y: 50)
+                .frame(width: proxy.size.width, height: 86)
+                .position(x: proxy.size.width / 2, y: 43)
                 .zIndex(30)
 
                 ZStack {
@@ -723,7 +723,7 @@ private struct DPIStageBar: View {
                     .frame(width: proxy.size.width)
                     dpiLegend
                 }
-                .position(x: proxy.size.width / 2, y: 105)
+                .position(x: proxy.size.width / 2, y: 88)
 
             }
             // Keep one bubble alive while moving between stages. Replacing
@@ -782,7 +782,7 @@ private struct DPIStageBar: View {
                     .compositingGroup()
                     .offset(
                         x: popoverX,
-                        y: -(proxy.size.height - 30)
+                        y: -(proxy.size.height - 24)
                     )
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .bottom)))
                     .zIndex(100)
@@ -868,7 +868,7 @@ private struct DPIStageBar: View {
                 break
             }
         }
-        .position(x: x, y: 70)
+        .position(x: x, y: 58)
         .zIndex(draggingStage == index ? 20 : 2)
     }
 
@@ -983,7 +983,7 @@ private struct DPIStageBar: View {
     }
 
     private var dpiLegend: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 7) {
             ForEach(legendOrder, id: \.self) { role in
                 legendItem(role)
             }
@@ -1199,7 +1199,14 @@ private struct DPIStageBar: View {
 }
 
 struct ContentView: View {
+    private enum AppTab: Hashable {
+        case configure
+        case backups
+        case settings
+    }
+
     @StateObject private var model = AppModel()
+    @State private var selectedTab: AppTab = .configure
     @State private var confirmRestore = false
     @State private var restoreURL: URL?
     @State private var confirmRecoveryRestore = false
@@ -1219,12 +1226,23 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            // Keep Settings on the standard macOS ⌘, shortcut even though the
+            // tab itself is represented by a TabView item.
+            Button("Settings") {
+                selectedTab = .settings
+            }
+            .keyboardShortcut(",", modifiers: [.command])
+            .opacity(0)
+            .frame(width: 0, height: 0)
+
             VStack(alignment: .leading, spacing: 14) {
-                header
-                    .padding(.horizontal, 20)
-                Divider()
-                    .padding(.horizontal, 20)
-                TabView {
+                if selectedTab != .settings {
+                    header
+                        .padding(.horizontal, 20)
+                    Divider()
+                        .padding(.horizontal, 20)
+                }
+                TabView(selection: $selectedTab) {
                     ZStack {
                         if model.loadingProfile && model.buttons.isEmpty {
                             loadingProfileState
@@ -1242,10 +1260,13 @@ struct ContentView: View {
                         }
                     }
                     .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
+                    .tag(AppTab.configure)
                     backupsPane
                         .tabItem { Label("Backups", systemImage: "archivebox") }
+                        .tag(AppTab.backups)
                     settingsPane
                         .tabItem { Label("Settings", systemImage: "gearshape") }
+                        .tag(AppTab.settings)
                 }
                 Divider()
                     .padding(.horizontal, 20)
@@ -1313,27 +1334,33 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(AppConstants.displayName)
-                    .font(.title2.weight(.semibold))
-            }
-            Spacer()
+        HStack(alignment: .center, spacing: 8) {
             if !model.devices.isEmpty {
-                Picker("Device", selection: Binding(
+                Text("Device")
+                    .font(.callout.weight(.medium))
+                Picker("", selection: Binding(
                     get: { model.selectedDeviceIndex },
                     set: { model.selectDevice($0) })) {
                     ForEach(model.devices) { device in
                         Text(device.title).tag(device.id)
                     }
                 }
-                .frame(width: 310)
+                .labelsHidden()
+                .frame(width: 180)
                 .disabled(model.devices.isEmpty)
             }
             Button("Refresh", action: model.refresh)
                 .keyboardShortcut("r", modifiers: [.command])
                 .disabled(model.busy)
             if model.busy { ProgressView().controlSize(.small) }
+            Spacer()
+            Button("Revert edits") { model.reloadSelectedProfile() }
+            Button("Save to mouse", action: model.applyAll)
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave ||
+                    (model.hasDPIChanges && !model.canApplyDPI)
+                )
         }
     }
 
@@ -1409,9 +1436,7 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 560)
             }
-            Text(model.knownDevicePollAttempts == 0
-                 ? "Checking for the mouse once per second for up to 60 seconds…"
-                 : "Checking for the mouse once per second (\(model.knownDevicePollAttempts)/60)…")
+            Text("Checking for the mouse in the background…")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             ProgressView()
@@ -1441,17 +1466,6 @@ struct ContentView: View {
 
     private var buttonsPane: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Spacer()
-                Button("Revert edits") { model.reloadSelectedProfile() }
-                Button("Save to mouse", action: model.applyAll)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(
-                        !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave ||
-                        (model.hasDPIChanges && !model.canApplyDPI)
-                    )
-            }
-            .padding(.horizontal, 20)
             if !model.recoveryBackups.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -1502,14 +1516,11 @@ struct ContentView: View {
             if let button = model.buttons.first(where: { $0.id == buttonID }) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Text("Button \(button.id)")
+                        Text(button.displayLabel)
                             .font(.body.weight(.medium))
-                            .frame(width: 76, alignment: .leading)
-                        Text(button.label)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .lineLimit(1)
+                            .help(button.displayLabel)
                         if button.draftChoice == "keystroke" {
                             if model.showNonStandardKeyboardKeys {
                                 let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
@@ -1538,7 +1549,7 @@ struct ContentView: View {
                             }
                         }
                         .labelsHidden()
-                        .frame(width: 190)
+                        .frame(width: 190, alignment: .trailing)
                         if model.showAdvancedFields {
                             TextField("8 hex digits", text: Binding(
                                 get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
@@ -1549,9 +1560,9 @@ struct ContentView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 122)
                         }
-                        Spacer()
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(
@@ -1614,6 +1625,10 @@ struct ContentView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+        // Keep the loading placeholder as tall as the populated profile bar.
+        // The picker and enable controls are intentionally hidden until the
+        // profile read completes, which would otherwise make this bar jump.
+        .frame(minHeight: 36)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.white.opacity(0.045))
@@ -1788,7 +1803,7 @@ struct ContentView: View {
     }
 
     private var dpiEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Onboard DPI")
@@ -1798,7 +1813,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Text("Active stages")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1806,29 +1821,31 @@ struct ContentView: View {
                         model.setDPIStageCount(model.dpiCount - 1)
                     } label: {
                         Image(systemName: "minus")
-                            .font(.title2.weight(.semibold))
-                            .frame(width: 34, height: 30)
+                            .font(.body.weight(.semibold))
+                            .frame(width: 28, height: 24)
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .disabled(model.dpiCount <= 1)
                     .accessibilityLabel("Remove DPI stage")
                     Text("\(model.dpiCount) of 5")
                         .font(.callout.monospacedDigit())
-                        .frame(minWidth: 44)
+                        .frame(minWidth: 40)
                     Button {
                         model.setDPIStageCount(model.dpiCount + 1)
                     } label: {
                         Image(systemName: "plus")
-                            .font(.title2.weight(.semibold))
-                            .frame(width: 34, height: 30)
+                            .font(.body.weight(.semibold))
+                            .frame(width: 28, height: 24)
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .disabled(model.dpiCount >= 5)
                     .accessibilityLabel("Add DPI stage")
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
                 if let currentDPI = model.dpiCapabilities.currentValue {
                     HStack(spacing: 6) {
                         Text("Live DPI")
@@ -1870,7 +1887,7 @@ struct ContentView: View {
                         model.deleteDPIStage(index: index)
                     }
                 )
-                .frame(height: 120)
+                .frame(height: 100)
                 .zIndex(10)
 
                 if let validation = model.dpiValidationMessage {
@@ -1880,9 +1897,8 @@ struct ContentView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(12)
+            .padding(8)
             .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-            Spacer()
         }
         .padding(.top, 4)
     }

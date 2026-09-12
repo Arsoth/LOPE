@@ -18,7 +18,7 @@ enum EngineError: LocalizedError {
 }
 
 enum AppConstants {
-    static let displayName = "Logitech Onboard Profile Editor"
+    static let displayName = "LOPE"
     static let shortName = "LOPE"
     static let engineName = "lope"
     static let appSupportDirectory = "LOPE"
