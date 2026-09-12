@@ -39,6 +39,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 100, "maximum": 44000 },
 	"profileIO": {
 		"supported": false,
 		"capability": "HITS/LIGHTFORCE profile transport unverified",

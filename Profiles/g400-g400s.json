@@ -47,6 +47,7 @@
 		{ "number": 7, "control": "G7 · DPI down", "aliases": [], "notes": null },
 		{ "number": 8, "control": "G8 · DPI up", "aliases": [], "notes": null }
 	],
+	"dpiRange": { "minimum": 200, "maximum": 4000 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ profile transport",

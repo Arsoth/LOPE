@@ -41,6 +41,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 250, "maximum": 2500 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ profile transport",

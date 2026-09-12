@@ -321,6 +321,7 @@ extension AppModel {
         keyInputDrafts.removeAll()
         buttons = loadingButtonRows()
         resetDPIState()
+        dpiCapabilities = currentMouseProfile.initialDPICapabilities
         dpiDetails = "Loading DPI capabilities from the mouse…"
     }
 
@@ -329,6 +330,7 @@ extension AppModel {
         dpiCount = 5
         defaultStage = 1
         shiftStage = 1
+        dpiCapabilities = DPICapabilities()
         baselineDPIStages = ["", "", "", "", ""]
         baselineDPICount = 5
         baselineDefaultStage = 1

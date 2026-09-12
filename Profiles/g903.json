@@ -65,6 +65,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 100, "maximum": 25600 },
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES · ambidextrous layout",

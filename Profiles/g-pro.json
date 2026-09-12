@@ -45,6 +45,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 100, "maximum": 16000 },
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",

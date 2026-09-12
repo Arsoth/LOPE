@@ -48,6 +48,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 200, "maximum": 2500 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy G300 onboard layout",

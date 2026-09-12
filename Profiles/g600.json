@@ -124,6 +124,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 200, "maximum": 8200 },
 	"profileIO": {
 		"supported": false,
 		"capability": "G600 layered onboard profile",

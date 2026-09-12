@@ -41,6 +41,7 @@
 			"notes": "Verify the live profile count on firmware variants that omit a top DPI control."
 		}
 	],
+	"dpiRange": { "minimum": 100, "maximum": 25600 },
 	"profileIO": {
 		"supported": false,
 		"capability": "HID++ profile transport unverified",

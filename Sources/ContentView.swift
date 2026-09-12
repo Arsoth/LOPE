@@ -1,7 +1,376 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
+import AppKit
 import SwiftUI
+
+private struct DPIStageTriangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct DPIStageDiamond: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct DPIStageSelection: Identifiable, Equatable {
+    let index: Int
+
+    var id: Int { index }
+}
+
+private struct PointerCursorModifier: ViewModifier {
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        content.onHover { isHovering in
+            guard enabled else { return }
+            (isHovering ? NSCursor.pointingHand : NSCursor.arrow).set()
+        }
+    }
+}
+
+private extension View {
+    func pointerCursor(enabled: Bool = true) -> some View {
+        modifier(PointerCursorModifier(enabled: enabled))
+    }
+}
+
+private struct DPIStageBar: View {
+    let stages: [String]
+    let defaultStage: Int
+    let shiftStage: Int
+    let capabilities: DPICapabilities
+    let onDragValue: (Int, Int) -> Void
+    let onAdjust: (Int, DPICapabilities.AdjustmentDirection) -> Void
+    let onTextChange: (Int, String) -> Void
+    let onSetDefault: (Int) -> Void
+    let onSetShift: (Int) -> Void
+    let onDelete: (Int) -> Void
+
+    @State private var editingStage: DPIStageSelection?
+    @State private var stageInteractionStart: TimeInterval?
+
+    private let clickDurationLimit: TimeInterval = 0.3
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                Capsule()
+                    .fill(.quaternary)
+                    .frame(height: 8)
+                    .overlay {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue.opacity(0.55), .purple.opacity(0.55)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .padding(.vertical, 2)
+                    }
+                    .frame(width: max(proxy.size.width - 28, 1))
+                    .position(x: proxy.size.width / 2, y: 55)
+
+                ForEach(tickValues, id: \.self) { value in
+                    Rectangle()
+                        .fill(.secondary.opacity(0.52))
+                        .frame(width: 1, height: 10)
+                        .position(x: position(for: value, width: proxy.size.width), y: 55)
+                }
+
+                ForEach(Array(stages.enumerated()), id: \.offset) { item in
+                    stageHandle(index: item.offset, text: item.element, width: proxy.size.width)
+                }
+
+                ZStack {
+                    HStack {
+                        Text(capabilities.minimum.map(String.init) ?? "100")
+                        Spacer()
+                        Text(capabilities.maximum.map(String.init) ?? "65535")
+                    }
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: proxy.size.width)
+                    dpiLegend
+                }
+                .position(x: proxy.size.width / 2, y: 105)
+
+            }
+            .coordinateSpace(name: "dpiBar")
+            .popover(
+                item: $editingStage,
+                attachmentAnchor: .point(popoverAnchor(for: proxy.size.width)),
+                arrowEdge: .top
+            ) {
+                stagePopover(index: $0.index)
+            }
+            .transaction { transaction in
+                transaction.animation = .easeOut(duration: 0.08)
+                transaction.disablesAnimations = false
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("DPI stage bar")
+    }
+
+    private func stageHandle(index: Int, text: String, width: CGFloat) -> some View {
+        let parsedValue = Int(text)
+        let displayValue = parsedValue.map(String.init) ?? "Enter DPI"
+        let positionValue = parsedValue ?? capabilities.minimum ?? 800
+        let isDefault = defaultStage == index + 1
+        let isShift = shiftStage == index + 1
+        let x = position(for: positionValue, width: width)
+
+        return ZStack(alignment: .topLeading) {
+            ZStack {
+                stageShape(isDefault: isDefault, isShift: isShift, isValid: parsedValue != nil)
+                    .frame(width: 30, height: 30)
+                Text("\(index + 1)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .offset(y: isShift && !isDefault ? 2 : 0)
+            }
+            .frame(width: 34, height: 34)
+            .position(x: 42, y: 16)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("dpiBar"))
+                    .onChanged { drag in
+                        if stageInteractionStart == nil {
+                            stageInteractionStart = ProcessInfo.processInfo.systemUptime
+                        }
+                        guard let candidate = value(at: drag.location.x, width: width, index: index) else { return }
+                        if drag.translation != .zero {
+                            onDragValue(index, candidate)
+                        }
+                    }
+                    .onEnded { drag in
+                        let now = ProcessInfo.processInfo.systemUptime
+                        let duration = now - (stageInteractionStart ?? now)
+                        stageInteractionStart = nil
+                        guard duration < clickDurationLimit else { return }
+                        presentStageEditor(index)
+                    }
+            )
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { presentStageEditor(index) }
+            .accessibilityLabel("DPI stage \(index + 1)")
+            .accessibilityValue(parsedValue.map { "\($0) DPI" } ?? "Invalid value")
+            .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    onAdjust(index, .increase)
+                case .decrement:
+                    onAdjust(index, .decrease)
+                @unknown default:
+                    break
+                }
+            }
+
+            Text(displayValue)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(parsedValue == nil ? .orange : .primary)
+                .lineLimit(1)
+                .frame(width: 84)
+                .position(x: 42, y: 45)
+                .allowsHitTesting(false)
+        }
+        .frame(width: 84, height: 62)
+        .position(x: x, y: 70)
+    }
+
+    private func popoverAnchor(for width: CGFloat) -> UnitPoint {
+        guard let editingStage, stages.indices.contains(editingStage.index) else {
+            return UnitPoint(x: 0.5, y: 55.0 / 120.0)
+        }
+        let value = Int(stages[editingStage.index]) ?? capabilities.minimum ?? 800
+        let x = position(for: value, width: width)
+        return UnitPoint(x: x / max(width, 1), y: 37.0 / 120.0)
+    }
+
+    @ViewBuilder
+    private func stageShape(isDefault: Bool, isShift: Bool, isValid: Bool) -> some View {
+        if isDefault {
+            Circle()
+                .fill(isValid ? Color.blue : Color.orange)
+        } else if isShift {
+            DPIStageTriangle()
+                .fill(isValid ? Color.orange : Color.red)
+        } else {
+            DPIStageDiamond()
+                .fill(isValid ? Color.secondary : Color.red)
+        }
+    }
+
+    private func stagePopover(index: Int) -> some View {
+        let isDefault = defaultStage == index + 1
+        let isShift = shiftStage == index + 1
+        let canDelete = !isDefault && !isShift
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("DPI stage \(index + 1)")
+                .font(.headline)
+            TextField(
+                "DPI",
+                text: Binding(
+                    get: { stages.indices.contains(index) ? stages[index] : "" },
+                    set: { onTextChange(index, $0) }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+
+            Divider()
+
+            Button {
+                onSetDefault(index)
+                dismissStageEditor()
+            } label: {
+                HStack(spacing: 7) {
+                    roleIcon(isDefault: true, isShift: false, filled: isDefault, tint: .white)
+                    Text(isDefault ? "Default" : "Make Default")
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .pointerCursor()
+
+            Divider()
+
+            Button {
+                onSetShift(index)
+                dismissStageEditor()
+            } label: {
+                HStack(spacing: 7) {
+                    roleIcon(isDefault: false, isShift: true, filled: isShift, tint: .white)
+                    Text(isShift ? "DPI Shift" : "Make DPI Shift")
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .pointerCursor()
+
+            Divider()
+
+            Button(role: .destructive) {
+                onDelete(index)
+                dismissStageEditor()
+            } label: {
+                Label("Delete stage", systemImage: "trash")
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .pointerCursor(enabled: canDelete)
+            .disabled(!canDelete)
+
+            Text("Dragging snaps to the mouse’s supported DPI values.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(width: 230)
+        .id(index)
+    }
+
+    private var dpiLegend: some View {
+        HStack(spacing: 9) {
+            legendItem(label: "Default", isDefault: true, isShift: false)
+            legendItem(label: "DPI Shift", isDefault: false, isShift: true)
+            legendItem(label: "Other", isDefault: false, isShift: false)
+        }
+    }
+
+    private func legendItem(label: String, isDefault: Bool, isShift: Bool) -> some View {
+        HStack(spacing: 3) {
+            let tint: Color = isDefault ? .blue : (isShift ? .orange : .secondary)
+            roleIcon(isDefault: isDefault, isShift: isShift, filled: true, tint: tint)
+            Text(label)
+        }
+    }
+
+    @ViewBuilder
+    private func roleIcon(isDefault: Bool, isShift: Bool, filled: Bool, tint: Color) -> some View {
+        Group {
+            if isDefault {
+                if filled {
+                    Circle().fill(tint)
+                } else {
+                    Circle().stroke(tint, lineWidth: 1.25)
+                }
+            } else if isShift {
+                if filled {
+                    DPIStageTriangle().fill(tint)
+                } else {
+                    DPIStageTriangle().stroke(tint, lineWidth: 1.25)
+                }
+            } else {
+                DPIStageDiamond().fill(tint)
+            }
+        }
+        .frame(width: 14, height: 14)
+    }
+
+    private var tickValues: [Int] {
+        let minimum = capabilities.minimum ?? 100
+        let maximum = capabilities.maximum ?? Int(UInt16.max)
+        let firstTick = ((minimum + 999) / 1000) * 1000
+        guard firstTick <= maximum else { return [] }
+        return Array(stride(from: firstTick, through: maximum, by: 1000))
+    }
+
+    private func presentStageEditor(_ index: Int) {
+        editingStage = DPIStageSelection(index: index)
+    }
+
+    private func dismissStageEditor() {
+        editingStage = nil
+    }
+
+    private func position(for value: Int, width: CGFloat) -> CGFloat {
+        let minimum = capabilities.minimum ?? 100
+        let maximum = capabilities.maximum ?? Int(UInt16.max)
+        guard maximum > minimum else { return width / 2 }
+        let logMinimum = log(Double(minimum))
+        let logMaximum = log(Double(maximum))
+        let fraction = min(
+            max(CGFloat((log(Double(max(value, minimum))) - logMinimum) / (logMaximum - logMinimum)), 0),
+            1
+        )
+        return 14 + fraction * max(width - 28, 1)
+    }
+
+    private func value(at x: CGFloat, width: CGFloat, index: Int) -> Int? {
+        let minimum = capabilities.minimum ?? 100
+        let maximum = capabilities.maximum ?? Int(UInt16.max)
+        let fraction = min(max((x - 14) / max(width - 28, 1), 0), 1)
+        let logMinimum = log(Double(minimum))
+        let logMaximum = log(Double(maximum))
+        let raw = Int(exp(logMinimum + Double(fraction) * (logMaximum - logMinimum)).rounded())
+        let lowerBound = index > 0 ? Int(stages[index - 1]).map { $0 + 1 } : nil
+        let upperBound = index + 1 < stages.count ? Int(stages[index + 1]).map { $0 - 1 } : nil
+        return capabilities.snappedValue(for: raw, lowerBound: lowerBound, upperBound: upperBound)
+    }
+}
 
 struct ContentView: View {
     @StateObject private var model = AppModel()
@@ -206,7 +575,10 @@ struct ContentView: View {
                 Button("Revert edits") { model.reloadSelectedProfile() }
                 Button("Save to mouse", action: model.applyAll)
                     .buttonStyle(.borderedProminent)
-                    .disabled(!model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave)
+                    .disabled(
+                        !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave ||
+                        (model.hasDPIChanges && !model.canApplyDPI)
+                    )
             }
             Text("Change button outputs and DPI together, then save once. The original data is backed up automatically.")
                 .font(.callout)
@@ -510,74 +882,75 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Picker("Active stages", selection: Binding(
-                    get: { model.dpiCount },
-                    set: { model.setDPIStageCount($0) })) {
-                    ForEach(1...5, id: \.self) { count in
-                        Text("\(count) stages").tag(count)
+                HStack(spacing: 5) {
+                    Text("Active stages")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        model.setDPIStageCount(model.dpiCount - 1)
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.title2.weight(.semibold))
+                            .frame(width: 38, height: 34)
                     }
+                    .buttonStyle(.bordered)
+                    .disabled(model.dpiCount <= 1)
+                    .accessibilityLabel("Remove DPI stage")
+                    Text("\(model.dpiCount) of 5")
+                        .font(.callout.monospacedDigit())
+                        .frame(minWidth: 44)
+                    Button {
+                        model.setDPIStageCount(model.dpiCount + 1)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.title2.weight(.semibold))
+                            .frame(width: 38, height: 34)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(model.dpiCount >= 5)
+                    .accessibilityLabel("Add DPI stage")
                 }
-                .labelsHidden()
-                .controlSize(.small)
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    ForEach(0..<model.dpiCount, id: \.self) { index in
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Stage \(index + 1)")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 4) {
-                                TextField("DPI", text: Binding(
-                                    get: { model.dpiStages[index] },
-                                    set: { model.dpiStages[index] = $0.filter { $0.isNumber } }))
-                                    .textFieldStyle(.roundedBorder)
-                                    .controlSize(.small)
-                                Text("DPI")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                DPIStageBar(
+                    stages: Array(model.dpiStages.prefix(model.dpiCount)),
+                    defaultStage: model.defaultStage,
+                    shiftStage: model.shiftStage,
+                    capabilities: model.dpiCapabilities,
+                    onDragValue: { index, value in
+                        model.setDPIStageValue(index: index, value: value)
+                    },
+                    onAdjust: { index, direction in
+                        model.adjustDPIStage(index: index, direction: direction)
+                    },
+                    onTextChange: { index, text in
+                        model.setDPIStageText(index: index, text: text)
+                    },
+                    onSetDefault: { index in
+                        model.setDefaultDPIStage(index + 1)
+                    },
+                    onSetShift: { index in
+                        model.setShiftDPIStage(index + 1)
+                    },
+                    onDelete: { index in
+                        model.deleteDPIStage(index: index)
                     }
-                }
+                )
+                .frame(height: 120)
 
-                HStack(spacing: 8) {
-                    dpiStagePicker(title: "Default", selection: $model.defaultStage)
-                    dpiStagePicker(title: "DPI shift", selection: $model.shiftStage)
-                    Spacer()
+                if let validation = model.dpiValidationMessage {
+                    Label(validation, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(12)
             .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-
-            Text(model.dpiDetails)
-                .font(.system(.callout, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
             Spacer()
         }
         .padding(.top, 4)
-    }
-
-    private func dpiStagePicker(title: String, selection: Binding<Int>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Picker(title, selection: selection) {
-                ForEach(1...model.dpiCount, id: \.self) { stage in
-                    Text("Stage \(stage)").tag(stage)
-                }
-            }
-            .labelsHidden()
-            .controlSize(.small)
-            .frame(width: 126)
-        }
     }
 
     private var backupsPane: some View {

@@ -52,9 +52,9 @@ test: $(APP) $(SWIFT_PROFILE_PARSER_TEST)
 	./$(APP) self-test
 	./$(SWIFT_PROFILE_PARSER_TEST)
 
-$(SWIFT_PROFILE_PARSER_TEST): Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift
+$(SWIFT_PROFILE_PARSER_TEST): Sources/DPIModel.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift
 	@mkdir -p .build
-	swiftc -O -target $(GUI_TARGET) Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
+	swiftc -O -target $(GUI_TARGET) Sources/DPIModel.swift Sources/ProfileOutputParser.swift Sources/ProfileSelection.swift Tests/ProfileOutputParserSelfTest.swift -o $(SWIFT_PROFILE_PARSER_TEST)
 
 clean:
 	rm -f $(APP) bin/$(APP) $(GUI_BIN) $(SWIFT_PROFILE_PARSER_TEST)

@@ -24,6 +24,7 @@ final class AppModel: ObservableObject {
     @Published var dpiCount = 5
     @Published var defaultStage = 3
     @Published var shiftStage = 1
+    @Published var dpiCapabilities = DPICapabilities()
     @Published var dpiDetails = "DPI capabilities have not been read."
     @Published var busy = false
     @Published var loadingProfile = false
@@ -149,8 +150,17 @@ final class AppModel: ObservableObject {
     }
 
     var canApplyDPI: Bool {
-        guard (1...5).contains(dpiCount), dpiStages.count == 5 else { return false }
-        return dpiStages.prefix(dpiCount).allSatisfy { UInt16($0) != nil }
+        dpiValidationMessage == nil
+    }
+
+    var dpiValidationMessage: String? {
+        DPIEditorValidation.message(
+            stages: dpiStages,
+            count: dpiCount,
+            defaultStage: defaultStage,
+            shiftStage: shiftStage,
+            capabilities: dpiCapabilities
+        )
     }
 
     var hasProfileChanges: Bool {

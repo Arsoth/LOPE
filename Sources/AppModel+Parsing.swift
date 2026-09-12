@@ -15,6 +15,7 @@ extension AppModel {
             let dpiText = try runEngine(["--sensor-only", "dpi"])
             parseDPI([profileText ?? "", dpiText].joined(separator: "\n"))
         } catch {
+            dpiCapabilities = DPICapabilities(errorMessage: error.localizedDescription)
             dpiDetails = error.localizedDescription
         }
     }
@@ -176,6 +177,26 @@ extension AppModel {
 
     func parseDPI(_ text: String) {
         let pattern = try! NSRegularExpression(pattern: #"(?:Onboard profile \d+ )?DPI stages:\s*([0-9, ]+)\s*\(default\s+(\d+),\s*shift\s+(\d+)\)"#)
+        let capabilities = DPIOutputParser.parse(text)
+        let loadingCapabilities = dpiCapabilities
+        if capabilities.hasKnownValues || !loadingCapabilities.hasKnownValues {
+            // A successfully reported onboard range is authoritative. Keep
+            // the catalog range only when the profile read contains stages
+            // but the firmware did not expose a separate capability range.
+            dpiCapabilities = capabilities
+        } else {
+            dpiCapabilities = DPICapabilities(
+                supportedValues: loadingCapabilities.supportedValues,
+                minimum: loadingCapabilities.minimum,
+                maximum: loadingCapabilities.maximum,
+                step: loadingCapabilities.step,
+                sensorCount: capabilities.sensorCount,
+                currentValue: capabilities.currentValue,
+                errorMessage: capabilities.errorMessage
+            )
+        }
+        dpiDetails = capabilities.displayText
+
         for line in text.split(separator: "\n").map(String.init) {
             let range = NSRange(line.startIndex..<line.endIndex, in: line)
             if let match = pattern.firstMatch(in: line, range: range) {
@@ -193,12 +214,6 @@ extension AppModel {
                     baselineDefaultStage = defaultStage
                     baselineShiftStage = shiftStage
                 }
-            }
-            if line.hasPrefix("Supported DPI:") || line.hasPrefix("Current sensor") {
-                dpiDetails = [dpiDetails, line].filter { !$0.isEmpty }.joined(separator: "\n")
-            }
-            if line.hasPrefix("DPI error:") {
-                dpiDetails = [dpiDetails, line].filter { !$0.isEmpty }.joined(separator: "\n")
             }
         }
     }

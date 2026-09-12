@@ -8,6 +8,15 @@ import Foundation
 /// than the Swift model: fields in `profileIO` are intended to be useful when
 /// adding a device whose firmware does not follow the common path.
 struct MouseProfileDescriptor: Codable, Hashable, Sendable {
+    struct DPIRange: Codable, Hashable, Sendable {
+        var minimum: Int
+        var maximum: Int
+
+        var capabilities: DPICapabilities {
+            DPICapabilities(minimum: minimum, maximum: maximum)
+        }
+    }
+
     struct Match: Codable, Hashable, Sendable {
         var nameContains: [String]
         var productIDs: [String]
@@ -71,8 +80,13 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     var name: String
     var match: Match
     var buttons: [Button]
+    var dpiRange: DPIRange?
     var profileIO: ProfileIO
     var sources: [String]
+
+    var initialDPICapabilities: DPICapabilities {
+        dpiRange?.capabilities ?? DPICapabilities()
+    }
 
     func button(for number: Int) -> Button? {
         buttons.first { $0.number == number }
@@ -163,6 +177,7 @@ struct MouseProfileCatalog: Sendable {
             .init(number: 2, control: "Secondary click", aliases: [], notes: nil),
             .init(number: 3, control: "Middle click", aliases: [], notes: nil)
         ],
+        dpiRange: .init(minimum: 100, maximum: 16000),
         profileIO: .init(
             supported: true,
             capability: "runtime-detected",

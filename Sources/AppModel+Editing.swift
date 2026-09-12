@@ -156,9 +156,115 @@ extension AppModel {
         }
     }
 
+    func setDPIStageText(index: Int, text: String) {
+        guard dpiStages.indices.contains(index), index < dpiCount else { return }
+        dpiStages[index] = text.filter { $0.isNumber }
+    }
+
+    func setDPIStageValue(index: Int, value: Int) {
+        guard dpiStages.indices.contains(index), index < dpiCount else { return }
+        let lowerBound = index > 0 ? Int(dpiStages[index - 1]).map { $0 + 1 } : nil
+        let upperBound = index + 1 < dpiCount ? Int(dpiStages[index + 1]).map { $0 - 1 } : nil
+        guard let snapped = dpiCapabilities.snappedValue(
+            for: value,
+            lowerBound: lowerBound,
+            upperBound: upperBound
+        ) else { return }
+        dpiStages[index] = String(snapped)
+    }
+
+    func adjustDPIStage(index: Int, direction: DPICapabilities.AdjustmentDirection) {
+        guard dpiStages.indices.contains(index), index < dpiCount,
+              let current = Int(dpiStages[index]) else { return }
+        let lowerBound = index > 0 ? Int(dpiStages[index - 1]).map { $0 + 1 } : nil
+        let upperBound = index + 1 < dpiCount ? Int(dpiStages[index + 1]).map { $0 - 1 } : nil
+        guard let adjusted = dpiCapabilities.adjustedValue(
+            from: current,
+            direction: direction,
+            lowerBound: lowerBound,
+            upperBound: upperBound
+        ) else { return }
+        dpiStages[index] = String(adjusted)
+    }
+
+    func setDefaultDPIStage(_ stage: Int) {
+        guard (1...dpiCount).contains(stage) else { return }
+        defaultStage = stage
+        guard dpiCount > 1, shiftStage == stage else { return }
+        shiftStage = (1...dpiCount).first(where: { $0 != stage }) ?? stage
+    }
+
+    func setShiftDPIStage(_ stage: Int) {
+        guard (1...dpiCount).contains(stage) else { return }
+        shiftStage = stage
+        guard dpiCount > 1, defaultStage == stage else { return }
+        defaultStage = (1...dpiCount).first(where: { $0 != stage }) ?? stage
+    }
+
+    func deleteDPIStage(index: Int) {
+        guard dpiCount > 1, (0..<dpiCount).contains(index) else { return }
+        let stage = index + 1
+        guard stage != defaultStage, stage != shiftStage else { return }
+
+        dpiStages.remove(at: index)
+        dpiStages.append("")
+        dpiCount -= 1
+
+        if defaultStage > stage {
+            defaultStage -= 1
+        }
+        if shiftStage > stage {
+            shiftStage -= 1
+        }
+    }
+
     func setDPIStageCount(_ requested: Int) {
         let count = min(max(requested, 1), 5)
-        dpiCount = count
+        let oldCount = dpiCount
+        guard count != oldCount else { return }
+
+        if count > oldCount {
+            let activeValues = dpiStages.prefix(oldCount).compactMap(Int.init)
+            if activeValues.count == oldCount, let last = activeValues.last {
+                let maximum = dpiCapabilities.maximum ?? Int(UInt16.max)
+                let insertBeforeLast = maximum - last <= 2_000
+                let insertionIndex = insertBeforeLast ? max(activeValues.count - 1, 0) : activeValues.count
+                let target = insertBeforeLast ? last - 1_000 : last + 1_000
+                let lowerBound = insertionIndex > 0 ? activeValues[insertionIndex - 1] + 1 : nil
+                let upperBound = insertionIndex < activeValues.count ? activeValues[insertionIndex] - 1 : nil
+
+                if let suggested = dpiCapabilities.snappedValue(
+                    for: target,
+                    lowerBound: lowerBound,
+                    upperBound: upperBound
+                ) {
+                    var updatedValues = activeValues
+                    updatedValues.insert(suggested, at: insertionIndex)
+                    dpiStages = updatedValues.map(String.init) + Array(repeating: "", count: 5 - count)
+                    dpiCount = count
+
+                    if defaultStage > insertionIndex {
+                        defaultStage += 1
+                    }
+                    if shiftStage > insertionIndex {
+                        shiftStage += 1
+                    }
+                    if oldCount == 1, defaultStage == shiftStage {
+                        shiftStage = defaultStage == 1 ? 2 : 1
+                    }
+                }
+            } else {
+                // Keep the active-stage affordance usable while a text field is
+                // incomplete; the validation message will request the value.
+                dpiCount = count
+                let previous = count > 1 ? Int(dpiStages[count - 2]) : nil
+                let fallback = previous.map { $0 + 1_000 } ?? 1_000
+                dpiStages[count - 1] = String(fallback)
+            }
+        } else {
+            dpiCount = count
+        }
+
         for index in count..<5 {
             dpiStages[index] = ""
         }

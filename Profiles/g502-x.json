@@ -65,6 +65,7 @@
 		{ "number": 10, "control": "G8 · DPI up", "aliases": [], "notes": null },
 		{ "number": 11, "control": "G7 · DPI down", "aliases": [], "notes": null }
 	],
+	"dpiRange": { "minimum": 100, "maximum": 25600 },
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES · G502 X layout",

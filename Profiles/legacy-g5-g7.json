@@ -45,6 +45,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 200, "maximum": 2000 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ 1.0/LGS onboard profile",

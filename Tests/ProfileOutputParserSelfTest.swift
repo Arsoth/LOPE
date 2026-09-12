@@ -37,6 +37,56 @@ struct ProfileOutputParserSelfTest {
             }
         }
 
-        print("profile metadata self-test: capacity and selection cases passed")
+        let rangeCapabilities = DPIOutputParser.parse(
+            "DPI sensors: 1\r\nSupported DPI: 400..25600 (step 50)\r\nCurrent sensor 1 DPI: 1600\r\n"
+        )
+        guard rangeCapabilities.minimum == 400,
+              rangeCapabilities.maximum == 25600,
+              rangeCapabilities.step == 50,
+              rangeCapabilities.sensorCount == 1,
+              rangeCapabilities.currentValue == 1600,
+              rangeCapabilities.accepts(1600),
+              !rangeCapabilities.accepts(1625),
+              rangeCapabilities.snappedValue(for: 1573) == 1550 else {
+            fatalError("DPI range parsing or snapping failed")
+        }
+
+        let listCapabilities = DPIOutputParser.parse("Supported DPI: 800, 1600, 3200\n")
+        guard listCapabilities.supportedValues == [800, 1600, 3200],
+              !listCapabilities.accepts(1200),
+              listCapabilities.snappedValue(for: 1300) == 1600,
+              listCapabilities.snappedValue(for: 1800, lowerBound: 1601) == 3200,
+              listCapabilities.snappedValue(for: 1800, upperBound: 1599) == 800 else {
+            fatalError("DPI discrete-list parsing or neighbor constraints failed")
+        }
+
+        let validStages = ["800", "1600", "3200", "", ""]
+        let validMessage = DPIEditorValidation.message(
+            stages: validStages,
+            count: 3,
+            defaultStage: 2,
+            shiftStage: 1,
+            capabilities: listCapabilities
+        )
+        guard validMessage == nil else { fatalError("valid DPI stages were rejected") }
+        let invalidCases: [([String], Int, String)] = [
+            (["800", "", "", "", ""], 2, "Enter a numeric value for DPI stage 2."),
+            (["800", "800", "", "", ""], 2, "DPI stages must be strictly increasing."),
+            (["800", "1200", "", "", ""], 2, "DPI stage 2 is not supported by this mouse.")
+        ]
+        for (stages, count, expected) in invalidCases {
+            let message = DPIEditorValidation.message(
+                stages: stages,
+                count: count,
+                defaultStage: 1,
+                shiftStage: 1,
+                capabilities: listCapabilities
+            )
+            guard message == expected else {
+                fatalError("DPI validation returned \(String(describing: message)); expected \(expected)")
+            }
+        }
+
+        print("profile metadata self-test: capacity, selection, and DPI cases passed")
     }
 }

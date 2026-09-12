@@ -45,6 +45,7 @@
 			"notes": null
 		}
 	],
+	"dpiRange": { "minimum": 200, "maximum": 12000 },
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES · format-3 DPI variant",
