@@ -4,8 +4,7 @@
 	"name": "G PRO wired",
 	"match": {
 		"nameContains": ["G PRO"],
-		"productIDs": ["0xC085"],
-		"priority": 10
+		"productIDs": ["0xC085"]
 	},
 	"buttons": [
 		{
@@ -45,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 100, "maximum": 16000 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 16000
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",
@@ -72,9 +74,7 @@
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": [
-			"The plain G PRO descriptor is lower priority than the G PRO Wireless descriptor."
-		]
+		"notes": ["The plain G PRO descriptor is lower priority than the G PRO Wireless descriptor."]
 	},
 	"rgbProfile": {
 		"supported": true,
@@ -83,7 +83,10 @@
 		"recordBytes": 11,
 		"colorOffset": 1,
 		"zones": [
-			{ "index": 0, "name": "Logo and side lighting" }
+			{
+				"index": 0,
+				"name": "Logo and side lighting"
+			}
 		],
 		"notes": [
 			"Validated legacy onboard RGB record: the combined Logo and side-lighting zone is record 0. Only the three-byte solid-color field is edited."

@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g-pro-x2",
-	"name": "PRO X2 SUPERSTRIKE",
+	"id": "g300",
+	"name": "G300",
 	"match": {
-		"nameContains": ["PRO X2 SUPERSTRIKE", "PRO X2"],
-		"productIDs": []
+		"nameContains": ["G300"],
+		"productIDs": ["0xC246"]
 	},
 	"buttons": [
 		{
@@ -36,27 +36,51 @@
 			"control": "G5 · Forward",
 			"aliases": ["Front thumb"],
 			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Top left",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Top middle",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Top right",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Mode switch",
+			"aliases": ["Profile cycle"],
+			"notes": null
 		}
 	],
 	"dpiRange": {
-		"minimum": 100,
-		"maximum": 44000
+		"minimum": 200,
+		"maximum": 2500
 	},
 	"profileIO": {
 		"supported": false,
-		"capability": "HITS/LIGHTFORCE profile transport unverified",
-		"feature": "runtime",
+		"capability": "legacy G300 onboard layout",
+		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
 			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "runtime-detected",
+			"getInfo": "legacy/runtime",
 			"readSector": "runtime-detected",
 			"controlSector": "runtime-detected",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "HITS actuation/haptic settings may share or extend profile storage; a dedicated descriptor is required",
+			"reason": "G300 mode-switch/profile layout needs a dedicated legacy writer",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -66,11 +90,11 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"The five logical controls are mapped, but the HITS-specific actuation and haptic fields are intentionally preserved until the profile format is captured."
+			"G300 uses a mode/profile switch and a mirrored ambidextrous shell; the mapping is kept separate from the standard six-button family. Shares a USB product ID with G300s; the revisions were not assigned distinct IDs."
 		]
 	},
 	"sources": [
-		"https://www.logitechg.com/en-us/shop/p/pro-x2-superstrike-mouse",
-		"https://www.logitechg.com/en-in/discover/learn/superstrike-hits-codes"
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://www.logitech.com/assets/51813/26/lgs-guide.pdf"
 	]
 }

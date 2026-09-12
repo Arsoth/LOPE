@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g100s",
-	"name": "G100s",
+	"id": "legacy-g9x",
+	"name": "Legacy G9x",
 	"match": {
-		"nameContains": ["G100S"],
-		"productIDs": []
+		"nameContains": ["G9X"],
+		"productIDs": ["0xC066", "0xC249"]
 	},
 	"buttons": [
 		{
@@ -28,41 +28,47 @@
 		{
 			"number": 4,
 			"control": "G4 · Back",
-			"aliases": ["Rear thumb"],
+			"aliases": ["Side button"],
 			"notes": null
 		},
 		{
 			"number": 5,
 			"control": "G5 · Forward",
-			"aliases": ["Front thumb"],
+			"aliases": ["Side button"],
 			"notes": null
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI button",
-			"aliases": ["Top DPI"],
+			"control": "G6 · Top control",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Top control",
+			"aliases": [],
 			"notes": null
 		}
 	],
 	"dpiRange": {
-		"minimum": 250,
-		"maximum": 2500
+		"minimum": 200,
+		"maximum": 5000
 	},
 	"profileIO": {
 		"supported": false,
-		"capability": "legacy HID++ profile transport",
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
 		"feature": "legacy",
 		"load": {
 			"command": "profiles",
 			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy/runtime",
+			"getInfo": "legacy HID++ 1.0",
 			"readSector": "legacy/runtime",
 			"controlSector": "legacy/runtime",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G100s storage has not been validated by the modern sector writer",
+			"reason": "Legacy G9x shell and macro storage require a dedicated legacy implementation",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -71,7 +77,10 @@
 			"buttonOffsetByFormat": "legacy/runtime",
 			"crc": "runtime-validated"
 		},
-		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
+		"notes": [
+			"The mapping is a conservative physical description for legacy discovery, not an authorization to write unknown macro records.",
+			"The two product IDs were inherited from a combined G9/G9x descriptor and are believed to be G9x's revisions (including the Signature Edition), but have not been independently re-verified against real devices."
+		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
 }

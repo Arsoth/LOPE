@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g305-g304",
-	"name": "G305 / G304 LIGHTSPEED",
+	"id": "g302",
+	"name": "G302",
 	"match": {
-		"nameContains": ["G305", "G304"],
-		"productIDs": [],
-		"priority": 20
+		"nameContains": ["G302"],
+		"productIDs": ["0xC07F"]
 	},
 	"buttons": [
 		{
@@ -45,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 12000 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 12000
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",
@@ -72,11 +74,7 @@
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": [
-			"G304 is the regional name used for G305 hardware in some markets."
-		]
+		"notes": []
 	},
-	"sources": [
-		"https://www.logitechg.com/en-us/shop/p/g305-lightspeed-se-gaming-mouse"
-	]
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
 }

@@ -364,8 +364,7 @@ extension AppModel {
             name: "\(deviceName.isEmpty ? "Unnamed mouse" : deviceName) (needs button names)",
             match: .init(
                 nameContains: deviceName.isEmpty ? [] : [deviceName],
-                productIDs: productID.isEmpty ? [] : [productID],
-                priority: 0
+                productIDs: productID.isEmpty ? [] : [productID]
             ),
             buttons: buttons,
             scrollWheelButtonLabels: nil,

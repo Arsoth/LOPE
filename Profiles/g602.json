@@ -4,8 +4,7 @@
 	"name": "G602",
 	"match": {
 		"nameContains": ["G602"],
-		"productIDs": ["0xC537"],
-		"priority": 30
+		"productIDs": ["0xC537"]
 	},
 	"buttons": [
 		{
@@ -75,7 +74,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 250, "maximum": 2500 },
+	"dpiRange": {
+		"minimum": 250,
+		"maximum": 2500
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",

@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g500-g500s",
-	"name": "G500 / G500s",
+	"id": "legacy-g9",
+	"name": "Legacy G9",
 	"match": {
-		"nameContains": ["G500", "G500S"],
-		"productIDs": ["0xC068", "0xC24E"],
-		"priority": 10
+		"nameContains": ["G9"],
+		"productIDs": ["0xC048"]
 	},
 	"buttons": [
 		{
@@ -29,37 +28,32 @@
 		{
 			"number": 4,
 			"control": "G4 · Back",
-			"aliases": ["Rear thumb"],
+			"aliases": ["Side button"],
 			"notes": null
 		},
 		{
 			"number": 5,
 			"control": "G5 · Forward",
-			"aliases": ["Front thumb"],
+			"aliases": ["Side button"],
 			"notes": null
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI Shift",
-			"aliases": ["Sniper"],
-			"notes": null
-		},
-		{ "number": 7, "control": "G7 · DPI down", "aliases": [], "notes": null },
-		{ "number": 8, "control": "G8 · DPI up", "aliases": [], "notes": null },
-		{
-			"number": 9,
-			"control": "Wheel tilt left",
-			"aliases": ["Scroll left"],
+			"control": "G6 · Top control",
+			"aliases": [],
 			"notes": null
 		},
 		{
-			"number": 10,
-			"control": "Wheel tilt right",
-			"aliases": ["Scroll right"],
+			"number": 7,
+			"control": "G7 · Top control",
+			"aliases": [],
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 8200 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 5000
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ 1.0/LGS onboard profile",
@@ -74,7 +68,7 @@
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G500/G500s storage has not been validated by the modern sector writer",
+			"reason": "Legacy G9 shell and macro storage require a dedicated legacy implementation",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -84,8 +78,9 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping."
+			"The mapping is a conservative physical description for legacy discovery, not an authorization to write unknown macro records.",
+			"The product ID was inherited from a combined G9/G9x descriptor and has not been independently re-verified against a real device."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
 }

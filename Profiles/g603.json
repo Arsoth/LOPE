@@ -4,8 +4,7 @@
 	"name": "G603 LIGHTSPEED",
 	"match": {
 		"nameContains": ["G603"],
-		"productIDs": ["0xB01C"],
-		"priority": 30
+		"productIDs": ["0xB01C"]
 	},
 	"buttons": [
 		{
@@ -45,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 12000 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 12000
+	},
 	"refreshGuidance": {
 		"sleepDescription": "In Endurance mode, the G603 can enter a low-power sleep state very quickly (the setup guide indicates about 3 seconds without activity).",
 		"wakeInstructions": "Keep moving the mouse while LOPE reads it. If it is asleep, turn it on or move/click it, then choose Refresh."

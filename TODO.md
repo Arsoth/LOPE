@@ -11,6 +11,37 @@
 
 # LOPE todo list
 
+### [ ] 1. Add a polling-rate picker beside the active DPI stages picker
+
+- [ ] Query HID++ report-rate support from the connected mouse: use feature `0x8061` when available, otherwise `0x8060`, and use the rates reported for the active connection.
+- [ ] Add a dropdown showing only the rates supported by that mouse.
+- [ ] Place the picker to the left of the active stages picker.
+
+**Done when:** The editor displays the mouse's supported polling rates beside the active DPI-stage control and can apply the selected rate safely.
+
+### [ ] 2. Hide edit actions while the Profile Editor is active
+
+- [ ] Hide the existing Revert edits and Save to mouse buttons in the shared bar when Profile Editor is selected.
+- [ ] Keep only the device selector and Refresh action in that bar.
+
+**Done when:** Selecting Profile Editor leaves the shared bar with only device selection and refresh; no second Revert edits or Save to mouse controls are added.
+
+### [ ] 3. Present the sleeping-mouse state as a modal over blurred loading backgrounds
+
+- [ ] Show the sleeping-mouse screen as a modal layered over the current screen instead of replacing the underlying data view.
+- [ ] Apply a slight blur to all loading-state backgrounds.
+- [ ] Preserve the underlying screen during transitions between profile-derived mocks, the sleeping-mouse state, and data screens.
+
+**Done when:** The sleeping-mouse state appears as a modal over a slightly blurred background, and loading transitions preserve the underlying screen without visibly jumping between views.
+
+### [ ] 4. Refactor the UI into smaller reusable components
+
+- [ ] Split the large ContentView sections into focused components.
+- [ ] Extract repeated controls and layouts into reusable views.
+- [ ] Preserve the current behavior and appearance while reducing ContentView's size.
+
+**Done when:** The UI is organized into smaller reusable components without behavior or visual regressions.
+
 # Ignore below item(s):
 
 ### [ ] 1. Detect and highlight all standard mouse buttons when possible

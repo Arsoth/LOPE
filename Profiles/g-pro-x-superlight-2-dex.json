@@ -1,9 +1,9 @@
 {
 	"schemaVersion": 1,
-	"id": "g100s",
-	"name": "G100s",
+	"id": "g-pro-x-superlight-2-dex",
+	"name": "PRO X SUPERLIGHT 2 DEX",
 	"match": {
-		"nameContains": ["G100S"],
+		"nameContains": ["PRO X SUPERLIGHT 2 DEX"],
 		"productIDs": []
 	},
 	"buttons": [
@@ -36,42 +36,38 @@
 			"control": "G5 · Forward",
 			"aliases": ["Front thumb"],
 			"notes": null
-		},
-		{
-			"number": 6,
-			"control": "G6 · DPI button",
-			"aliases": ["Top DPI"],
-			"notes": null
 		}
 	],
 	"dpiRange": {
-		"minimum": 250,
-		"maximum": 2500
+		"minimum": 100,
+		"maximum": 44000
 	},
 	"profileIO": {
 		"supported": false,
-		"capability": "legacy HID++ profile transport",
-		"feature": "legacy",
+		"capability": "HID++ profile transport unverified",
+		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
-			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy/runtime",
-			"readSector": "legacy/runtime",
-			"controlSector": "legacy/runtime",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "runtime-detected",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G100s storage has not been validated by the modern sector writer",
+			"reason": "HERO 2/LIGHTFORCE firmware variants need a captured profile descriptor before standard writes are enabled",
 			"backup": "required",
 			"verify": "required"
 		},
 		"layout": {
 			"buttonRecord": "runtime-reported",
-			"buttonOffsetByFormat": "legacy/runtime",
+			"buttonOffsetByFormat": "runtime-validated",
 			"crc": "runtime-validated"
 		},
-		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
+		"notes": [
+			"The plain 2, 2C, and 2 SE variants expose the same five-button logical mapping in product specifications, but each model's profile transport must be verified per firmware family, so they are cataloged in their own files."
+		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://www.logitechg.com/en-gb/products/gaming-mice/pro-x-superlight-2-dex.910-007358.html"]
 }

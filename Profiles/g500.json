@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g100s",
-	"name": "G100s",
+	"id": "g500",
+	"name": "G500",
 	"match": {
-		"nameContains": ["G100S"],
-		"productIDs": []
+		"nameContains": ["G500"],
+		"productIDs": ["0xC068"]
 	},
 	"buttons": [
 		{
@@ -39,30 +39,54 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI button",
-			"aliases": ["Top DPI"],
+			"control": "G6 · DPI Shift",
+			"aliases": ["Sniper"],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · DPI down",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · DPI up",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "Wheel tilt right",
+			"aliases": ["Scroll right"],
 			"notes": null
 		}
 	],
 	"dpiRange": {
-		"minimum": 250,
-		"maximum": 2500
+		"minimum": 200,
+		"maximum": 8200
 	},
 	"profileIO": {
 		"supported": false,
-		"capability": "legacy HID++ profile transport",
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
 		"feature": "legacy",
 		"load": {
 			"command": "profiles",
 			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy/runtime",
+			"getInfo": "legacy HID++ 1.0",
 			"readSector": "legacy/runtime",
 			"controlSector": "legacy/runtime",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G100s storage has not been validated by the modern sector writer",
+			"reason": "Legacy G500 storage has not been validated by the modern sector writer",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -71,7 +95,9 @@
 			"buttonOffsetByFormat": "legacy/runtime",
 			"crc": "runtime-validated"
 		},
-		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
+		"notes": [
+			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping."
+		]
 	},
 	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
 }

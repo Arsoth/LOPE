@@ -4,8 +4,7 @@
 	"name": "G604 LIGHTSPEED",
 	"match": {
 		"nameContains": ["G604"],
-		"productIDs": ["0x4085"],
-		"priority": 40
+		"productIDs": ["0x4085"]
 	},
 	"buttons": [
 		{
@@ -87,9 +86,15 @@
 			"notes": null
 		}
 	],
-	"scrollWheelButtonLabels": { "14": "Scroll down", "15": "Scroll up" },
+	"scrollWheelButtonLabels": {
+		"14": "Scroll down",
+		"15": "Scroll up"
+	},
 	"hiddenProfileButtonNumbers": [16],
-	"dpiRange": { "minimum": 100, "maximum": 16000 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 16000
+	},
 	"refreshGuidance": {
 		"sleepDescription": "The G604 can enter a low-power sleep state after several minutes without activity.",
 		"wakeInstructions": "Keep moving the mouse while LOPE reads it. If it is asleep, turn it on or move/click it, then choose Refresh."

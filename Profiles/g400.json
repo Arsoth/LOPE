@@ -1,9 +1,9 @@
 {
 	"schemaVersion": 1,
-	"id": "g100s",
-	"name": "G100s",
+	"id": "g400",
+	"name": "G400",
 	"match": {
-		"nameContains": ["G100S"],
+		"nameContains": ["G400"],
 		"productIDs": []
 	},
 	"buttons": [
@@ -39,14 +39,26 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI button",
-			"aliases": ["Top DPI"],
+			"control": "G6 · DPI Shift",
+			"aliases": ["Sniper"],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · DPI down",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · DPI up",
+			"aliases": [],
 			"notes": null
 		}
 	],
 	"dpiRange": {
-		"minimum": 250,
-		"maximum": 2500
+		"minimum": 200,
+		"maximum": 4000
 	},
 	"profileIO": {
 		"supported": false,
@@ -62,7 +74,7 @@
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G100s storage has not been validated by the modern sector writer",
+			"reason": "Legacy G400 storage has not been validated by the modern sector writer",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -71,7 +83,9 @@
 			"buttonOffsetByFormat": "legacy/runtime",
 			"crc": "runtime-validated"
 		},
-		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
+		"notes": [
+			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware."
+		]
 	},
 	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
 }

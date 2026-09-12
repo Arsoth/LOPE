@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g100s",
-	"name": "G100s",
+	"id": "legacy-g5",
+	"name": "Legacy G5",
 	"match": {
-		"nameContains": ["G100S"],
-		"productIDs": []
+		"nameContains": ["G5"],
+		"productIDs": ["0xC041", "0xC049"]
 	},
 	"buttons": [
 		{
@@ -39,30 +39,30 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI button",
+			"control": "G6 · DPI control",
 			"aliases": ["Top DPI"],
 			"notes": null
 		}
 	],
 	"dpiRange": {
-		"minimum": 250,
-		"maximum": 2500
+		"minimum": 200,
+		"maximum": 2000
 	},
 	"profileIO": {
 		"supported": false,
-		"capability": "legacy HID++ profile transport",
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
 		"feature": "legacy",
 		"load": {
 			"command": "profiles",
 			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy/runtime",
+			"getInfo": "legacy HID++ 1.0",
 			"readSector": "legacy/runtime",
 			"controlSector": "legacy/runtime",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G100s storage has not been validated by the modern sector writer",
+			"reason": "Legacy G5 records are not compatible with the standard sector writer",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -71,7 +71,10 @@
 			"buttonOffsetByFormat": "legacy/runtime",
 			"crc": "runtime-validated"
 		},
-		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
+		"notes": [
+			"This is a low-priority legacy descriptor; a more specific future descriptor for this exact model can override it with a higher priority.",
+			"The two product IDs were inherited from a combined G5/G7 descriptor and are believed to cover G5's hardware revisions, but have not been independently re-verified against real devices."
+		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
 }

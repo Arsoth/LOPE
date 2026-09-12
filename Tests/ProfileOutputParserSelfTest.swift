@@ -63,7 +63,7 @@ struct ProfileOutputParserSelfTest {
         }
 
         let g203Profile = MouseProfileCatalog.shared.profile(deviceName: "", productID: "0xC092")
-        guard g203Profile.id == "g102-g203", g203Profile.profileIO.canSave else {
+        guard g203Profile.id == "g203", g203Profile.profileIO.canSave else {
             fatalError("G203 LIGHTSYNC product-ID catalog match failed")
         }
 

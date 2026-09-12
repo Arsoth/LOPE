@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g700-g700s",
-	"name": "G700 / G700s",
+	"id": "g700",
+	"name": "G700",
 	"match": {
-		"nameContains": ["G700", "G700S"],
-		"productIDs": ["0xC06B", "0xC07C"],
-		"priority": 30
+		"nameContains": ["G700"],
+		"productIDs": ["0xC06B"]
 	},
 	"buttons": [
 		{
@@ -87,8 +86,14 @@
 			"notes": null
 		}
 	],
-	"scrollWheelButtonLabels": { "14": "Scroll down", "15": "Scroll up" },
-	"dpiRange": { "minimum": 200, "maximum": 8200 },
+	"scrollWheelButtonLabels": {
+		"14": "Scroll down",
+		"15": "Scroll up"
+	},
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 8200
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ 1.0/LGS onboard profile",
@@ -103,7 +108,7 @@
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G700/G700s macro/profile records are not compatible with the standard sector writer",
+			"reason": "Legacy G700 macro/profile records are not compatible with the standard sector writer",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -117,8 +122,5 @@
 			"Keep this family cataloged so its physical controls are named correctly. Virtual wheel records 14/15 remain visible and editable; do not route this family through the modern writer until a legacy-safe implementation exists."
 		]
 	},
-	"sources": [
-		"https://github.com/libratbag/libratbag/wiki/Devices",
-		"https://support.logi.com/hc/en-150/articles/360023399193-LED-indicator-lights-on-the-G700s-gaming-mouse"
-	]
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
 }

@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "legacy-g5-g7",
-	"name": "Legacy G5 / G7",
+	"id": "g-pro-x-superlight-2c",
+	"name": "PRO X SUPERLIGHT 2C",
 	"match": {
-		"nameContains": ["G5", "G7"],
-		"productIDs": ["0xC041", "0xC049", "0xC51A"],
-		"priority": 1
+		"nameContains": ["PRO X SUPERLIGHT 2C"],
+		"productIDs": []
 	},
 	"buttons": [
 		{
@@ -37,41 +36,38 @@
 			"control": "G5 · Forward",
 			"aliases": ["Front thumb"],
 			"notes": null
-		},
-		{
-			"number": 6,
-			"control": "G6 · DPI control",
-			"aliases": ["Top DPI"],
-			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 2000 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 44000
+	},
 	"profileIO": {
 		"supported": false,
-		"capability": "legacy HID++ 1.0/LGS onboard profile",
-		"feature": "legacy",
+		"capability": "HID++ profile transport unverified",
+		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
-			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy HID++ 1.0",
-			"readSector": "legacy/runtime",
-			"controlSector": "legacy/runtime",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "runtime-detected",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G5/G7 records are not compatible with the standard sector writer",
+			"reason": "HERO 2/LIGHTFORCE firmware variants need a captured profile descriptor before standard writes are enabled",
 			"backup": "required",
 			"verify": "required"
 		},
 		"layout": {
 			"buttonRecord": "runtime-reported",
-			"buttonOffsetByFormat": "legacy/runtime",
+			"buttonOffsetByFormat": "runtime-validated",
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"This broad legacy descriptor is intentionally low priority; a more specific future descriptor can override it by using a higher priority."
+			"The plain 2, 2 SE, and DEX variants expose the same five-button logical mapping in product specifications, but each model's profile transport must be verified per firmware family, so they are cataloged in their own files."
 		]
 	},
-	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://www.logitechg.com/en-us/shop/c/gaming-mice"]
 }

@@ -20,7 +20,6 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     struct Match: Codable, Hashable, Sendable {
         var nameContains: [String]
         var productIDs: [String]
-        var priority: Int
     }
 
     struct Button: Codable, Hashable, Sendable {
@@ -226,14 +225,14 @@ struct MouseProfileCatalog: Sendable {
             guard nameHit || productHit else { return nil }
 
             // A name match is more reliable than a shared receiver/product
-            // ID. Prefer the most specific match, then the descriptor's
-            // explicit priority, then the longest matching name token.
+            // ID. Among name matches, the longest matching token wins, so a
+            // more specific model name (e.g. "G9X") automatically outranks a
+            // shorter one it happens to contain (e.g. "G9").
             let matchingNameLength = descriptor.match.nameContains
                 .filter { normalizedName.contains($0.lowercased()) }
                 .map(\.count)
                 .max() ?? 0
-            let specificity = (nameHit ? 10_000 : 0) +
-                descriptor.match.priority * 100 + matchingNameLength
+            let specificity = (nameHit ? 10_000 : 0) + matchingNameLength
             return (descriptor, specificity)
         }
 
@@ -329,8 +328,7 @@ struct MouseProfileCatalog: Sendable {
     \t"name": "Example Mouse (rename this file to use it)",
     \t"match": {
     \t\t"nameContains": ["Example Mouse"],
-    \t\t"productIDs": ["0x0000"],
-    \t\t"priority": 10
+    \t\t"productIDs": ["0x0000"]
     \t},
     \t"buttons": [
     \t\t{ "number": 1, "control": "Primary click", "aliases": ["Left"], "notes": null },
@@ -372,7 +370,7 @@ struct MouseProfileCatalog: Sendable {
         schemaVersion: 1,
         id: "generic",
         name: "Unknown Logitech mouse",
-        match: .init(nameContains: [], productIDs: [], priority: 0),
+        match: .init(nameContains: [], productIDs: []),
         buttons: [
             .init(number: 1, control: "Primary click", aliases: [], notes: nil),
             .init(number: 2, control: "Secondary click", aliases: [], notes: nil),

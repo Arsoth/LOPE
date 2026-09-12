@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g502-x",
-	"name": "G502 X",
+	"id": "g502-lightspeed",
+	"name": "G502 LIGHTSPEED",
 	"match": {
-		"nameContains": ["G502 X"],
-		"productIDs": []
+		"nameContains": ["G502 LIGHTSPEED"],
+		"productIDs": ["0xC332"]
 	},
 	"buttons": [
 		{
@@ -33,44 +33,44 @@
 		},
 		{
 			"number": 5,
-			"control": "G6 · DPI Shift",
-			"aliases": ["Reversible sniper button"],
-			"notes": null
-		},
-		{
-			"number": 6,
 			"control": "G5 · Forward",
 			"aliases": ["Front thumb"],
 			"notes": null
 		},
 		{
+			"number": 6,
+			"control": "G6 · DPI Shift",
+			"aliases": ["Sniper"],
+			"notes": null
+		},
+		{
 			"number": 7,
-			"control": "Wheel tilt left",
-			"aliases": ["Scroll left"],
+			"control": "G7 · DPI down",
+			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 8,
-			"control": "Wheel tilt right",
-			"aliases": ["Scroll right"],
-			"notes": null
-		},
-		{
-			"number": 9,
-			"control": "G9 · Profile",
-			"aliases": ["Top button"],
-			"notes": null
-		},
-		{
-			"number": 10,
 			"control": "G8 · DPI up",
 			"aliases": [],
 			"notes": null
 		},
 		{
+			"number": 9,
+			"control": "Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		},
+		{
 			"number": 11,
-			"control": "G7 · DPI down",
-			"aliases": [],
+			"control": "G9 · Profile",
+			"aliases": ["Profile cycle"],
 			"notes": null
 		}
 	],
@@ -80,7 +80,7 @@
 	},
 	"profileIO": {
 		"supported": true,
-		"capability": "HID++ 2.0 ONBOARD_PROFILES · G502 X layout",
+		"capability": "HID++ 2.0 ONBOARD_PROFILES",
 		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
@@ -102,16 +102,34 @@
 		"layout": {
 			"buttonRecord": "4 bytes per control",
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
-			"nonProfileControls": "scroll up/down are wheel motion, not editable profile records",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"The G502 X line uses a different record order from G502 HERO/LIGHTSPEED. The wired, LIGHTSPEED, and PLUS variants share this physical mapping; this file is the wired variant and has no RGB."
+			"This is the original G502 record order, shared with G502 HERO. Do not reuse it for G502 X: that family moves the DPI and tilt records."
+		]
+	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 0,
+				"name": "Primary"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the Primary/DPI and Logo zones. Only the three-byte solid-color field is edited."
 		]
 	},
 	"sources": [
-		"https://www.logitechg.com/en-us/discover/learn/g502-hero-vs-g502-x",
-		"https://www.logitechg.com/en-gb/products/gaming-mice/g502-x-wired-lightforce.910-006146.html",
-		"https://github.com/libratbag/libratbag/blob/master/src/driver-hidpp20.c"
+		"https://www.logitechg.com/en-us/shop/p/g502-lightspeed-wireless-gaming-mouse",
+		"https://github.com/libratbag/libratbag/wiki/Devices"
 	]
 }

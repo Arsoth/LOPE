@@ -67,8 +67,27 @@ final class AppModel: ObservableObject {
     var normalButtonRows: [ButtonRow] = []
     var gShiftButtonRows: [ButtonRow] = []
 
+    @Published var profileEditorID = ""
+    @Published var profileEditorName = ""
+    @Published var profileEditorSources = ""
+    @Published var profileEditorButtonNames: [Int: String] = [:]
+    // Everything the simple editor fields do not expose (aliases, scroll-wheel
+    // labels, hidden-button numbers, refresh guidance, RGB zones, profileIO):
+    // carried over untouched from the descriptor already covering this device,
+    // an imported file, or a freshly synthesized starting point, so saving or
+    // exporting never silently drops data the UI does not surface.
+    var profileEditorBase: MouseProfileDescriptor?
+
     var hasGShiftLayer: Bool {
         !gShiftButtonRows.isEmpty
+    }
+
+    /// The physical button numbers currently read from the connected mouse,
+    /// independent of the normal/G-Shift output layer. This always tracks
+    /// `normalButtonRows`/`gShiftButtonRows` directly rather than being
+    /// stored, so the profile editor's row list never goes stale.
+    var profileEditorButtonNumbers: [Int] {
+        Set(normalButtonRows.map(\.id) + gShiftButtonRows.map(\.id)).sorted()
     }
 
     // Test and diagnostic callers can replace the process boundary without
@@ -317,6 +336,7 @@ final class AppModel: ObservableObject {
         buttons = normal
         keyInputDrafts.removeAll()
         recordingKeyboardButtonID = nil
+        resetProfileEditorDraft()
     }
 
     func selectButtonLayer(_ layer: ButtonLayer) {

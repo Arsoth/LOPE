@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g302-g303",
-	"name": "G302 / G303",
+	"id": "g102",
+	"name": "G102",
 	"match": {
-		"nameContains": ["G302", "G303"],
-		"productIDs": ["0xC07F", "0xC080"],
-		"priority": 20
+		"nameContains": ["G102"],
+		"productIDs": ["0xC084"]
 	},
 	"buttons": [
 		{
@@ -45,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 12000 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 8000
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",
@@ -70,9 +72,12 @@
 		"layout": {
 			"buttonRecord": "4 bytes per control",
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"dpiUnusedStage": "0x0000; firmware treats the first zero as the end of the contiguous DPI table",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": []
+		"notes": [
+			"Button 6 is the physical DPI button; its current output may be a standard DPI function or a custom assignment."
+		]
 	},
 	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
 }

@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g400-g400s",
-	"name": "G400 / G400s",
+	"id": "g500s",
+	"name": "G500s",
 	"match": {
-		"nameContains": ["G400", "G400S"],
-		"productIDs": [],
-		"priority": 10
+		"nameContains": ["G500S"],
+		"productIDs": ["0xC24E"]
 	},
 	"buttons": [
 		{
@@ -44,25 +43,50 @@
 			"aliases": ["Sniper"],
 			"notes": null
 		},
-		{ "number": 7, "control": "G7 · DPI down", "aliases": [], "notes": null },
-		{ "number": 8, "control": "G8 · DPI up", "aliases": [], "notes": null }
+		{
+			"number": 7,
+			"control": "G7 · DPI down",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · DPI up",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 4000 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 8200
+	},
 	"profileIO": {
 		"supported": false,
-		"capability": "legacy HID++ profile transport",
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
 		"feature": "legacy",
 		"load": {
 			"command": "profiles",
 			"engineArguments": "--summary-only --profile <number>",
-			"getInfo": "legacy/runtime",
+			"getInfo": "legacy HID++ 1.0",
 			"readSector": "legacy/runtime",
 			"controlSector": "legacy/runtime",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
 			"strategy": "read-only",
-			"reason": "Legacy G400/G400s storage has not been validated by the modern sector writer",
+			"reason": "Legacy G500s storage has not been validated by the modern sector writer",
 			"backup": "required",
 			"verify": "required"
 		},
@@ -72,7 +96,7 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware."
+			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping."
 		]
 	},
 	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]

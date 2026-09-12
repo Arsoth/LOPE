@@ -4,8 +4,7 @@
 	"name": "G PRO Wireless",
 	"match": {
 		"nameContains": ["G PRO WIRELESS", "PRO WIRELESS"],
-		"productIDs": ["0xC088"],
-		"priority": 40
+		"productIDs": ["0xC088"]
 	},
 	"buttons": [
 		{
@@ -57,7 +56,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 100, "maximum": 25600 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 25600
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES · optional ambidextrous controls",

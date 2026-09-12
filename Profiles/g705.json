@@ -2,7 +2,10 @@
 	"schemaVersion": 1,
 	"id": "g705",
 	"name": "G705",
-	"match": { "nameContains": ["G705"], "productIDs": [], "priority": 30 },
+	"match": {
+		"nameContains": ["G705"],
+		"productIDs": []
+	},
 	"buttons": [
 		{
 			"number": 1,
@@ -41,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 100, "maximum": 8200 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 8200
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "HID++ profile transport unverified",
@@ -69,7 +75,5 @@
 			"The six-button physical mapping follows Logitech's documented two-thumb-button plus top DPI layout; transport remains conservative until hardware capture is available."
 		]
 	},
-	"sources": [
-		"https://www.logitechg.com/en-us/products/gaming-mice/g705-wireless-gaming-mouse.html"
-	]
+	"sources": ["https://www.logitechg.com/en-us/products/gaming-mice/g705-wireless-gaming-mouse.html"]
 }

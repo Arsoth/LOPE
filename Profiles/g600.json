@@ -4,8 +4,7 @@
 	"name": "G600 MMO",
 	"match": {
 		"nameContains": ["G600"],
-		"productIDs": ["0xC24A"],
-		"priority": 50
+		"productIDs": ["0xC24A"]
 	},
 	"buttons": [
 		{
@@ -44,7 +43,12 @@
 			"aliases": ["Second mode"],
 			"notes": null
 		},
-		{ "number": 7, "control": "G7 · Top left", "aliases": [], "notes": null },
+		{
+			"number": 7,
+			"control": "G7 · Top left",
+			"aliases": [],
+			"notes": null
+		},
 		{
 			"number": 8,
 			"control": "G8 · Mode switch",
@@ -124,7 +128,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 8200 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 8200
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "G600 layered onboard profile",

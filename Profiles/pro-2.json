@@ -4,8 +4,7 @@
 	"name": "PRO 2 LIGHTSPEED",
 	"match": {
 		"nameContains": ["PRO 2 LIGHTSPEED", "PRO 2"],
-		"productIDs": [],
-		"priority": 50
+		"productIDs": []
 	},
 	"buttons": [
 		{
@@ -39,7 +38,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 100, "maximum": 32000 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 32000
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "HID++ profile transport unverified",

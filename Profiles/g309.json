@@ -2,7 +2,10 @@
 	"schemaVersion": 1,
 	"id": "g309",
 	"name": "G309 LIGHTSPEED",
-	"match": { "nameContains": ["G309"], "productIDs": [], "priority": 30 },
+	"match": {
+		"nameContains": ["G309"],
+		"productIDs": []
+	},
 	"buttons": [
 		{
 			"number": 1,
@@ -41,7 +44,10 @@
 			"notes": "Verify the live profile count on firmware variants that omit a top DPI control."
 		}
 	],
-	"dpiRange": { "minimum": 100, "maximum": 25600 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 25600
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "HID++ profile transport unverified",
@@ -69,7 +75,5 @@
 			"This descriptor supplies the physical mapping while the newer LIGHTFORCE profile format remains intentionally read-only until captured from hardware."
 		]
 	},
-	"sources": [
-		"https://www.logitechg.com/en-us/products/gaming-mice/g309-lightspeed-wireless-mouse.html"
-	]
+	"sources": ["https://www.logitechg.com/en-us/products/gaming-mice/g309-lightspeed-wireless-mouse.html"]
 }

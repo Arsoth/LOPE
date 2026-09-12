@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g300-g300s",
-	"name": "G300 / G300s",
+	"id": "g300s",
+	"name": "G300s",
 	"match": {
-		"nameContains": ["G300", "G300S"],
-		"productIDs": ["0xC246"],
-		"priority": 20
+		"nameContains": ["G300S"],
+		"productIDs": ["0xC246"]
 	},
 	"buttons": [
 		{
@@ -38,9 +37,24 @@
 			"aliases": ["Front thumb"],
 			"notes": null
 		},
-		{ "number": 6, "control": "G6 · Top left", "aliases": [], "notes": null },
-		{ "number": 7, "control": "G7 · Top middle", "aliases": [], "notes": null },
-		{ "number": 8, "control": "G8 · Top right", "aliases": [], "notes": null },
+		{
+			"number": 6,
+			"control": "G6 · Top left",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Top middle",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Top right",
+			"aliases": [],
+			"notes": null
+		},
 		{
 			"number": 9,
 			"control": "G9 · Mode switch",
@@ -48,7 +62,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 2500 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 2500
+	},
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy G300 onboard layout",
@@ -73,7 +90,7 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"G300/G300s use a mode/profile switch and a mirrored ambidextrous shell; the mapping is kept separate from the standard six-button family."
+			"G300s uses a mode/profile switch and a mirrored ambidextrous shell; the mapping is kept separate from the standard six-button family. Shares a USB product ID with G300; the revisions were not assigned distinct IDs."
 		]
 	},
 	"sources": [

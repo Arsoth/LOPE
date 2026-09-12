@@ -4,8 +4,7 @@
 	"name": "G703 LIGHTSPEED",
 	"match": {
 		"nameContains": ["G703"],
-		"productIDs": ["0xC087"],
-		"priority": 30
+		"productIDs": ["0xC087"]
 	},
 	"buttons": [
 		{
@@ -45,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 12000 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 12000
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",
@@ -72,9 +74,7 @@
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": [
-			"The wired G403-style shell and G703 LIGHTSPEED share the six-control mapping."
-		]
+		"notes": ["The wired G403-style shell and G703 LIGHTSPEED share the six-control mapping."]
 	},
 	"rgbProfile": {
 		"supported": true,
@@ -83,8 +83,14 @@
 		"recordBytes": 11,
 		"colorOffset": 1,
 		"zones": [
-			{ "index": 0, "name": "Scroll wheel" },
-			{ "index": 1, "name": "Logo" }
+			{
+				"index": 0,
+				"name": "Scroll wheel"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
 		],
 		"notes": [
 			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the scroll-wheel and logo zones. Only the three-byte solid-color field is edited."

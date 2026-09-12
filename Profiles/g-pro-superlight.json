@@ -4,8 +4,7 @@
 	"name": "PRO X SUPERLIGHT",
 	"match": {
 		"nameContains": ["PRO X SUPERLIGHT"],
-		"productIDs": [],
-		"priority": 20
+		"productIDs": []
 	},
 	"buttons": [
 		{
@@ -39,7 +38,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 100, "maximum": 25600 },
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 25600
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",
@@ -70,7 +72,5 @@
 			"The original SUPERLIGHT layout has five programmable controls and no DPI control in the profile array."
 		]
 	},
-	"sources": [
-		"https://www.logitechg.com/en-us/products/gaming-mice/pro-x-superlight-wireless-mouse.html"
-	]
+	"sources": ["https://www.logitechg.com/en-us/products/gaming-mice/pro-x-superlight-wireless-mouse.html"]
 }

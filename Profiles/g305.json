@@ -1,11 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g102-g203",
-	"name": "G102 / G203",
+	"id": "g305",
+	"name": "G305 LIGHTSPEED",
 	"match": {
-		"nameContains": ["G102", "G203"],
-		"productIDs": ["0xC084", "0xC092"],
-		"priority": 20
+		"nameContains": ["G305"],
+		"productIDs": []
 	},
 	"buttons": [
 		{
@@ -45,7 +44,10 @@
 			"notes": null
 		}
 	],
-	"dpiRange": { "minimum": 200, "maximum": 8000 },
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 12000
+	},
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES",
@@ -70,15 +72,9 @@
 		"layout": {
 			"buttonRecord": "4 bytes per control",
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
-			"dpiUnusedStage": "0x0000; firmware treats the first zero as the end of the contiguous DPI table",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": [
-			"Button 6 is the physical DPI button; its current output may be a standard DPI function or a custom assignment."
-		]
+		"notes": ["G304 is the identical hardware sold under a different regional name; see g304.json."]
 	},
-	"sources": [
-		"https://www.logitechg.com/en-us/shop/p/g203-lightsync-gaming-mouse",
-		"https://github.com/libratbag/libratbag/wiki/Devices"
-	]
+	"sources": ["https://www.logitechg.com/en-us/shop/p/g305-lightspeed-se-gaming-mouse"]
 }
