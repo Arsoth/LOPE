@@ -10,8 +10,10 @@ The app has three layers:
 
 - `Sources/AppMain.swift` and `Sources/ContentView.swift` provide the SwiftUI
   window, tabs, editor, settings, and status messages. The footer message fades
-  after 30 seconds; its info button opens the in-memory history of the ten most
-  recent status events.
+  after 30 seconds; its info button replaces the footer with a full-width,
+  scrollable history drawer whose header is the same footer bar and shows the
+  ten most recent status events. Opening the drawer reduces the editor's
+  available height rather than covering it.
 - `Sources/LogitechOnboardProfileManagerApp.swift` plus the `AppModel+*.swift`
   extensions own device selection, refresh state, parsing, backup management,
   editing, and writes.

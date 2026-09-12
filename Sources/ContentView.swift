@@ -1460,6 +1460,7 @@ struct ContentView: View {
                 .padding(.horizontal, 20)
               Divider()
                 .frame(maxWidth: .infinity)
+                .background(appBackground)
                 .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
             }
           }
@@ -1616,9 +1617,18 @@ struct ContentView: View {
   }
 
   private var statusFooter: some View {
+    statusBar(showsHistoryHeader: false)
+  }
+
+  private var statusHistoryHeader: some View {
+    statusBar(showsHistoryHeader: true)
+  }
+
+  private func statusBar(showsHistoryHeader: Bool) -> some View {
     VStack(alignment: .leading, spacing: 14) {
       Divider()
         .frame(maxWidth: .infinity)
+        .background(appBackground)
         .shadow(color: .black.opacity(0.22), radius: 6, y: -2)
 
       HStack(alignment: .top) {
@@ -1628,14 +1638,26 @@ struct ContentView: View {
           Image(systemName: "info.circle")
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Show recent events")
+        .accessibilityLabel(
+          showsHistoryHeader ? "Close recent events" : "Show recent events"
+        )
         .pointerCursor()
-        Text(model.status)
-          .font(.callout)
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-          .opacity(statusMessageOpacity)
-        Spacer()
+        if showsHistoryHeader {
+          Text("Recent events")
+            .font(.headline)
+            .foregroundStyle(.primary)
+          Spacer()
+          Text("Last \(statusHistory.count)")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else {
+          Text(model.status)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .opacity(statusMessageOpacity)
+          Spacer()
+        }
       }
       .padding(.horizontal, statusFooterHorizontalInset)
     }
@@ -1643,7 +1665,7 @@ struct ContentView: View {
     .frame(maxWidth: .infinity)
     .background(appBackground)
     .shadow(
-      color: .black.opacity(statusHistoryPresented ? 0.36 : 0.16),
+      color: .black.opacity(0.24),
       radius: 7,
       y: -3
     )
@@ -1651,29 +1673,12 @@ struct ContentView: View {
 
   private var statusHistoryDrawer: some View {
     VStack(spacing: 0) {
-      HStack(alignment: .center, spacing: 8) {
-        Button {
-          statusHistoryPresented = false
-        } label: {
-          Image(systemName: "info.circle")
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Close recent events")
-        .pointerCursor()
-        Text("Recent events")
-          .font(.headline)
-          .foregroundStyle(.primary)
-        Spacer()
-        Text("Last \(statusHistory.count)")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-      }
-      .padding(.horizontal, statusFooterHorizontalInset)
-      .frame(maxWidth: .infinity)
-      .frame(height: 40)
-      .background(appBackground)
-      .shadow(color: .black.opacity(0.24), radius: 6, y: 3)
-      .zIndex(1)
+      statusHistoryHeader
+
+      Divider()
+        .frame(maxWidth: .infinity)
+        .background(appBackground)
+        .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
 
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -1997,14 +2002,13 @@ struct ContentView: View {
           }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 4)
+        .padding(.bottom, 4)
         .background(ScrollViewScrollerInset(rightInset: 3))
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .id(model.selectedDeviceIndex)
 
     }
-    .padding(.top, 4)
   }
 
   private func buttonRow(_ buttonID: Int) -> some View {
@@ -2213,7 +2217,7 @@ struct ContentView: View {
       get: { model.profileEnabled(profileID) },
       set: { model.setProfileEnabled(profileID: profileID, enabled: $0) }
     )
-    return HStack(spacing: 2) {
+    return HStack(spacing: 3) {
       Text(label)
         .font(.caption)
       Toggle("", isOn: enabled)
@@ -2226,7 +2230,7 @@ struct ContentView: View {
         .font(.caption)
         .foregroundStyle(crcColor)
     }
-    .padding(.horizontal, 3)
+    .padding(.horizontal, 2)
     .padding(.vertical, 2)
     // .background(
     //   profileID == model.profileNumber
