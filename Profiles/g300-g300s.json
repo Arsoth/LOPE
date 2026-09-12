@@ -49,7 +49,6 @@
 		}
 	],
 	"dpiRange": { "minimum": 200, "maximum": 2500 },
-	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy G300 onboard layout",

@@ -8,12 +8,12 @@ README.
 
 The app has three layers:
 
-* `Sources/AppMain.swift` and `Sources/ContentView.swift` provide the SwiftUI
+- `Sources/AppMain.swift` and `Sources/ContentView.swift` provide the SwiftUI
   window, tabs, editor, settings, and status messages.
-* `Sources/LogitechOnboardProfileManagerApp.swift` plus the `AppModel+*.swift`
+- `Sources/LogitechOnboardProfileManagerApp.swift` plus the `AppModel+*.swift`
   extensions own device selection, refresh state, parsing, backup management,
   editing, and writes.
-* `Sources/logitech_onboard.m` assembles the C HID++ engine from the focused
+- `Sources/logitech_onboard.m` assembles the C HID++ engine from the focused
   `.inc` modules. The GUI invokes the bundled engine as a separate process.
 
 Mouse-specific physical layouts and capability metadata are JSON descriptors in
@@ -94,10 +94,10 @@ non-programmable records are defined in the matching JSON descriptor.
 The top-level output menu is ordered as:
 
 1. Disabled
-2. Custom
+2. Keyboard
 3. Standard mouse and keyboard outputs
 
-Function keys and special keys are one keyboard-key list. Custom is a keyboard
+Function keys and special keys are one keyboard-key list. Keyboard is a keyboard
 record workflow: clicking the recorded-input box captures one macOS key event
 plus its Ctrl, Shift, Alt, and Command flags. The highlighted box displays the
 complete chord and exposes an X that cancels without changing the existing
@@ -106,12 +106,8 @@ the optional extended-key override hidden until the Settings opt-in is enabled.
 That opt-in adds keys such as Insert, F13–F24, and Sleep.
 
 The standard HID++ keyboard record has one usage byte and one modifier bitmap.
-The descriptor field `keyboardOutput` stores the corresponding per-mouse
-capacity. The current catalog records `maxKeys: 1` and `maxLength: 1` for every
-descriptor because the editor supports the single-key SEND record, not macro
-records. The UI enforces the descriptor limit and displays the current/max
-usage as `X/Y`. A future device with a validated multi-key format can set its
-own descriptor values without changing the generic editor model.
+Macro records use a separate format and remain outside this editor's writable
+keyboard-output model.
 
 ### DPI and profiles
 
@@ -146,14 +142,14 @@ device to match the backup metadata.
 
 ### No mouse or no profile
 
-* Confirm that the mouse or receiver is connected and powered on.
-* Keep wireless mice active and click **Refresh**. For G603/G604, follow the
+- Confirm that the mouse or receiver is connected and powered on.
+- Keep wireless mice active and click **Refresh**. For G603/G604, follow the
   wake text and allow the one-minute known-device poll to finish.
-* For a wired device, select the Input Monitoring helper entry, enable LOPE in
+- For a wired device, select the Input Monitoring helper entry, enable LOPE in
   **System Settings → Privacy & Security → Input Monitoring**, return to LOPE,
   and click **Refresh**.
-* Quit G HUB and other remappers while reading or saving.
-* A connected MX mouse without a descriptor is intentionally not shown in the
+- Quit G HUB and other remappers while reading or saving.
+- A connected MX mouse without a descriptor is intentionally not shown in the
   generic button editor. A cataloged read-only model is likewise intentional.
 
 ### Save or restore problems

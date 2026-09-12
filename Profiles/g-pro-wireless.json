@@ -58,7 +58,6 @@
 		}
 	],
 	"dpiRange": { "minimum": 100, "maximum": 25600 },
-	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": true,
 		"capability": "HID++ 2.0 ONBOARD_PROFILES · optional ambidextrous controls",

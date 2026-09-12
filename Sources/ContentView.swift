@@ -188,6 +188,7 @@ private struct KeyboardInputMonitor: NSViewRepresentable {
         var localMonitor: Any?
         var eventTap: CFMachPort?
         var eventTapSource: CFRunLoopSource?
+        var eventTapCanSuppressEvents = false
 
         func update(isActive: Bool, onKeyDown: @escaping (NSEvent) -> Void) {
             self.isActive = isActive
@@ -218,12 +219,14 @@ private struct KeyboardInputMonitor: NSViewRepresentable {
 
         private func installEventTap() {
             guard eventTap == nil else { return }
-            if !AXIsProcessTrusted() {
-                let options = [
-                    kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
-                ] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(options)
+            // Accessibility is only needed for an active filtering tap. Keep
+            // the fallback passive so users can record from other apps with
+            // Input Monitoring alone, without prompting for Accessibility.
+            eventTapCanSuppressEvents = AXIsProcessTrusted()
+            if !CGPreflightListenEventAccess() {
+                _ = CGRequestListenEventAccess()
             }
+            let tapOptions: CGEventTapOptions = eventTapCanSuppressEvents ? .defaultTap : .listenOnly
             let eventMask = (CGEventMask(1) << CGEventType.keyDown.rawValue) |
                 (CGEventMask(1) << CGEventType.keyUp.rawValue) |
                 (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
@@ -231,7 +234,7 @@ private struct KeyboardInputMonitor: NSViewRepresentable {
             guard let tap = CGEvent.tapCreate(
                 tap: .cgSessionEventTap,
                 place: .headInsertEventTap,
-                options: .defaultTap,
+                options: tapOptions,
                 eventsOfInterest: eventMask,
                 callback: { _, type, event, refcon in
                     guard let refcon else { return Unmanaged.passUnretained(event) }
@@ -250,9 +253,12 @@ private struct KeyboardInputMonitor: NSViewRepresentable {
                     if type == .keyDown, let nsEvent = NSEvent(cgEvent: event) {
                         coordinator.onKeyDown(nsEvent)
                     }
-                    // The event tap is what stops global shortcuts such as
-                    // Cmd+Shift+4 from reaching other apps.
-                    return nil
+                    // An active tap stops global shortcuts such as Cmd+Shift+4.
+                    // A listen-only tap can still capture the chord, but must
+                    // pass it through to the app that owns the shortcut.
+                    return coordinator.eventTapCanSuppressEvents
+                        ? nil
+                        : Unmanaged.passUnretained(event)
                 },
                 userInfo: coordinatorPointer
             ) else {
@@ -284,6 +290,7 @@ private struct KeyboardInputMonitor: NSViewRepresentable {
                 CFMachPortInvalidate(eventTap)
                 self.eventTap = nil
             }
+            eventTapCanSuppressEvents = false
         }
 
         deinit {
@@ -1457,6 +1464,19 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .lineLimit(1)
+                        if button.draftChoice == "custom" {
+                            if model.showNonStandardKeyboardKeys {
+                                let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
+                                if model.keyboardKeyChoice(buttonIndex: buttonIndex) != 0 {
+                                    keyboardModifierControls(buttonID)
+                                } else {
+                                    keyboardRecordingControl(buttonID)
+                                }
+                                keyboardChoiceCard(buttonID: buttonID)
+                            } else {
+                                keyboardRecordingControl(buttonID)
+                            }
+                        }
                         Picker("", selection: Binding(
                             get: { model.buttons.first(where: { $0.id == buttonID })?.draftChoice ?? "custom" },
                             set: { choice in
@@ -1473,12 +1493,6 @@ struct ContentView: View {
                         }
                         .labelsHidden()
                         .frame(width: 190)
-                        if button.draftChoice == "custom" {
-                            keyboardRecordingControl(buttonID)
-                            if model.showNonStandardKeyboardKeys {
-                                keyboardChoiceCard(buttonID: buttonID)
-                            }
-                        }
                         if model.showAdvancedFields {
                             TextField("8 hex digits", text: Binding(
                                 get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
@@ -1612,11 +1626,32 @@ struct ContentView: View {
                 })
                 .frame(width: 0, height: 0)
             keyboardRecordingBox(buttonID)
-            Text(model.keyboardOutputLengthLabel(buttonIndex: model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0))
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
         }
         .help("Click the input box to capture a key and its modifiers. The X cancels recording.")
+    }
+
+    private func keyboardModifierControls(_ buttonID: Int) -> some View {
+        let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
+        return HStack(spacing: 4) {
+            keyboardModifierToggle(buttonIndex: buttonIndex, label: "Ctrl", bit: 0x01)
+            keyboardModifierToggle(buttonIndex: buttonIndex, label: "Shift", bit: 0x02)
+            keyboardModifierToggle(buttonIndex: buttonIndex, label: "Alt", bit: 0x04)
+            keyboardModifierToggle(buttonIndex: buttonIndex, label: "Cmd", bit: 0x08)
+        }
+        .frame(width: 190, height: 26, alignment: .leading)
+        .help("Choose the modifiers to send with the selected extended key.")
+    }
+
+    private func keyboardModifierToggle(buttonIndex: Int, label: String, bit: UInt8) -> some View {
+        Toggle(label, isOn: Binding(
+            get: { model.isModifierEnabled(buttonIndex: buttonIndex, bit: bit) },
+            set: { model.setModifier(buttonIndex: buttonIndex, bit: bit, enabled: $0) }
+        ))
+        .toggleStyle(.checkbox)
+        .controlSize(.small)
+        .font(.caption)
+        .fixedSize()
+        .help(label)
     }
 
     private func keyboardRecordingBox(_ buttonID: Int) -> some View {
@@ -1629,15 +1664,19 @@ struct ContentView: View {
                 guard !isRecording else { return }
                 model.beginKeyboardRecording(buttonIndex: buttonIndex)
             } label: {
-                Text(isRecording ? "Recording..." : (chord.isEmpty ? "Click to record" : chord))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(width: 190, alignment: .leading)
-                    .padding(.leading, 8)
-                    .padding(.trailing, isRecording ? 30 : 8)
-                    .padding(.vertical, 5)
+                HStack(spacing: 0) {
+                    Text(isRecording ? "Recording..." : (chord.isEmpty ? "Click to record" : chord))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.leading, 8)
+                .padding(.trailing, isRecording ? 28 : 8)
+                .frame(width: 190, height: 26, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .contentShape(Rectangle())
 
             if isRecording {
                 Button {
@@ -1645,14 +1684,14 @@ struct ContentView: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
+                        .frame(width: 26, height: 26)
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
                 .help("Cancel recording")
             }
         }
-        .frame(width: 190, alignment: .leading)
+        .frame(width: 190, height: 26, alignment: .leading)
         .background(
             isRecording
                 ? Color.accentColor.opacity(0.18)
@@ -1679,7 +1718,7 @@ struct ContentView: View {
                 guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return }
                 model.setKeyboardKeyChoice(buttonIndex: index, key: key)
             })) {
-            Text("Extended key").tag(0)
+            Text("Use Recorded Key").tag(0)
             ForEach(model.keyboardOutputKeys) { key in
                 Text(key.label).tag(Int(key.id))
             }

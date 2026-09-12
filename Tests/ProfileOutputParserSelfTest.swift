@@ -51,10 +51,7 @@ struct ProfileOutputParserSelfTest {
               g604Profile.scrollWheelButtonLabel(for: 14) == "Scroll down",
               g604Profile.scrollWheelButtonLabel(for: 15) == "Scroll up",
               g604Profile.refreshGuidance?.sleepDescription.contains("several minutes") == true,
-              !MouseProfileCatalog.shared.profiles.isEmpty,
-              MouseProfileCatalog.shared.profiles.allSatisfy({
-                  $0.keyboardOutputLimits.maxKeys == 1 && $0.keyboardOutputLimits.maxLength == 1
-              }) else {
+              !MouseProfileCatalog.shared.profiles.isEmpty else {
             fatalError("G604 hidden/non-programmable control metadata failed")
         }
 

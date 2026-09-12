@@ -96,38 +96,18 @@ extension AppModel {
         return (modifiers + [key]).joined(separator: "+")
     }
 
-    func setKeyboardKeyText(buttonIndex: Int, text: String) {
-        let keyTokens = text.split { $0 == "," || $0 == "+" || $0.isWhitespace }
-        guard keyTokens.count <= currentMouseProfile.keyboardOutputLimits.maxKeys else {
-            status = "This mouse stores at most \(currentMouseProfile.keyboardOutputLimits.maxKeys) key per keyboard output."
-            return
-        }
-        keyInputDrafts[buttonIndex] = text
-        if let key = keyboardKeyCode(for: text) {
-            let chord = keyboardBytes(buttonIndex) ?? (modifier: 0, key: 0)
-            setKeyboardChord(buttonIndex: buttonIndex, modifier: chord.modifier, key: key)
-        }
-    }
-
-    func keyboardOutputCurrentLength(buttonIndex: Int) -> Int {
-        guard buttons.indices.contains(buttonIndex),
-              let bytes = rawBytes(buttons[buttonIndex].draftRaw) else { return 0 }
-        return bytes[0] == 0x80 && bytes[1] == 0x02 && bytes[3] != 0 ? 1 : 0
-    }
-
-    func keyboardOutputLengthLabel(buttonIndex: Int) -> String {
-        let limits = currentMouseProfile.keyboardOutputLimits
-        let maximum = min(limits.maxKeys, limits.maxLength)
-        return "\(keyboardOutputCurrentLength(buttonIndex: buttonIndex))/\(maximum)"
-    }
-
     func keyboardKeyChoice(buttonIndex: Int) -> Int {
         let key = UInt8(keyboardKey(buttonIndex: buttonIndex))
         return keyboardOutputKeys.contains(where: { $0.id == key }) ? Int(key) : 0
     }
 
     func setKeyboardKeyChoice(buttonIndex: Int, key: Int) {
-        guard key > 0, let usage = UInt8(exactly: key),
+        guard buttons.indices.contains(buttonIndex) else { return }
+        if key == 0 {
+            setKeyboardChord(buttonIndex: buttonIndex, modifier: 0, key: 0)
+            return
+        }
+        guard let usage = UInt8(exactly: key),
               let selected = keyboardKeys.first(where: { $0.id == usage }) else { return }
         if isNonStandardKeyboardKey(selected) && !showNonStandardKeyboardKeys {
             status = "Enable non-standard keyboard keys in Settings before choosing \(selected.label)."

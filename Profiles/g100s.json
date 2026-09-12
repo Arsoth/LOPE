@@ -42,7 +42,6 @@
 		}
 	],
 	"dpiRange": { "minimum": 250, "maximum": 2500 },
-	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ profile transport",

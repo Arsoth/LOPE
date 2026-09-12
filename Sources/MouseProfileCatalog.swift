@@ -8,19 +8,6 @@ import Foundation
 /// than the Swift model: fields in `profileIO` are intended to be useful when
 /// adding a device whose firmware does not follow the common path.
 struct MouseProfileDescriptor: Codable, Hashable, Sendable {
-    struct KeyboardOutput: Codable, Hashable, Sendable {
-        /// Editable HID++ keyboard bindings contain one key usage and a
-        /// modifier bitmap. Macro records use a separate format and remain
-        /// outside this editor's writable keyboard-output model.
-        var maxKeys: Int
-        var maxLength: Int
-
-        init(maxKeys: Int = 1, maxLength: Int = 1) {
-            self.maxKeys = maxKeys
-            self.maxLength = maxLength
-        }
-    }
-
     struct DPIRange: Codable, Hashable, Sendable {
         var minimum: Int
         var maximum: Int
@@ -102,7 +89,6 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     var hiddenProfileButtonNumbers: [Int]?
     var dpiRange: DPIRange?
     var refreshGuidance: OnboardProfileRefreshGuidance?
-    var keyboardOutput: KeyboardOutput?
     var profileIO: ProfileIO
     var sources: [String]
 
@@ -118,9 +104,6 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
         scrollWheelButtonLabels?[String(number)]
     }
 
-    var keyboardOutputLimits: KeyboardOutput {
-        keyboardOutput ?? KeyboardOutput()
-    }
 }
 
 struct MouseProfileCatalog: Sendable {
@@ -211,7 +194,6 @@ struct MouseProfileCatalog: Sendable {
         hiddenProfileButtonNumbers: nil,
         dpiRange: .init(minimum: 100, maximum: 16000),
         refreshGuidance: nil,
-        keyboardOutput: .init(),
         profileIO: .init(
             supported: true,
             capability: "runtime-detected",

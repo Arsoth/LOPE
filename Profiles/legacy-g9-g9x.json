@@ -47,7 +47,6 @@
 		{ "number": 7, "control": "G7 · Top control", "aliases": [], "notes": null }
 	],
 	"dpiRange": { "minimum": 200, "maximum": 5000 },
-	"keyboardOutput": { "maxKeys": 1, "maxLength": 1 },
 	"profileIO": {
 		"supported": false,
 		"capability": "legacy HID++ 1.0/LGS onboard profile",
