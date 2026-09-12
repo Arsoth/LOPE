@@ -11,30 +11,7 @@
 
 # LOPE todo list
 
-### [x] 1. Add a polling-rate picker beside the active DPI stages picker
-
-- [x] Query HID++ report-rate support from the connected mouse: use feature `0x8061` when available, otherwise `0x8060`, and use the rates reported for the active connection.
-- [x] Add a dropdown showing only the rates supported by that mouse.
-- [x] Place the picker to the left of the active stages picker.
-
-**Done when:** The editor displays the mouse's supported polling rates beside the active DPI-stage control and can apply the selected rate safely.
-
-### [x] 2. Hide edit actions while the Profile Editor is active
-
-- [x] Hide the existing Revert edits and Save to mouse buttons in the shared bar when Profile Editor is selected.
-- [x] Keep only the device selector and Refresh action in that bar.
-
-**Done when:** Selecting Profile Editor leaves the shared bar with only device selection and refresh; no second Revert edits or Save to mouse controls are added.
-
-### [x] 3. Present the sleeping-mouse state as a modal over blurred loading backgrounds
-
-- [x] Show the sleeping-mouse screen as a modal layered over the current screen instead of replacing the underlying data view.
-- [x] Apply a slight blur to all loading-state backgrounds.
-- [x] Preserve the underlying screen during transitions between profile-derived mocks, the sleeping-mouse state, and data screens.
-
-**Done when:** The sleeping-mouse state appears as a modal over a slightly blurred background, and loading transitions preserve the underlying screen without visibly jumping between views.
-
-### [ ] 4. Refactor the UI into smaller reusable components
+### [ ] 1. Refactor the UI into smaller reusable components
 
 - [ ] Split the large ContentView sections into focused components.
 - [ ] Extract repeated controls and layouts into reusable views.

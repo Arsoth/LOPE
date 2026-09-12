@@ -18,29 +18,6 @@ private struct StatusEvent: Identifiable {
   }
 }
 
-private struct TopRoundedRectangle: Shape {
-  let radius: CGFloat
-
-  func path(in rect: CGRect) -> Path {
-    let radius = min(radius, min(rect.width, rect.height) / 2)
-    var path = Path()
-    path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
-    path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + radius))
-    path.addQuadCurve(
-      to: CGPoint(x: rect.minX + radius, y: rect.minY),
-      control: CGPoint(x: rect.minX, y: rect.minY)
-    )
-    path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
-    path.addQuadCurve(
-      to: CGPoint(x: rect.maxX, y: rect.minY + radius),
-      control: CGPoint(x: rect.maxX, y: rect.minY)
-    )
-    path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-    path.closeSubpath()
-    return path
-  }
-}
-
 private struct DPIStageTriangle: Shape {
   func path(in rect: CGRect) -> Path {
     var path = Path()
@@ -1475,37 +1452,56 @@ struct ContentView: View {
       .opacity(0)
       .frame(width: 0, height: 0)
 
-      VStack(alignment: .leading, spacing: 14) {
-        if selectedTab != .settings {
-          header
-            .padding(.horizontal, 20)
-          Divider()
-            .padding(.horizontal, 20)
-        }
-        TabView(selection: $selectedTab) {
-          ZStack {
-            configureContent
-              .blur(radius: configureBackgroundBlurRadius)
-            if model.loadingProfile && !model.buttons.isEmpty {
-              loadingProfileOverlay
-            }
-            if model.waitingForKnownDevice {
-              knownDeviceWakeModal
+      VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+          if selectedTab != .settings {
+            VStack(alignment: .leading, spacing: 14) {
+              header
+                .padding(.horizontal, 20)
+              Divider()
+                .frame(maxWidth: .infinity)
+                .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
             }
           }
-          .tabItem { Label("Configure", systemImage: "cursorarrow.click").pointerCursor() }
-          .tag(AppTab.configure)
-          backupsPane
-            .tabItem { Label("Backups", systemImage: "archivebox").pointerCursor() }
-            .tag(AppTab.backups)
-          profileEditorPane
-            .tabItem { Label("Profile Editor", systemImage: "square.and.pencil").pointerCursor() }
-            .tag(AppTab.profileEditor)
-          settingsPane
-            .tabItem { Label("Settings", systemImage: "gearshape").pointerCursor() }
-            .tag(AppTab.settings)
+          TabView(selection: $selectedTab) {
+            ZStack {
+              configureContent
+                .blur(radius: configureBackgroundBlurRadius)
+              if model.loadingProfile && !model.buttons.isEmpty {
+                loadingProfileOverlay
+              }
+              if model.waitingForKnownDevice {
+                knownDeviceWakeModal
+              }
+            }
+            .tabItem { Label("Configure", systemImage: "cursorarrow.click").pointerCursor() }
+            .tag(AppTab.configure)
+            backupsPane
+              .tabItem { Label("Backups", systemImage: "archivebox").pointerCursor() }
+              .tag(AppTab.backups)
+            profileEditorPane
+              .tabItem { Label("Profile Editor", systemImage: "square.and.pencil").pointerCursor() }
+              .tag(AppTab.profileEditor)
+            settingsPane
+              .tabItem { Label("Settings", systemImage: "gearshape").pointerCursor() }
+              .tag(AppTab.settings)
+          }
         }
-        statusFooter
+        .simultaneousGesture(
+          TapGesture().onEnded {
+            if statusHistoryPresented {
+              statusHistoryPresented = false
+            }
+          }
+        )
+        if statusHistoryPresented {
+          statusHistoryDrawer
+            .frame(maxWidth: .infinity)
+            .frame(height: statusPanelHeight, alignment: .topLeading)
+            .transition(.move(edge: .bottom))
+        } else {
+          statusFooter
+        }
 
         // Future expansion: restore the button-press highlighting control
         // here, below the footer/status line, after a reliable Logitech
@@ -1518,48 +1514,6 @@ struct ContentView: View {
         //         // Future button-event monitor action.
         //     }
         // }
-      }
-    }
-    .coordinateSpace(name: "statusRoot")
-    .overlay {
-      if statusHistoryPresented {
-        Color.clear
-          .contentShape(Rectangle())
-          .onTapGesture { statusHistoryPresented = false }
-          .accessibilityHidden(true)
-          .zIndex(0)
-      }
-    }
-    .overlay(alignment: .bottomLeading) {
-      if statusHistoryPresented {
-        GeometryReader { proxy in
-          statusHistoryPopup
-            .frame(
-              width: max(proxy.size.width - statusFooterHorizontalInset * 2, 1),
-              height: statusPanelHeight,
-              alignment: .topLeading
-            )
-            .position(
-              x: proxy.size.width / 2,
-              y: proxy.size.height - statusPanelHeight / 2
-            )
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .transition(.move(edge: .bottom))
-        .zIndex(1)
-      }
-    }
-    .overlay(alignment: .bottom) {
-      if statusHistoryPresented {
-        statusFooter
-          .zIndex(2)
-      }
-    }
-    .overlay {
-      if statusHistoryPresented {
-        EscapeKeyMonitor(onEscape: { statusHistoryPresented = false })
-          .frame(width: 0, height: 0)
-          .allowsHitTesting(false)
       }
     }
     .padding(.top, 20)
@@ -1664,7 +1618,8 @@ struct ContentView: View {
   private var statusFooter: some View {
     VStack(alignment: .leading, spacing: 14) {
       Divider()
-        .padding(.horizontal, statusFooterHorizontalInset)
+        .frame(maxWidth: .infinity)
+        .shadow(color: .black.opacity(0.22), radius: 6, y: -2)
 
       HStack(alignment: .top) {
         Button {
@@ -1688,15 +1643,23 @@ struct ContentView: View {
     .frame(maxWidth: .infinity)
     .background(appBackground)
     .shadow(
-      color: statusHistoryPresented ? .black.opacity(0.42) : .clear,
-      radius: 10,
-      y: -4
+      color: .black.opacity(statusHistoryPresented ? 0.36 : 0.16),
+      radius: 7,
+      y: -3
     )
   }
 
-  private var statusHistoryPopup: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      HStack(alignment: .firstTextBaseline) {
+  private var statusHistoryDrawer: some View {
+    VStack(spacing: 0) {
+      HStack(alignment: .center, spacing: 8) {
+        Button {
+          statusHistoryPresented = false
+        } label: {
+          Image(systemName: "info.circle")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close recent events")
+        .pointerCursor()
         Text("Recent events")
           .font(.headline)
           .foregroundStyle(.primary)
@@ -1705,9 +1668,12 @@ struct ContentView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-      .padding(.bottom, 9)
-
-      Divider()
+      .padding(.horizontal, statusFooterHorizontalInset)
+      .frame(maxWidth: .infinity)
+      .frame(height: 40)
+      .background(appBackground)
+      .shadow(color: .black.opacity(0.24), radius: 6, y: 3)
+      .zIndex(1)
 
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0) {
@@ -1727,26 +1693,26 @@ struct ContentView: View {
                   .fixedSize(horizontal: false, vertical: true)
                   .textSelection(.enabled)
               }
+              .padding(.horizontal, statusFooterHorizontalInset)
               if index < statusHistory.count - 1 {
                 Divider()
               }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 9)
           }
         }
+        .frame(maxWidth: .infinity)
       }
-      .frame(maxHeight: .infinity)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(Color(nsColor: .controlBackgroundColor))
     }
-    .padding(12)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .contentShape(TopRoundedRectangle(radius: 12))
-    .background(
-      Color(nsColor: .controlBackgroundColor),
-      in: TopRoundedRectangle(radius: 12)
-    )
+    .background(Color(nsColor: .controlBackgroundColor))
     .overlay {
-      TopRoundedRectangle(radius: 12)
-        .stroke(Color.primary.opacity(0.18), lineWidth: 0.75)
+      EscapeKeyMonitor(onEscape: { statusHistoryPresented = false })
+        .frame(width: 0, height: 0)
+        .allowsHitTesting(false)
     }
     .onExitCommand {
       statusHistoryPresented = false
@@ -2262,12 +2228,12 @@ struct ContentView: View {
     }
     .padding(.horizontal, 3)
     .padding(.vertical, 2)
-    .background(
-      profileID == model.profileNumber
-        ? Color.accentColor.opacity(0.12)
-        : Color.clear,
-      in: RoundedRectangle(cornerRadius: 6)
-    )
+    // .background(
+    //   profileID == model.profileNumber
+    //     ? Color.accentColor.opacity(0.12)
+    //     : Color.clear,
+    //   in: RoundedRectangle(cornerRadius: 6)
+    // )
     .help(helpText)
   }
 
