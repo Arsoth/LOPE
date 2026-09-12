@@ -163,6 +163,15 @@ static int run_profiles(const Options *options) {
         // first enabled slot and report the actual selection below.
         requested_profile = 0;
     }
+
+    // Keep the selected profile's validated DPI data alive long enough to
+    // compare it with the sensor reading below. This lets a normal GUI
+    // refresh repair the live index after a mouse/KVM power transition while
+    // leaving valid DPI-shift values alone.
+    uint16_t selected_stages[5] = {0};
+    size_t selected_stage_count = 0;
+    int selected_default_stage = 0;
+    int selected_profile_number = 0;
     if (options->headers_only && !options->include_dpi) {
         for (size_t i = 0; i < header_count; i++) {
             printf("Profile %zu (sector 0x%04X, enabled=%s)\n",
@@ -202,6 +211,14 @@ static int run_profiles(const Options *options) {
                                              (int)selected + 1, &profile)) {
             printf("Selected profile: %zu\n", selected + 1);
             print_profile_summary(&profile, true);
+            if (profile.dpi_layout_supported && profile.dpi_count <= 5) {
+                selected_profile_number = (int)selected + 1;
+                selected_stage_count = profile.dpi_count;
+                selected_default_stage = (int)profile.dpi_default_index + 1;
+                for (size_t i = 0; i < selected_stage_count; i++) {
+                    selected_stages[i] = read_le16(profile.data + profile.dpi_offset + i * 2);
+                }
+            }
             free(profile.data);
         }
     } else {
@@ -235,6 +252,13 @@ static int run_profiles(const Options *options) {
         uint16_t current = 0;
         if (adjustable_dpi_values(device, values, &value_count, MAX_DPI_VALUES,
                                   &sensor_count, &current)) {
+            if (selected_stage_count > 0) {
+                if (recover_live_dpi_if_needed(device, selected_profile_number,
+                                               selected_stages, selected_stage_count,
+                                               selected_default_stage, current)) {
+                    current = selected_stages[selected_default_stage - 1];
+                }
+            }
             printf("Device: %s\n", device_label(device));
             printf("DPI sensors: %u\n", sensor_count);
             print_supported_dpi(values, value_count);

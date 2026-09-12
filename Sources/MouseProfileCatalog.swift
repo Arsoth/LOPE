@@ -80,6 +80,13 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     var name: String
     var match: Match
     var buttons: [Button]
+    // Some onboard profiles expose vertical wheel motion as extra records
+    // after the physical button records. Keep these records visible and
+    // editable, including when their current output is disabled.
+    var scrollWheelButtonLabels: [String: String]?
+    // A device may also expose non-programmable controls in its profile
+    // record list. Do not present those records as editable buttons.
+    var hiddenProfileButtonNumbers: [Int]?
     var dpiRange: DPIRange?
     var profileIO: ProfileIO
     var sources: [String]
@@ -90,6 +97,10 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
 
     func button(for number: Int) -> Button? {
         buttons.first { $0.number == number }
+    }
+
+    func scrollWheelButtonLabel(for number: Int) -> String? {
+        scrollWheelButtonLabels?[String(number)]
     }
 }
 
@@ -177,6 +188,8 @@ struct MouseProfileCatalog: Sendable {
             .init(number: 2, control: "Secondary click", aliases: [], notes: nil),
             .init(number: 3, control: "Middle click", aliases: [], notes: nil)
         ],
+        scrollWheelButtonLabels: nil,
+        hiddenProfileButtonNumbers: nil,
         dpiRange: .init(minimum: 100, maximum: 16000),
         profileIO: .init(
             supported: true,

@@ -4,6 +4,19 @@
 import Foundation
 
 enum ProfileOutputParser {
+    static func scrollWheelOutputLabel(_ raw: String) -> String? {
+        let normalized = raw.filter { !$0.isWhitespace }.uppercased()
+        switch normalized {
+        case "90100000": return "Scroll down"
+        case "90110000": return "Scroll up"
+        default: return nil
+        }
+    }
+
+    static func isScrollWheelOutput(_ raw: String) -> Bool {
+        scrollWheelOutputLabel(raw) != nil
+    }
+
     static func onboardProfileCapacity(in text: String) -> Int? {
         let pattern = try! NSRegularExpression(pattern: #"^Profile capacity:\s+(\d+)\s*$"#)
         let normalizedText = text.replacingOccurrences(of: "\r\n", with: "\n")

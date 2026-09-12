@@ -213,11 +213,36 @@ static bool get_current_onboard_profile(Device *device, uint8_t *profile_index_o
         print_reply_error("ONBOARD_PROFILES.getCurrentProfile", reply);
         return false;
     }
-    // The profile index is returned in the second parameter and is zero-based
-    // on the G502 X family. Keep this raw so the caller can compare it to the
-    // editor's one-based profile number explicitly.
+    // The profile index is returned in the second parameter. Keep the raw
+    // value here; G502 X firmware returns a one-based profile number while
+    // some older devices use a zero-based value.
     *profile_index_out = reply.bytes[1];
     return true;
+}
+
+static bool is_g502x_family_device(const Device *device) {
+    if (device == NULL || device->iface == NULL) {
+        return false;
+    }
+    switch (device->iface->product_id) {
+        case 0xC095: // G502 X PLUS
+        case 0xC098: // G502 X LIGHTSPEED
+        case 0xC099: // G502 X
+        case 0x4099: // G502 X PLUS through receiver
+        case 0x409F: // G502 X LIGHTSPEED through receiver
+            return true;
+        default:
+            break;
+    }
+    return text_contains_case_insensitive(device_label(device), "G502 X") ||
+           text_contains_case_insensitive(device_label(device), "G502X");
+}
+
+static int current_onboard_profile_number(const Device *device, uint8_t raw_index) {
+    if (is_g502x_family_device(device)) {
+        return raw_index == 0 ? 0 : (int)raw_index;
+    }
+    return (int)raw_index + 1;
 }
 
 static bool set_current_onboard_dpi_index(Device *device, uint8_t index) {
@@ -244,6 +269,59 @@ static bool get_current_onboard_dpi_index(Device *device, uint8_t *index_out) {
     return true;
 }
 
+static bool get_current_sensor_dpi(Device *device, uint8_t sensor_index, uint16_t *dpi_out) {
+    const uint8_t params[3] = {sensor_index, 0, 0};
+    Reply reply = device_call(device, FEATURE_ADJUSTABLE_DPI, 0x20,
+                              params, sizeof(params), 2.0);
+    if (reply.status != REPLY_OK || reply.length < 3) {
+        print_reply_error("ADJUSTABLE_DPI.getSensorDpi", reply);
+        return false;
+    }
+    *dpi_out = (uint16_t)(((uint16_t)reply.bytes[1] << 8) | reply.bytes[2]);
+    return true;
+}
+
+static bool live_dpi_matches(Device *device, uint16_t expected_dpi) {
+    uint16_t current_dpi = 0;
+    return get_current_sensor_dpi(device, 0, &current_dpi) && current_dpi == expected_dpi;
+}
+
+static bool set_live_dpi_index_and_verify(Device *device,
+                                          uint8_t desired_index,
+                                          uint16_t expected_dpi) {
+    // A G502 X can still be finishing its profile-sector commit when the
+    // first 0x8100 DPI-index command arrives (especially after a receiver or
+    // KVM reconnect). Repeat the complete set/read/physical-DPI verification
+    // rather than accepting a matching index byte while the sensor remains at
+    // a stale or boot-safe value such as 25600.
+    for (size_t attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) {
+            usleep(150000);
+        }
+        if (!set_current_onboard_dpi_index(device, desired_index)) {
+            continue;
+        }
+        uint8_t current_index = 0;
+        if (get_current_onboard_dpi_index(device, &current_index) &&
+            current_index == desired_index &&
+            live_dpi_matches(device, expected_dpi)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool profile_contains_dpi(const uint16_t *stages,
+                                 size_t stage_count,
+                                 uint16_t dpi) {
+    for (size_t i = 0; i < stage_count; i++) {
+        if (stages[i] == dpi) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void sync_active_profile_default_dpi(Device *device,
                                              int profile_number,
                                              int default_stage,
@@ -253,21 +331,49 @@ static void sync_active_profile_default_dpi(Device *device,
         fprintf(stderr, "warning: saved DPI profile, but could not identify the active profile for live DPI sync\n");
         return;
     }
-    if ((int)active_profile + 1 != profile_number) {
+    int active_profile_number = current_onboard_profile_number(device, active_profile);
+    if (active_profile_number != profile_number) {
         printf("Live DPI unchanged: active onboard profile is %u; saved profile %d is not active.\n",
-               (unsigned)active_profile + 1, profile_number);
+               (unsigned)active_profile_number, profile_number);
         return;
     }
     uint8_t desired_index = (uint8_t)(default_stage - 1);
-    uint8_t current_index = 0;
-    if (!set_current_onboard_dpi_index(device, desired_index) ||
-        !get_current_onboard_dpi_index(device, &current_index) ||
-        current_index != desired_index) {
-        fprintf(stderr, "warning: profile sector is saved, but the live default DPI index could not be verified\n");
+    if (!set_live_dpi_index_and_verify(device, desired_index, default_dpi)) {
+        fprintf(stderr, "warning: profile sector is saved, but the live DPI remained different from %u after retrying\n",
+                default_dpi);
         return;
     }
-    printf("Live default DPI: %u (stage %d; current index verified).\n",
+    printf("Live default DPI: %u (stage %d; sensor value verified).\n", default_dpi, default_stage);
+}
+
+static bool recover_live_dpi_if_needed(Device *device,
+                                       int profile_number,
+                                       const uint16_t *stages,
+                                       size_t stage_count,
+                                       int default_stage,
+                                       uint16_t current_dpi) {
+    if (stage_count == 0 || default_stage < 1 || default_stage > (int)stage_count ||
+        profile_number < 1) {
+        return false;
+    }
+
+    uint8_t active_profile = 0;
+    if (!get_current_onboard_profile(device, &active_profile) ||
+        current_onboard_profile_number(device, active_profile) != profile_number ||
+        profile_contains_dpi(stages, stage_count, current_dpi)) {
+        return false;
+    }
+
+    uint16_t default_dpi = stages[default_stage - 1];
+    printf("Live DPI %u is not an active stage; restoring profile %d default %u.\n",
+           current_dpi, profile_number, default_dpi);
+    if (!set_live_dpi_index_and_verify(device, (uint8_t)(default_stage - 1), default_dpi)) {
+        fprintf(stderr, "warning: could not repair the live DPI after reconnect; stored profile data was left unchanged\n");
+        return false;
+    }
+    printf("Recovered live DPI: %u (stage %d; sensor value verified).\n",
            default_dpi, default_stage);
+    return true;
 }
 
 static int read_profile_control(Device *device,
@@ -491,8 +597,12 @@ static int adjustable_dpi_values(Device *device,
         return 0;
     }
     const uint8_t empty_params[3] = {0, 0, 0};
-    Reply reply = device_call_long(device, FEATURE_ADJUSTABLE_DPI, 0x00,
-                                   empty_params, sizeof(empty_params), 2.0);
+    // 0x2201 uses short requests with long responses on G502 X firmware. The
+    // old forced-long request was accepted inconsistently across direct USB,
+    // receiver, and post-reconnect paths. device_call selects short here and
+    // still applies the receiver fallback when required.
+    Reply reply = device_call(device, FEATURE_ADJUSTABLE_DPI, 0x00,
+                              empty_params, sizeof(empty_params), 2.0);
     if (reply.status != REPLY_OK || reply.length < 1) {
         print_reply_error("ADJUSTABLE_DPI.getSensorCount", reply);
         return 0;
@@ -500,8 +610,8 @@ static int adjustable_dpi_values(Device *device,
     uint8_t sensor_count = reply.bytes[0];
 
     const uint8_t sensor_params[3] = {0, 0, 0};
-    reply = device_call_long(device, FEATURE_ADJUSTABLE_DPI, 0x10,
-                             sensor_params, sizeof(sensor_params), 2.0);
+    reply = device_call(device, FEATURE_ADJUSTABLE_DPI, 0x10,
+                        sensor_params, sizeof(sensor_params), 2.0);
     if (reply.status != REPLY_OK || reply.length < 3) {
         print_reply_error("ADJUSTABLE_DPI.getSensorDpiList", reply);
         return 0;
@@ -559,13 +669,9 @@ static int adjustable_dpi_values(Device *device,
         *sensor_count_out = sensor_count == 0 ? 1 : sensor_count;
     }
     if (current_out != NULL) {
-        reply = device_call_long(device, FEATURE_ADJUSTABLE_DPI, 0x20,
-                                 sensor_params, sizeof(sensor_params), 2.0);
-        if (reply.status != REPLY_OK || reply.length < 3) {
-            print_reply_error("ADJUSTABLE_DPI.getSensorDpi", reply);
+        if (!get_current_sensor_dpi(device, 0, current_out)) {
             return 0;
         }
-        *current_out = (uint16_t)(((uint16_t)reply.bytes[1] << 8) | reply.bytes[2]);
     }
     return 1;
 }

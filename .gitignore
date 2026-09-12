@@ -4,3 +4,5 @@ outputs/
 lope
 *.logiob
 *.bin
+rebuild-signed.sh
+agents.md

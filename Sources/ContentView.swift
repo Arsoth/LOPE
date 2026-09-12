@@ -550,6 +550,15 @@ private struct DPIStageBar: View {
                         max(markerX - popoverWidth / 2, 0),
                         max(proxy.size.width - popoverWidth, 0)
                     )
+                    // Keep the arrow clear of the rounded bottom corners when
+                    // a stage is close to either end of the track. A small
+                    // offset is preferable to letting the arrow straddle the
+                    // curve and makes the anchor read as intentional.
+                    let arrowEdgeClearance: CGFloat = 36
+                    let arrowX = min(
+                        max(markerX - popoverX, arrowEdgeClearance),
+                        popoverWidth - arrowEdgeClearance
+                    )
                     VStack(spacing: -1) {
                         ZStack(alignment: .topLeading) {
                             if let fadingStage,
@@ -569,7 +578,7 @@ private struct DPIStageBar: View {
                             .fill(Color.black.opacity(0.86))
                             .frame(width: 22, height: 11)
                             .rotationEffect(.degrees(180))
-                            .offset(x: markerX - popoverX - popoverWidth / 2)
+                            .offset(x: arrowX - popoverWidth / 2)
                     }
                     .frame(width: 230)
                     .background {
@@ -1025,7 +1034,7 @@ struct ContentView: View {
                         loadingProfileOverlay
                     }
                 }
-                .tabItem { Label("Buttons", systemImage: "cursorarrow.click") }
+                .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
                 backupsPane
                     .tabItem { Label("Backups", systemImage: "archivebox") }
                 settingsPane
@@ -1518,7 +1527,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "minus")
                             .font(.title2.weight(.semibold))
-                            .frame(width: 38, height: 34)
+                            .frame(width: 34, height: 30)
                     }
                     .buttonStyle(.bordered)
                     .disabled(model.dpiCount <= 1)
@@ -1531,7 +1540,7 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "plus")
                             .font(.title2.weight(.semibold))
-                            .frame(width: 38, height: 34)
+                            .frame(width: 34, height: 30)
                     }
                     .buttonStyle(.bordered)
                     .disabled(model.dpiCount >= 5)

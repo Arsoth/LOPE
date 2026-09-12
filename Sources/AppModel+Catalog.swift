@@ -24,6 +24,8 @@ extension AppModel {
         if description.contains("dpi down") { return "90040000" }
         if description.contains("dpi button") { return "90050000" }
         if description.contains("profile") || description.contains("mode switch") { return "900A0000" }
+        if description.contains("scroll down") { return "90100000" }
+        if description.contains("scroll up") { return "90110000" }
         if description.contains("tilt left") || description.contains("scroll left") { return "90010000" }
         if description.contains("tilt right") || description.contains("scroll right") { return "90020000" }
         if description.contains("primary") { return "80010001" }
@@ -102,6 +104,8 @@ extension AppModel {
             OutputPreset(id: "80010080", label: "Mouse button 8", raw: "80010080"),
             OutputPreset(id: "90010000", label: "Tilt left", raw: "90010000"),
             OutputPreset(id: "90020000", label: "Tilt right", raw: "90020000"),
+            OutputPreset(id: "90100000", label: "Scroll down", raw: "90100000"),
+            OutputPreset(id: "90110000", label: "Scroll up", raw: "90110000"),
             OutputPreset(id: "90030000", label: "DPI up", raw: "90030000"),
             OutputPreset(id: "90040000", label: "DPI down", raw: "90040000"),
             OutputPreset(id: "90050000", label: "Cycle DPI", raw: "90050000"),

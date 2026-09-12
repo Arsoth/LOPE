@@ -10,6 +10,7 @@ private let deviceReadAttempts = 3
 private let deviceReadRetryDelay: TimeInterval = 0.2
 private let profileReadAttempts = 5
 private let profileReadRetryDelay: TimeInterval = 0.25
+private let reconnectPollNanoseconds: UInt64 = 2_000_000_000
 
 @MainActor
 extension AppModel {
@@ -26,6 +27,73 @@ extension AppModel {
             return
         }
         startInitialRefresh(cachedDevice: cachedDevice)
+    }
+
+    func startReconnectMonitor() {
+        reconnectMonitorTask?.cancel()
+        reconnectMonitorTask = Task { @MainActor [weak self] in
+            var initialized = false
+            var wasReachable = false
+
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: reconnectPollNanoseconds)
+                } catch {
+                    return
+                }
+                guard let self, !Task.isCancelled else { return }
+                guard !self.busy, let executable = self.engine else { continue }
+
+                let selected = self.devices.first { $0.id == self.selectedDeviceIndex }
+                let selectedIndex = selected?.id ?? self.selectedDeviceIndex
+                let currentDirectory = self.backupDirectory
+                let snapshot = await Task.detached(priority: .utility) {
+                    Self.makeDeviceEnumerationSnapshot(
+                        executable: executable,
+                        currentDirectory: currentDirectory,
+                        preferredDeviceIndex: selectedIndex,
+                        preferredDeviceKey: nil
+                    )
+                }.value
+                guard !Task.isCancelled else { return }
+                guard snapshot.errorMessage == nil else { continue }
+
+                guard let selected else {
+                    if !snapshot.devices.isEmpty {
+                        self.status = "A Logitech mouse was found; checking its onboard profile…"
+                        self.startRefresh(preferredDeviceIndex: selectedIndex,
+                                          preferredProfileNumber: self.profileNumber)
+                    }
+                    continue
+                }
+
+                // A KVM can recreate the USB interface, changing the location
+                // and registry portions of deviceKey. Product/name matching
+                // lets us recognize that same mouse after reconnect without
+                // trusting the stale HID identity.
+                let matchingDevice = snapshot.devices.first {
+                    !$0.productID.isEmpty && $0.productID == selected.productID &&
+                    $0.name == selected.name
+                }
+                let reachable = matchingDevice != nil
+                let identityChanged = matchingDevice?.deviceKey != selected.deviceKey
+                if !initialized {
+                    initialized = true
+                    wasReachable = reachable
+                    continue
+                }
+                if !reachable {
+                    wasReachable = false
+                    continue
+                }
+                if !wasReachable || identityChanged {
+                    wasReachable = true
+                    self.status = "Mouse reconnected; checking live DPI…"
+                    self.startRefresh(preferredDeviceIndex: selected.id,
+                                      preferredProfileNumber: self.profileNumber)
+                }
+            }
+        }
     }
 
     private func startInitialRefresh(cachedDevice: DeviceChoice) {

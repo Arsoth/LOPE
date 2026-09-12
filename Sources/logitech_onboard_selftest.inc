@@ -48,6 +48,19 @@ static int run_self_test(void) {
         fprintf(stderr, "receiver connection-type self-test failed\n");
         return 1;
     }
+    HidInterface profile_index_interface = {0};
+    Device profile_index_device = {0};
+    profile_index_device.iface = &profile_index_interface;
+    profile_index_interface.product_id = 0xC099; // G502 X
+    bool profile_index_ok = current_onboard_profile_number(&profile_index_device, 1) == 1 &&
+                            current_onboard_profile_number(&profile_index_device, 2) == 2;
+    profile_index_interface.product_id = 0xC08B; // G502 HERO
+    profile_index_ok = profile_index_ok &&
+                       current_onboard_profile_number(&profile_index_device, 0) == 1;
+    if (!profile_index_ok) {
+        fprintf(stderr, "onboard profile-index mapping self-test failed\n");
+        return 1;
+    }
     uint8_t frame[LONG_REPORT_BYTES];
     const uint8_t ping_params[3] = {0x00, 0x00, 0x5A};
     size_t frame_length = build_hidpp_frame(false, 0x01, 0x001B, ping_params, sizeof(ping_params), frame);

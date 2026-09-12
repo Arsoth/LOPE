@@ -46,6 +46,7 @@ final class AppModel: ObservableObject {
     var refreshGeneration = 0
     var recoveryDeviceKey: String?
     var discoveredBackups: [BackupEntry] = []
+    var reconnectMonitorTask: Task<Void, Never>?
 
     var currentMouseProfile: MouseProfileDescriptor {
         currentCatalogProfile ?? MouseProfileCatalog.genericProfile
@@ -135,6 +136,7 @@ final class AppModel: ObservableObject {
         refreshBackups()
         Task { @MainActor in
             initialRefresh()
+            startReconnectMonitor()
         }
     }
 

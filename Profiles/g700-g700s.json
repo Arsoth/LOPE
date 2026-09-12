@@ -87,6 +87,7 @@
 			"notes": null
 		}
 	],
+	"scrollWheelButtonLabels": { "14": "Scroll down", "15": "Scroll up" },
 	"dpiRange": { "minimum": 200, "maximum": 8200 },
 	"profileIO": {
 		"supported": false,
@@ -109,10 +110,11 @@
 		"layout": {
 			"buttonRecord": "runtime-reported",
 			"buttonOffsetByFormat": "legacy/runtime",
+			"wheelMotion": "up/down are exposed as virtual profile records 14/15; keep them visible and editable",
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"Keep this family cataloged so its physical controls are named correctly, but do not route it through the modern writer until a legacy-safe implementation exists."
+			"Keep this family cataloged so its physical controls are named correctly. Virtual wheel records 14/15 remain visible and editable; do not route this family through the modern writer until a legacy-safe implementation exists."
 		]
 	},
 	"sources": [

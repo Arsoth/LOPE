@@ -20,6 +20,21 @@ struct ProfileOutputParserSelfTest {
             }
         }
 
+        guard ProfileOutputParser.scrollWheelOutputLabel("90 10 00 00") == "Scroll down",
+              ProfileOutputParser.scrollWheelOutputLabel("90110000") == "Scroll up",
+              ProfileOutputParser.isScrollWheelOutput("90 10 00 00"),
+              !ProfileOutputParser.isScrollWheelOutput("90010000"),
+              !ProfileOutputParser.isScrollWheelOutput("FFFFFFFF") else {
+            fatalError("scroll-wheel output recognition failed")
+        }
+
+        let g604Profile = MouseProfileCatalog.shared.profile(deviceName: "G604", productID: "0x4085")
+        guard g604Profile.hiddenProfileButtonNumbers?.contains(16) == true,
+              g604Profile.scrollWheelButtonLabel(for: 14) == "Scroll down",
+              g604Profile.scrollWheelButtonLabel(for: 15) == "Scroll up" else {
+            fatalError("G604 hidden/non-programmable control metadata failed")
+        }
+
         let selectionCases: [(Int?, [Int], Int, Int?)] = [
             (nil, [1], 2, 1),       // multi-profile mouse -> one-profile mouse
             (nil, [1, 2], 1, 1),    // one-profile mouse -> multi-profile mouse

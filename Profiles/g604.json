@@ -87,10 +87,12 @@
 			"notes": null
 		}
 	],
+	"scrollWheelButtonLabels": { "14": "Scroll down", "15": "Scroll up" },
+	"hiddenProfileButtonNumbers": [16],
 	"dpiRange": { "minimum": 100, "maximum": 16000 },
 	"profileIO": {
 		"supported": true,
-		"capability": "HID++ 2.0 ONBOARD_PROFILES · 13-record G604 layout",
+		"capability": "HID++ 2.0 ONBOARD_PROFILES · 13 physical G604 controls plus virtual wheel records",
 		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
@@ -112,11 +114,11 @@
 		"layout": {
 			"buttonRecord": "4 bytes per control",
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
-			"wheelMotion": "up/down are scroll events, not profile records",
+			"wheelMotion": "up/down are exposed as virtual profile records 14/15; keep them visible and editable",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"The six thumb buttons are represented as two rows of three. The profile record list has 13 controls; do not label it as a simple six-button mouse."
+			"The six thumb buttons are represented as two rows of three. The physical profile record list has 13 controls plus editable virtual wheel records 14/15."
 		]
 	},
 	"sources": [

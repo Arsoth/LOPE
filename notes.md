@@ -76,11 +76,11 @@ instead of a premature "no onboard profile" message.
 **Done when:** MX mice show neither the fallback UI nor the bottom warning, without
 changing the behavior for other devices.
 
-### [ ] 13. Add a lightmode tot he app selectable in system preferences - defaulting to match system
+### [ ] 13. Add a lightmode to the app selectable in system preferences - defaulting to match system
 
-- [ ] lightmode should be off white, not pure eye searing white.
+- [ ] lightmode should be off white/light grey, not pure eye searing white.
 - [ ] defaults to system preference (most OS's expose this).
-- [ ] dark mode and light mode should be colorblind safe by default
+- [ ] dark mode and light mode should be colorblind safe by default - the DPI colors are currently safe and work in both modes, do not change.
 
 **Done when:** there's a light and a dark mode that are both colorblind safe defaulting to current OS preferences
 

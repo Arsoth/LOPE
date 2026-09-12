@@ -425,6 +425,16 @@ static Reply channel_request(HidChannel *channel,
             }
             memcpy(reply.bytes, body + 2, reply.length);
             reply.status = REPLY_OK;
+            if (hid_debug_enabled()) {
+                char line[512];
+                int written = snprintf(line, sizeof(line),
+                                       "hid-debug rx report=0x%02X device=0x%02X request=0x%04X length=%zu bytes=",
+                                       node->report_id, returned_device, request_id, reply.length);
+                for (size_t i = 0; i < reply.length && i < 16 && written < (int)sizeof(line); i++) {
+                    written += snprintf(line + written, sizeof(line) - (size_t)written, "%02X", reply.bytes[i]);
+                }
+                hid_debug_log("%s", line);
+            }
             free(node);
             return reply;
         }

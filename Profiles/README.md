@@ -8,8 +8,10 @@ Each JSON file describes one Logitech G mouse family. The descriptor is delibera
 2. Give it a unique `id` and a display `name`.
 3. Add the exact device-name fragments and, when known, product IDs under `match`.
 4. List profile-array positions under `buttons`. These are the runtime profile record numbers, not necessarily the names printed on the shell.
-5. Fill in `profileIO`. Use the standard HID++ 0x8100 values only after a real profile read has confirmed them. Set `profileIO.supported` to `false` and `save.strategy` to `read-only` for an unverified or legacy device.
-6. Add the file name to `index.json` and put source links in `sources`.
+5. If the firmware exposes vertical wheel motion as extra profile records, map their record numbers to labels under `scrollWheelButtonLabels`. They remain visible and editable, and also stay available as output presets.
+6. If the profile record list includes known non-programmable controls, list their runtime record numbers under `hiddenProfileButtonNumbers` so they are preserved in the device data but not offered for editing.
+7. Fill in `profileIO`. Use the standard HID++ 0x8100 values only after a real profile read has confirmed them. Set `profileIO.supported` to `false` and `save.strategy` to `read-only` for an unverified or legacy device.
+8. Add the file name to `index.json` and put source links in `sources`.
 
 The app loads the JSON files from the bundled `MouseProfiles` directory. During development it also reads `Profiles/` from the current working directory. Unknown devices continue to use the runtime-detected generic mapping.
 

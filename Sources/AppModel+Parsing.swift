@@ -162,11 +162,18 @@ extension AppModel {
             guard let profile = currentProfile,
                   let match = buttonPattern.firstMatch(in: line, range: full),
                   let number = Int(capture(match, in: line, index: 1)) else { continue }
+            if currentMouseProfile.hiddenProfileButtonNumbers?.contains(number) == true {
+                continue
+            }
             let rawBytes = capture(match, in: line, index: 3)
             let raw = normalize(rawBytes)
+            let label = currentMouseProfile.button(for: number)?.label
+                ?? currentMouseProfile.scrollWheelButtonLabel(for: number)
+                ?? ProfileOutputParser.scrollWheelOutputLabel(raw)
+                ?? physicalButtonLabel(number)
             rows[profile, default: []].append(ButtonRow(
                 id: number,
-                label: physicalButtonLabel(number),
+                label: label,
                 currentRaw: raw,
                 draftRaw: raw,
                 draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "custom"
