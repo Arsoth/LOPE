@@ -1,0 +1,616 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026
+
+import Foundation
+import XCTest
+
+@testable import LOPECore
+
+// Covers AppModel+KnownDeviceReconnect.swift. `startReconnectMonitor` and
+// `startKnownDeviceProbe` both read `AppModel.engine` directly (unlike
+// AppModel+DeviceDiscovery.swift's functions, which take an explicit
+// `executable` parameter, and unlike `runEngine`, which honors
+// `engineRunnerOverride`), so exercising their HID++-reachable branches
+// requires a real file at one of `engine`'s resolution candidates. This
+// file installs a throwaway script at `bin/lope` (the Makefile's own build
+// output location for the CLI core, already gitignored) for the duration
+// of the tests that need it, and removes it again in `tearDown`.
+@MainActor
+final class AppModelKnownDeviceReconnectTests: XCTestCase {
+  private var temporaryDirectories: [URL] = []
+  private var createdBinDirectory = false
+
+  private static let repoRoot = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+  private static let binDirectory = repoRoot.appendingPathComponent("bin", isDirectory: true)
+  private static let engineURL = binDirectory.appendingPathComponent("lope")
+
+  override func tearDown() {
+    let fileManager = FileManager.default
+    try? fileManager.removeItem(at: Self.engineURL)
+    if createdBinDirectory {
+      try? fileManager.removeItem(at: Self.binDirectory)
+    }
+    createdBinDirectory = false
+    for directory in temporaryDirectories {
+      try? fileManager.removeItem(at: directory)
+    }
+    temporaryDirectories.removeAll()
+    super.tearDown()
+  }
+
+  private func makeTemporaryDirectory() -> URL {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "lope-known-device-test-\(UUID().uuidString)", isDirectory: true)
+    try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    temporaryDirectories.append(url)
+    return url
+  }
+
+  /// Installs a throwaway script at the `bin/lope` location `AppModel.engine`
+  /// falls back to when no bundled resource or `./lope` symlink is present
+  /// (exactly the case in the `swift test` sandbox). Refuses to clobber a
+  /// real build artifact left behind by a concurrent `make`/`rebuild-signed.sh`.
+  private func installFakeEngine(_ body: String) {
+    let fileManager = FileManager.default
+    if !fileManager.fileExists(atPath: Self.binDirectory.path) {
+      try! fileManager.createDirectory(at: Self.binDirectory, withIntermediateDirectories: true)
+      createdBinDirectory = true
+    }
+    precondition(
+      !fileManager.fileExists(atPath: Self.engineURL.path),
+      "bin/lope already exists; refusing to overwrite a real build artifact")
+    let script = "#!/bin/sh\n" + body + "\n"
+    try! script.write(to: Self.engineURL, atomically: true, encoding: .utf8)
+    try! fileManager.setAttributes(
+      [.posixPermissions: 0o755], ofItemAtPath: Self.engineURL.path)
+  }
+
+  private func makeModel() -> AppModel {
+    let model = AppModel(startInitialRefresh: false)
+    model.configurationDirectory = makeTemporaryDirectory()
+    // `startKnownDeviceProbe`/`startReconnectMonitor` launch the fake engine
+    // with `backupDirectory` as its working directory; `Process` requires
+    // that directory to already exist.
+    try! FileManager.default.createDirectory(
+      at: model.backupDirectory, withIntermediateDirectories: true)
+    return model
+  }
+
+  // MARK: - hasKnownOnboardProfileCapability
+
+  func testHasKnownOnboardProfileCapabilityIsTrueForSupportedCatalogDevice() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    XCTAssertTrue(model.hasKnownOnboardProfileCapability(device))
+  }
+
+  func testHasKnownOnboardProfileCapabilityIsFalseForMatchedButUnsupportedDevice() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 2, name: "G600 MMO", connection: "Wired", productID: "0xC24A", deviceKey: "aaaa-0002")
+    XCTAssertTrue(
+      MouseProfileCatalog.shared.matchingProfile(
+        deviceName: device.name, productID: device.productID) != nil,
+      "test relies on G600 matching a catalog entry")
+    XCTAssertFalse(model.hasKnownOnboardProfileCapability(device))
+  }
+
+  func testHasKnownOnboardProfileCapabilityIsFalseForUnmatchedDevice() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 3, name: "Totally Unknown Widget", connection: "Wireless", productID: "0xFFFF",
+      deviceKey: "aaaa-0003")
+    XCTAssertNil(
+      MouseProfileCatalog.shared.matchingProfile(
+        deviceName: device.name, productID: device.productID))
+    XCTAssertFalse(model.hasKnownOnboardProfileCapability(device))
+  }
+
+  // MARK: - knownDeviceRefreshStatus
+
+  func testKnownDeviceRefreshStatusUsesGuidanceWhenNotExpired() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    let guidance = MouseProfileCatalog.shared.matchingProfile(
+      deviceName: device.name, productID: device.productID)!.refreshGuidance!
+
+    XCTAssertEqual(
+      model.knownDeviceRefreshStatus(for: device, expired: false),
+      "\(guidance.sleepDescription) \(guidance.wakeInstructions) LOPE will keep checking in the background."
+    )
+  }
+
+  func testKnownDeviceRefreshStatusUsesGuidanceWhenExpired() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    let guidance = MouseProfileCatalog.shared.matchingProfile(
+      deviceName: device.name, productID: device.productID)!.refreshGuidance!
+
+    XCTAssertEqual(
+      model.knownDeviceRefreshStatus(for: device, expired: true),
+      "Still waiting for \(device.name). \(guidance.wakeInstructions)")
+  }
+
+  func testKnownDeviceRefreshStatusFallsBackWhenCatalogHasNoGuidance() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 2, name: "G600 MMO", connection: "Wired", productID: "0xC24A", deviceKey: "aaaa-0002")
+    XCTAssertNil(
+      MouseProfileCatalog.shared.matchingProfile(
+        deviceName: device.name, productID: device.productID)?.refreshGuidance,
+      "test relies on G600 having no refresh guidance")
+
+    XCTAssertEqual(
+      model.knownDeviceRefreshStatus(for: device, expired: false),
+      "\(device.name) is not currently detected. Turn it on, then choose Refresh.")
+  }
+
+  // MARK: - beginKnownDeviceRefresh
+
+  func testBeginKnownDeviceRefreshSetsWaitingStateAndSchedulesPolling() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+
+    model.beginKnownDeviceRefresh(device)
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+
+    XCTAssertEqual(model.knownDisconnectedDevice, device)
+    XCTAssertTrue(model.waitingForKnownDevice)
+    XCTAssertEqual(model.knownDevicePollAttempts, 0)
+    XCTAssertEqual(model.currentDeviceName, device.name)
+    XCTAssertEqual(model.deviceSummary, "\(device.title) — waiting for the mouse")
+    XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: false))
+    XCTAssertNotNil(model.knownDevicePollTask)
+  }
+
+  func testBeginKnownDeviceRefreshDoesNotReplaceAnInFlightPollTask() {
+    let model = makeModel()
+    let firstDevice = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    let secondDevice = DeviceChoice(
+      id: 2, name: "G600 MMO", connection: "Wired", productID: "0xC24A", deviceKey: "aaaa-0002")
+
+    model.beginKnownDeviceRefresh(firstDevice)
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+    XCTAssertNotNil(model.knownDevicePollTask)
+
+    // A second call while a poll task is already running must not crash or
+    // leave polling state cleared, even though the visible device fields
+    // still track whichever device was passed most recently.
+    model.beginKnownDeviceRefresh(secondDevice)
+    XCTAssertNotNil(model.knownDevicePollTask)
+    XCTAssertEqual(model.knownDisconnectedDevice, secondDevice)
+  }
+
+  // MARK: - finishKnownDeviceProbe
+
+  func testFinishKnownDeviceProbeResetsBusyWhenGenerationMatches() {
+    let model = makeModel()
+    model.refreshGeneration = 3
+    model.busy = true
+    model.refreshTask = Task {}
+
+    model.finishKnownDeviceProbe(generation: 3)
+
+    XCTAssertFalse(model.busy)
+    XCTAssertNil(model.refreshTask)
+  }
+
+  func testFinishKnownDeviceProbeIsNoOpWhenGenerationIsStale() {
+    let model = makeModel()
+    model.refreshGeneration = 5
+    model.busy = true
+    let placeholder = Task<Void, Never> {}
+    model.refreshTask = placeholder
+
+    model.finishKnownDeviceProbe(generation: 3)
+
+    XCTAssertTrue(model.busy)
+    XCTAssertNotNil(model.refreshTask)
+  }
+
+  // MARK: - stopKnownDevicePolling
+
+  func testStopKnownDevicePollingClearsPollingStateButKeepsDeviceByDefault() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.knownDevicePollTask = Task {}
+    model.waitingForKnownDevice = true
+    model.knownDevicePollAttempts = 4
+    model.knownDisconnectedDevice = device
+
+    model.stopKnownDevicePolling(clearDevice: false)
+
+    XCTAssertNil(model.knownDevicePollTask)
+    XCTAssertFalse(model.waitingForKnownDevice)
+    XCTAssertEqual(model.knownDevicePollAttempts, 0)
+    XCTAssertEqual(model.knownDisconnectedDevice, device)
+  }
+
+  func testStopKnownDevicePollingClearsDeviceWhenRequested() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.knownDevicePollTask = Task {}
+    model.knownDisconnectedDevice = device
+
+    model.stopKnownDevicePolling(clearDevice: true)
+
+    XCTAssertNil(model.knownDisconnectedDevice)
+  }
+
+  // MARK: - showKnownDeviceUnavailable
+
+  func testShowKnownDeviceUnavailableWithNoAvailableDevicesUsesSingleDevicePlaceholder() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.busy = true
+    model.loadingProfile = true
+    model.refreshTask = Task {}
+
+    model.showKnownDeviceUnavailable(device)
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+
+    XCTAssertFalse(model.busy)
+    XCTAssertFalse(model.loadingProfile)
+    XCTAssertNil(model.refreshTask)
+    XCTAssertEqual(model.knownDisconnectedDevice, device)
+    XCTAssertTrue(model.waitingForKnownDevice)
+    XCTAssertEqual(model.currentDeviceName, device.name)
+    XCTAssertEqual(model.devices, [device])
+    XCTAssertEqual(model.selectedDeviceIndex, device.id)
+    XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: false))
+    XCTAssertNotNil(model.knownDevicePollTask)
+  }
+
+  func testShowKnownDeviceUnavailableWithAvailableDevicesKeepsListAndResetsSelectionToZero() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    let other = DeviceChoice(
+      id: 9, name: "Other Mouse", connection: "Wireless", productID: "0xEEEE",
+      deviceKey: "eeee-0009")
+
+    model.showKnownDeviceUnavailable(device, availableDevices: [device, other])
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+
+    XCTAssertEqual(model.devices, [device, other])
+    XCTAssertEqual(model.selectedDeviceIndex, 0)
+  }
+
+  func testShowKnownDeviceUnavailableDoesNotRestartPollingWhenAlreadyPolling() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.knownDevicePollTask = Task {}
+
+    model.showKnownDeviceUnavailable(device)
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+
+    XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: false))
+    XCTAssertNotNil(model.knownDevicePollTask)
+  }
+
+  // MARK: - startKnownDeviceProbe
+
+  func testStartKnownDeviceProbeReturnsBusyFalseWhenEngineUnavailable() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.knownDisconnectedDevice = device
+    model.busy = false
+
+    model.startKnownDeviceProbe(device)
+
+    XCTAssertFalse(model.busy)
+    XCTAssertNil(model.refreshTask)
+  }
+
+  func testStartKnownDeviceProbeAppliesSnapshotWhenDeviceRespondsWithMatchingKey() async {
+    installFakeEngine(
+      """
+      if [ "$1" = "list" ]; then
+        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.knownDisconnectedDevice = device
+
+    model.startKnownDeviceProbe(device)
+    await model.refreshTask?.value
+
+    XCTAssertFalse(model.busy)
+    XCTAssertNil(model.refreshTask)
+    XCTAssertEqual(model.currentDeviceName, "Recon Mouse")
+    XCTAssertEqual(model.devices.map(\.deviceKey), ["aaaa-0001"])
+  }
+
+  func testStartKnownDeviceProbeFinishesWhenReportedDeviceKeyDoesNotMatch() async {
+    installFakeEngine(
+      """
+      if [ "$1" = "list" ]; then
+        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-9999)'
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.knownDisconnectedDevice = device
+    model.refreshGeneration = 0
+
+    model.startKnownDeviceProbe(device)
+    await model.refreshTask?.value
+
+    // A device sharing the id but reporting a different key never satisfies
+    // `selected.deviceKey == device.deviceKey`, so the probe must finish
+    // (busy cleared) without touching devices/currentDeviceName.
+    XCTAssertFalse(model.busy)
+    XCTAssertNil(model.refreshTask)
+    XCTAssertEqual(model.currentDeviceName, "")
+  }
+
+  func testStartKnownDeviceProbeFinishesWhenProfileReadNeverSucceeds() async {
+    installFakeEngine(
+      """
+      if [ "$1" = "list" ]; then
+        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        exit 0
+      fi
+      echo "profile read failed" 1>&2
+      exit 1
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.knownDisconnectedDevice = device
+
+    model.startKnownDeviceProbe(device)
+    await model.refreshTask?.value
+
+    XCTAssertFalse(model.busy)
+    XCTAssertNil(model.refreshTask)
+  }
+
+  func testStartKnownDeviceProbeIgnoresStaleGeneration() async {
+    installFakeEngine(
+      """
+      if [ "$1" = "list" ]; then
+        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.knownDisconnectedDevice = device
+
+    model.startKnownDeviceProbe(device)
+    // startKnownDeviceProbe captures `refreshGeneration` synchronously before
+    // returning; bumping it again immediately (before the background probe's
+    // first suspension point resolves) simulates another refresh having
+    // superseded this one, and must make the probe's result a no-op.
+    model.refreshGeneration += 1
+    await model.refreshTask?.value
+
+    XCTAssertTrue(
+      model.busy, "a superseded probe must not clear busy out from under the newer refresh")
+    XCTAssertEqual(model.currentDeviceName, "")
+  }
+
+  func testStartKnownDeviceProbeIgnoresResultWhenKnownDisconnectedDeviceChanged() async {
+    installFakeEngine(
+      """
+      if [ "$1" = "list" ]; then
+        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    let otherDevice = DeviceChoice(
+      id: 2, name: "Different Mouse", connection: "Wireless", productID: "0xBBBB",
+      deviceKey: "bbbb-0002")
+    model.knownDisconnectedDevice = device
+
+    model.startKnownDeviceProbe(device)
+    // The user (or another poll) moved on to a different known-disconnected
+    // device while this probe's HID read was still in flight.
+    model.knownDisconnectedDevice = otherDevice
+    await model.refreshTask?.value
+
+    XCTAssertTrue(model.busy)
+    XCTAssertEqual(model.currentDeviceName, "")
+  }
+
+  // MARK: - startReconnectMonitor
+
+  func testStartReconnectMonitorCancelsAPreviousMonitorPromptly() async {
+    let model = makeModel()
+
+    model.startReconnectMonitor()
+    let firstTask = model.reconnectMonitorTask
+
+    let start = Date()
+    model.startReconnectMonitor()
+    await firstTask?.value
+    let elapsed = Date().timeIntervalSince(start)
+
+    XCTAssertLessThan(
+      elapsed, 1.0, "cancelling the superseded monitor must not wait out its poll interval")
+    model.reconnectMonitorTask?.cancel()
+  }
+
+  func testStartReconnectMonitorSkipsPollingWhileBusy() async {
+    let counterFile = makeTemporaryDirectory().appendingPathComponent("count")
+    installFakeEngine(
+      """
+      printf '.' >> "\(counterFile.path)"
+      exit 0
+      """)
+    let model = makeModel()
+    model.busy = true
+
+    model.startReconnectMonitor()
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    model.reconnectMonitorTask?.cancel()
+
+    let attempts = (try? String(contentsOf: counterFile)) ?? ""
+    XCTAssertTrue(attempts.isEmpty, "a busy model must not invoke the engine while polling")
+  }
+
+  func testStartReconnectMonitorContinuesLoopingWhenEngineIsUnavailable() async {
+    let model = makeModel()
+
+    model.startReconnectMonitor()
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+
+    // No bundled/`bin/lope` engine exists in the test sandbox, so every
+    // iteration's `guard ... let executable = self.engine else { continue }`
+    // must keep the loop alive rather than exiting or crashing.
+    XCTAssertNotNil(model.reconnectMonitorTask)
+    XCTAssertEqual(model.status, "Connect a Logitech mouse, then choose Refresh.")
+    model.reconnectMonitorTask?.cancel()
+  }
+
+  func testStartReconnectMonitorStartsRefreshWhenNoDeviceWasSelected() async {
+    installFakeEngine(
+      """
+      if [ "$1" = "list" ]; then
+        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    XCTAssertTrue(model.devices.isEmpty)
+
+    model.startReconnectMonitor()
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    // The reconnect monitor's discovery hands off to startRefresh(), which
+    // runs its own background task; let it settle before asserting.
+    await model.refreshTask?.value
+    model.reconnectMonitorTask?.cancel()
+
+    XCTAssertEqual(model.currentDeviceName, "Recon Mouse")
+    XCTAssertFalse(model.busy)
+  }
+
+  func testStartReconnectMonitorIgnoresADeviceThatDisappearsAfterCalibration() async {
+    let modeFile = makeTemporaryDirectory().appendingPathComponent("mode")
+    try! "present".write(to: modeFile, atomically: true, encoding: .utf8)
+    installFakeEngine(
+      """
+      mode=$(cat "\(modeFile.path)" 2>/dev/null || echo gone)
+      if [ "$1" = "list" ]; then
+        if [ "$mode" = "present" ]; then
+          echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        fi
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.devices = [device]
+    model.selectedDeviceIndex = device.id
+
+    model.startReconnectMonitor()
+    // Iteration 1 only calibrates `wasReachable`; it never changes status.
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    try! "gone".write(to: modeFile, atomically: true, encoding: .utf8)
+    // Iteration 2 observes the device is now unreachable and must not start
+    // a refresh.
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    model.reconnectMonitorTask?.cancel()
+
+    XCTAssertEqual(model.status, "Connect a Logitech mouse, then choose Refresh.")
+    XCTAssertNil(model.refreshTask)
+  }
+
+  func testStartReconnectMonitorDetectsIdentityChangeAfterCalibration() async {
+    let modeFile = makeTemporaryDirectory().appendingPathComponent("mode")
+    try! "1".write(to: modeFile, atomically: true, encoding: .utf8)
+    installFakeEngine(
+      """
+      mode=$(cat "\(modeFile.path)" 2>/dev/null || echo 1)
+      if [ "$1" = "list" ]; then
+        echo "[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-000$mode)"
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.devices = [device]
+    model.selectedDeviceIndex = device.id
+
+    model.startReconnectMonitor()
+    // Iteration 1 calibrates against key "...0001" (mode file holds "1").
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    // A KVM-style reconnect: same product/name, new HID identity.
+    try! "2".write(to: modeFile, atomically: true, encoding: .utf8)
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    await model.refreshTask?.value
+    model.reconnectMonitorTask?.cancel()
+
+    XCTAssertFalse(model.busy)
+    XCTAssertEqual(model.currentDeviceName, "Recon Mouse")
+  }
+}

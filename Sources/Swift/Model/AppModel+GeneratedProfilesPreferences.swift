@@ -1,23 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
-import AppKit
 import Foundation
 
 @MainActor
 extension AppModel {
-  func chooseConfigurationDirectory() -> URL? {
-    let panel = NSOpenPanel()
-    panel.canChooseFiles = false
-    panel.canChooseDirectories = true
-    panel.canCreateDirectories = true
-    panel.allowsMultipleSelection = false
-    panel.message = "Choose where LOPE stores backups and custom mouse profiles."
-    panel.prompt = "Use this directory"
-    panel.directoryURL = configurationDirectory
-    return panel.runModal() == .OK ? panel.url : nil
-  }
-
   func setConfigurationDirectory(_ url: URL) {
     configurationDirectory = url
     configurationDirectoryPath = url.path
@@ -33,25 +20,6 @@ extension AppModel {
 
   func resetConfigurationDirectory() {
     setConfigurationDirectory(defaultConfigurationDirectory)
-  }
-
-  func openBackupDirectoryInFinder() {
-    try? FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
-    guard NSWorkspace.shared.open(backupDirectory) else {
-      status = "Could not open the backups directory in Finder."
-      return
-    }
-    status = "Opened the backups directory in Finder."
-  }
-
-  func openCustomProfilesDirectoryInFinder() {
-    let directory = customProfilesDirectory
-    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    guard NSWorkspace.shared.open(directory) else {
-      status = "Could not open the custom profiles directory in Finder."
-      return
-    }
-    status = "Opened the custom profiles directory in Finder."
   }
 
   /// Turns the live, blindly-editable session for an unrecognized mouse

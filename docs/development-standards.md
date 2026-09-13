@@ -123,14 +123,35 @@ setup, see
   (`--ignore-filename-regex`/a negative-lookahead source pattern) from the
   report and the threshold check. That directory is test infrastructure —
   the `test_<module>.c` files, `selftest.c`'s dispatcher, and
-  `test_doubles.c`'s mocking seams — not production code, so it is scored
-  the same way `Sources/Swift/Tests/` is already excluded from the Swift side. Self-test
+  `test_doubles.c`'s mocking seams — not production code. Self-test
   files built from `&&`-chained assertions (`ok = a() && b() && !c(); if
   (!ok) { ...; return 1; }`) structurally cap their own branch coverage
   well under 90%: once every chained condition passes, the early-bail
   branch for each `&&` never executes, and that is a property of the
   assertion style, not a gap in what is tested. Excluding the directory
   avoids grading test code against a metric it can't meaningfully satisfy.
+  `coverage-check-swift` and `coverage-swift` exclude `Sources/Swift/Tests/`
+  the same way — a test file grading itself against the coverage gate is
+  circular, so it is excluded from both the report and the threshold check,
+  matching `Sources/C/Testing/` on the C side.
+- `coverage-check-swift` and `coverage-swift` also exclude
+  `Sources/Swift/Model/Shims/`, the same way the C side excludes
+  `Sources/C/Testing/`. `Shims/` holds small, single-purpose files whose
+  entire job is one real AppKit modal dialog (`NSOpenPanel`/`NSSavePanel`)
+  or `NSWorkspace` call (e.g. `AppModel+ProfileEditorShim.swift`,
+  `AppModel+RefreshShim.swift`). No XCTest can drive a live `.runModal()`
+  or observe whether Finder/System Settings actually opened, and unlike
+  the CLI process boundary — which has a real mocking seam,
+  `AppModel.engineRunnerOverride` — there is no way to inject a fake for
+  these AppKit calls. When a function mixes an unmockable OS-dialog call
+  with logic that *is* testable (e.g. encoding a value and writing it to
+  the URL the dialog returned), keep only the dialog call and the thinnest
+  possible glue in the `Shims/` file, and move the rest into a plain
+  function taking the resolved URL/value as an ordinary argument in the
+  original (non-`Shims/`) file, so it stays covered — see
+  `writeProfileEditorExport`/`applyImportedProfileEditorDraft` in
+  `AppModel+ProfileEditor.swift` versus their callers in
+  `AppModel+ProfileEditorShim.swift` for the pattern.
 - `make coverage-check` is wired into the pre-commit hook alongside
   `make test` and `make lint`.
 - For each uncovered line or path you touch:

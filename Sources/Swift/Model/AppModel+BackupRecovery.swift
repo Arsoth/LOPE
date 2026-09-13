@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
-import AppKit
 import Foundation
-import UniformTypeIdentifiers
 
 @MainActor
 extension AppModel {
@@ -61,19 +59,6 @@ extension AppModel {
     } catch {
       status = error.localizedDescription
     }
-  }
-
-  func chooseRestoreBackup() -> URL? {
-    let panel = NSOpenPanel()
-    panel.canChooseFiles = true
-    panel.canChooseDirectories = false
-    panel.allowsMultipleSelection = false
-    panel.allowedContentTypes = [
-      UTType(filenameExtension: AppConstants.backupExtension) ?? .data,
-      UTType(filenameExtension: "bin") ?? .data,
-    ]
-    panel.directoryURL = backupDirectory
-    return panel.runModal() == .OK ? panel.url : nil
   }
 
   func restore(_ url: URL) {

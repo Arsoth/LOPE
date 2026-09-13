@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
-import AppKit
 import Foundation
 import IOKit.hidsystem
 
@@ -58,22 +57,6 @@ extension AppModel {
     deviceSummary = selected.title
     refreshBackups()
     startRefresh(preferredDeviceIndex: index, preferredProfileNumber: 0)
-  }
-
-  func openInputMonitoringSettings() {
-    updateInputMonitoringAuthorization()
-    let candidates = [
-      "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
-      "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ListenEvent",
-    ]
-    for value in candidates {
-      if let url = URL(string: value), NSWorkspace.shared.open(url) {
-        status = "Enable Input Monitoring for this app, then return and choose Refresh."
-        return
-      }
-    }
-    status =
-      "Open System Settings > Privacy & Security > Input Monitoring, enable this app, then choose Refresh."
   }
 
   func updateInputMonitoringAuthorization() {

@@ -1,32 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
-import AppKit
 import Foundation
-import UniformTypeIdentifiers
 
 @MainActor
 extension AppModel {
-  func chooseJSONBackup() -> URL? {
-    let panel = NSOpenPanel()
-    panel.canChooseFiles = true
-    panel.canChooseDirectories = false
-    panel.allowsMultipleSelection = false
-    panel.allowedContentTypes = [UTType.json]
-    panel.directoryURL = defaultDocumentsDirectory
-    return panel.runModal() == .OK ? panel.url : nil
-  }
-
-  func chooseJSONExport() -> URL? {
-    let panel = NSSavePanel()
-    panel.canCreateDirectories = true
-    panel.allowedContentTypes = [UTType.json]
-    panel.directoryURL = defaultDocumentsDirectory
-    panel.nameFieldStringValue = editableJSONExportName()
-    panel.message = "Export the selected profile as an editable JSON file."
-    return panel.runModal() == .OK ? panel.url : nil
-  }
-
   func exportCurrentJSON(to url: URL) {
     guard !profiles.isEmpty else {
       status = "Read a Logitech profile before exporting JSON."

@@ -98,7 +98,7 @@ coverage-c: $(C_COVERAGE_PROFDATA)
 
 coverage-swift:
 	swift test --enable-code-coverage
-	xcrun llvm-cov report "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)" --ignore-filename-regex='/Tests/|\.derived/'
+	xcrun llvm-cov report "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)" --ignore-filename-regex='/Tests/|/Shims/|\.derived/'
 
 coverage: coverage-c coverage-swift
 
@@ -107,7 +107,7 @@ coverage-check-c: $(C_COVERAGE_PROFDATA)
 
 coverage-check-swift:
 	swift test --enable-code-coverage
-	scripts/check-coverage.sh "Swift" "/Sources/" $(COVERAGE_MIN_LINE) -1 -- "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)"
+	scripts/check-coverage.sh "Swift" "/Sources/(?!Swift/Model/Shims/|Swift/Tests/)" $(COVERAGE_MIN_LINE) -1 -- "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)"
 
 coverage-check: coverage-check-c coverage-check-swift
 
