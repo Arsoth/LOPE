@@ -5,10 +5,13 @@
 
 typedef int (*DiscoverDevicesForOptionsFn)(HidContext *context, const Options *options,
                                            Device *devices, size_t *count);
+typedef int (*HidContextCreateFn)(HidContext *context);
 
 extern DiscoverDevicesForOptionsFn discover_devices_for_options_impl;
+extern HidContextCreateFn hid_context_create_impl;
 
 int hid_context_create(HidContext *context);
+int hid_context_create_hardware(HidContext *context);
 void hid_context_release(HidContext *context);
 int open_vendor_channels(HidContext *context);
 

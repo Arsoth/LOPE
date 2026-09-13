@@ -2,7 +2,12 @@
 
 int test_watch_cli(void) {
     bool mouse_button_name_ok = strcmp(mouse_button_name(0), "Left") == 0 &&
+                                strcmp(mouse_button_name(1), "Right") == 0 &&
+                                strcmp(mouse_button_name(2), "Middle") == 0 &&
                                 strcmp(mouse_button_name(3), "Back / rear thumb") == 0 &&
+                                strcmp(mouse_button_name(4), "Forward") == 0 &&
+                                strcmp(mouse_button_name(5), "Button 6") == 0 &&
+                                strcmp(mouse_button_name(6), "Button 7") == 0 &&
                                 strcmp(mouse_button_name(7), "Button 8") == 0 &&
                                 strcmp(mouse_button_name(9), "unknown") == 0;
     int decimal_value = 0;
@@ -14,9 +19,66 @@ int test_watch_cli(void) {
         !parse_decimal("12x", &decimal_value) && parse_slot("ff", &slot_value) &&
         slot_value == 0xFF && parse_slot("0xFF", &slot_value) && slot_value == 0xFF &&
         parse_slot("3", &slot_value) && slot_value == 3 && !parse_slot("0", &slot_value) &&
-        !parse_slot("7", &slot_value) && !parse_slot("bad", &slot_value);
+        !parse_slot("7", &slot_value) && !parse_slot("bad", &slot_value) &&
+        !parse_slot(NULL, &slot_value) && !parse_slot("3", NULL);
     if (!mouse_button_name_ok || !decimal_slot_ok) {
         fprintf(stderr, "mouse_button_name/parse_decimal/parse_slot self-test failed\n");
+        return 1;
+    }
+
+    typedef struct {
+        uint8_t *callback_buffer;
+        uint8_t previous_buttons;
+        bool have_previous;
+        char label[256];
+    } WatchCallbackTestState;
+    WatchCallbackTestState watch_state = {0};
+    snprintf(watch_state.label, sizeof(watch_state.label), "test mouse");
+    uint8_t numbered_report[] = {REPORT_SHORT, 0x01};
+    uint8_t numbered_press[] = {REPORT_SHORT, 0x09};
+    uint8_t unnumbered_press[] = {0x02};
+    char callback_path[] = "/tmp/lomps-selftest-watch-callback-XXXXXX";
+    int callback_fd = mkstemp(callback_path);
+    int callback_saved_stdout = callback_fd >= 0 ? dup(fileno(stdout)) : -1;
+    bool callback_ok =
+        callback_fd >= 0 && callback_saved_stdout >= 0 && dup2(callback_fd, fileno(stdout)) >= 0;
+    if (callback_fd >= 0) {
+        close(callback_fd);
+    }
+    if (callback_ok) {
+        watch_report_callback_for_test(NULL, 0, NULL, 0, 0, NULL, 0);
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, numbered_report,
+                                       (CFIndex)sizeof(numbered_report));
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, numbered_press,
+                                       (CFIndex)sizeof(numbered_press));
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, numbered_press,
+                                       (CFIndex)sizeof(numbered_press));
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, 0, unnumbered_press,
+                                       (CFIndex)sizeof(unnumbered_press));
+        fflush(stdout);
+    }
+    if (callback_saved_stdout >= 0) {
+        dup2(callback_saved_stdout, fileno(stdout));
+        close(callback_saved_stdout);
+        clearerr(stdout);
+    }
+    char callback_contents[2048] = {0};
+    if (callback_ok) {
+        FILE *callback_readback = fopen(callback_path, "r");
+        if (callback_readback != NULL) {
+            size_t callback_bytes =
+                fread(callback_contents, 1, sizeof(callback_contents) - 1, callback_readback);
+            callback_contents[callback_bytes] = '\0';
+            fclose(callback_readback);
+        } else {
+            callback_ok = false;
+        }
+    }
+    unlink(callback_path);
+    callback_ok = callback_ok && callback_contents[0] != '\0' && watch_state.have_previous &&
+                  watch_state.previous_buttons == 0x02;
+    if (!callback_ok) {
+        fprintf(stderr, "watch report callback self-test failed\n");
         return 1;
     }
 

@@ -306,7 +306,7 @@ static int compare_hid_interfaces(const void *left_pointer, const void *right_po
     return strcmp(left->transport, right->transport);
 }
 
-int hid_context_create(HidContext *context) {
+int hid_context_create_hardware(HidContext *context) {
     memset(context, 0, sizeof(*context));
     // IOHIDDeviceOpen uses the HID-specific Input Monitoring permission. Do
     // not request it during enumeration: the GUI presents the wired-device
@@ -407,6 +407,13 @@ int hid_context_create(HidContext *context) {
     }
     return 1;
 }
+
+// hid_context_create_impl is a test seam: command self-tests can inject an
+// empty context while still exercising their normal discovery/selection and
+// cleanup paths without enumerating real macOS HID devices.
+HidContextCreateFn hid_context_create_impl = hid_context_create_hardware;
+
+int hid_context_create(HidContext *context) { return hid_context_create_impl(context); }
 
 int open_vendor_channels(HidContext *context) {
     for (size_t i = 0; i < context->count; i++) {

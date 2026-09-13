@@ -122,5 +122,51 @@ int test_hid_discovery(void) {
         return 1;
     }
 
+    HidInterface receiver_interface = {0};
+    receiver_interface.is_vendor = true;
+    receiver_interface.channel_open = true;
+    receiver_interface.product_id = 0xC539;
+    snprintf(receiver_interface.product, sizeof(receiver_interface.product), "G603 receiver");
+    HidContext receiver_context = {.items = &receiver_interface, .count = 1};
+    Reply receiver_pairing = {
+        .status = REPLY_OK, .length = 8, .bytes = {0, 0, 0, 0x40, 0x6C, 0, 0, 1}};
+    Reply receiver_slot_replies[] = {
+        receiver_pairing,          {.status = REPLY_TIMEOUT}, {.status = REPLY_TIMEOUT},
+        {.status = REPLY_TIMEOUT}, {.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext receiver_test_context = {
+        .replies = receiver_slot_replies,
+        .reply_count = sizeof(receiver_slot_replies) / sizeof(receiver_slot_replies[0]),
+    };
+    g_channel_request_test_context = &receiver_test_context;
+    Device receiver_devices[MAX_DEVICES];
+    size_t receiver_count = 0;
+    bool receiver_ok =
+        discover_devices(&receiver_context, -1, receiver_devices, &receiver_count, false) &&
+        receiver_count == 1 && receiver_devices[0].device_number == 1 &&
+        receiver_devices[0].request_device_number == 1 &&
+        strcmp(device_label(&receiver_devices[0]), "G603 LIGHTSPEED") == 0 &&
+        is_mouse_device(&receiver_devices[0]) && receiver_test_context.calls == 5;
+    Device receiver_endpoint = {
+        .iface = &receiver_interface, .device_number = 0xFF, .request_device_number = 0xFF};
+    receiver_ok = receiver_ok && is_receiver_endpoint(&receiver_endpoint) &&
+                  !is_mouse_device(&receiver_endpoint);
+
+    char device_key[64];
+    format_device_key(&discover_key_devices[0], device_key, sizeof(device_key));
+    uint64_t parsed_location = 0;
+    uint64_t parsed_registry = 0;
+    uint8_t parsed_number = 0;
+    receiver_ok =
+        receiver_ok && strcmp(device_key, "1234-5678-FF") == 0 &&
+        parse_device_key(device_key, &parsed_location, &parsed_registry, &parsed_number) &&
+        parsed_location == 0x1234 && parsed_registry == 0x5678 && parsed_number == 0xFF &&
+        !parse_device_key("1234-5678-100", &parsed_location, &parsed_registry, &parsed_number);
+    reset_hid_test_seams();
+    if (!receiver_ok) {
+        fprintf(stderr, "receiver discovery seam self-test failed\n");
+        return 1;
+    }
+
     return 0;
 }

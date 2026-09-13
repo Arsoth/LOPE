@@ -12,6 +12,9 @@ typedef Reply (*ChannelRequestFn)(HidChannel *channel, uint8_t device_number, ui
 extern ChannelRequestFn channel_request_impl;
 
 void on_sigint(int signal_number);
+void hid_report_callback_for_test(void *context, IOReturn result, void *sender,
+                                  IOHIDReportType type, uint32_t report_id, uint8_t *report,
+                                  CFIndex report_length);
 
 bool hid_debug_enabled(void);
 void hid_debug_log(const char *format, ...);

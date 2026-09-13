@@ -54,6 +54,9 @@ uint8_t report_rate_connection_type(const Device *device) {
     // discovery layer's connection names are the existing source of truth;
     // Bluetooth/Bolt/Unifying devices are treated as wired for this feature,
     // since 0x8061's active-list query remains authoritative for visibility.
+    if (device == NULL || device->iface == NULL) {
+        return 0;
+    }
     const char *connection = device_connection(device);
     return connection != NULL &&
                    (strcmp(connection, "LIGHTSPEED") == 0 || strcmp(connection, "Wireless") == 0)

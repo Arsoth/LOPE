@@ -9,10 +9,27 @@
 #
 # Usage: run-c-selftest-quiet.sh <self-test binary> [arguments...]
 
-set -uo pipefail
+set -euo pipefail
 
-output="$(mktemp)"
-trap 'rm -f "$output"' EXIT
+if [[ "$#" -eq 0 ]]; then
+  echo "Usage: run-c-selftest-quiet.sh <self-test binary> [arguments...]" >&2
+  exit 2
+fi
+
+output=""
+cleanup() {
+  if [[ -n "$output" ]]; then
+    rm -f -- "$output"
+  fi
+}
+trap cleanup EXIT
+
+temp_dir="${TMPDIR:-/tmp}"
+output="$(mktemp "${temp_dir%/}/lope-c-selftest.XXXXXX" 2>/dev/null)" || {
+  fallback_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/.build"
+  mkdir -p "$fallback_dir"
+  output="$(mktemp "$fallback_dir/lope-c-selftest.XXXXXX")"
+}
 
 status=0
 "$@" >"$output" 2>&1 || status=$?

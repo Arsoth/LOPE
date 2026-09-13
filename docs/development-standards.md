@@ -115,7 +115,10 @@ setup, see
   `COVERAGE_MIN_BRANCH`; default 90 each) via `scripts/check-coverage.sh`,
   which prints every file below the threshold in one run before failing,
   matching per-file-and-aggregate gating intent. `coverage-check-c` checks
-  line and branch minimums for the C core; `coverage-check-swift` checks
+  line and branch minimums for the C core. The hardware-facing
+  `Sources/C/Core/main.m` dispatcher is excluded because the self-test exercises
+  command logic through injected seams rather than invoking live-device
+  entrypoint paths; `coverage-check-swift` checks
   the line minimum only for Swift (branch checking is skipped there since
   the toolchain cannot report it). Override thresholds ad hoc with
   `make coverage-check COVERAGE_MIN_LINE=80`.

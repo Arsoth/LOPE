@@ -53,20 +53,24 @@ int test_report_rate(void) {
     wired_interface.product_id = 0xC09A;
     bool connection_type_ok = report_rate_connection_type(&lightspeed_device) == 1 &&
                               report_rate_connection_type(&wireless_device) == 1 &&
-                              report_rate_connection_type(&wired_device) == 0;
+                              report_rate_connection_type(&wired_device) == 0 &&
+                              report_rate_connection_type(NULL) == 0;
     if (!connection_type_ok) {
         fprintf(stderr, "report-rate connection-type self-test failed\n");
         return 1;
     }
 
     uint32_t parsed_hertz = 0;
-    bool hertz_parser_ok = parse_report_rate_hertz("1000", &parsed_hertz) && parsed_hertz == 1000 &&
-                           !parse_report_rate_hertz(NULL, &parsed_hertz) &&
-                           !parse_report_rate_hertz("1000", NULL) &&
-                           !parse_report_rate_hertz("", &parsed_hertz) &&
-                           !parse_report_rate_hertz("0", &parsed_hertz) &&
-                           !parse_report_rate_hertz("abc", &parsed_hertz) &&
-                           !parse_report_rate_hertz("12x", &parsed_hertz);
+    bool hertz_parser_ok =
+        parse_report_rate_hertz("1000", &parsed_hertz) && parsed_hertz == 1000 &&
+        parse_report_rate_hertz("4294967295", &parsed_hertz) && parsed_hertz == UINT32_MAX &&
+        !parse_report_rate_hertz(NULL, &parsed_hertz) && !parse_report_rate_hertz("1000", NULL) &&
+        !parse_report_rate_hertz("", &parsed_hertz) &&
+        !parse_report_rate_hertz("0", &parsed_hertz) &&
+        !parse_report_rate_hertz("abc", &parsed_hertz) &&
+        !parse_report_rate_hertz("12x", &parsed_hertz) &&
+        !parse_report_rate_hertz("4294967296", &parsed_hertz) &&
+        !parse_report_rate_hertz("-1", &parsed_hertz);
     if (!hertz_parser_ok) {
         fprintf(stderr, "report-rate hertz parser self-test failed\n");
         return 1;
@@ -220,6 +224,23 @@ int test_report_rate(void) {
     adjustable_ok = adjustable_ok && !read_report_rate_capabilities(
                                          &capability_device, &adjustable_empty_mask_capabilities);
 
+    const Reply adjustable_unsupported_current_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x01}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x02}},
+    };
+    ChannelRequestTestContext adjustable_unsupported_current_context = {
+        .replies = adjustable_unsupported_current_replies,
+        .reply_count = 2,
+        .calls = 0,
+    };
+    g_channel_request_test_context = &adjustable_unsupported_current_context;
+    ReportRateCapabilities adjustable_unsupported_current_capabilities;
+    adjustable_ok = adjustable_ok &&
+                    read_report_rate_capabilities(&capability_device,
+                                                  &adjustable_unsupported_current_capabilities) &&
+                    !adjustable_unsupported_current_capabilities.current_valid &&
+                    adjustable_unsupported_current_capabilities.current_hertz == 0;
+
     Device no_feature_device = {0};
     HidInterface no_feature_interface = {0};
     no_feature_device.iface = &no_feature_interface;
@@ -270,6 +291,14 @@ int test_report_rate(void) {
         !report_rate_profile_interval(&no_feature_device, 1000, &profile_interval_ms);
     if (!profile_interval_ok) {
         fprintf(stderr, "report-rate profile-interval self-test failed\n");
+        return 1;
+    }
+
+    Options invalid_rate_options = {0};
+    invalid_rate_options.positionals[0] = "0";
+    invalid_rate_options.positional_count = 1;
+    if (run_set_report_rate(&invalid_rate_options) != 1) {
+        fprintf(stderr, "run_set_report_rate invalid-input self-test failed\n");
         return 1;
     }
 

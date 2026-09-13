@@ -1,6 +1,11 @@
 #include "internal.h"
 #include "test_doubles.h"
 
+static int create_empty_hid_context(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    return 1;
+}
+
 int test_commands_read(void) {
     uint16_t parsed_dpi[5] = {0};
     size_t parsed_dpi_count = 0;
@@ -159,6 +164,123 @@ int test_commands_read(void) {
                        run_current_dpi(&command_options) == 1;
     if (!no_capability_ok) {
         fprintf(stderr, "command no-capability self-test failed\n");
+        return 1;
+    }
+
+    // The command entry points own context creation, so inject an empty
+    // context here while the discovery and HID++ seams provide the selected
+    // device and deterministic profile replies. This covers the normal read
+    // command flow without depending on a physical HID device.
+    hid_context_create_impl = create_empty_hid_context;
+    HidInterface read_interface = {0};
+    read_interface.vendor_id = LOGITECH_VID;
+    read_interface.product_id = 0xC099;
+    Device read_device = {0};
+    read_device.iface = &read_interface;
+    read_device.device_number = 0xFF;
+    read_device.request_device_number = 0xFF;
+    read_device.protocol = 4.2;
+    read_device.feature_count = 2;
+    read_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    read_device.features[1] = (Feature){.id = FEATURE_ADJUSTABLE_DPI, .index = 3};
+    DiscoverDevicesTestContext read_discovery = {.devices = &read_device, .count = 1, .result = 1};
+    g_discover_devices_test_context = &read_discovery;
+
+    uint8_t read_control[255];
+    uint8_t read_profile[255];
+    build_mock_control_sector_two_profiles(read_control);
+    build_mock_onboard_sector(read_profile);
+    Reply read_control_chunks[32];
+    Reply read_profile_chunks[32];
+    size_t read_control_count =
+        build_sector_read_replies(read_control, MAX_HEADERS * 4 + 4, read_control_chunks, 32);
+    size_t read_profile_count =
+        build_sector_read_replies(read_profile, sizeof(read_profile), read_profile_chunks, 32);
+    Reply read_sensor_count = {.status = REPLY_OK, .length = 1, .bytes = {1}};
+    Reply read_sensor_list = {
+        .status = REPLY_OK,
+        .length = 11,
+        .bytes = {0x00, 0x03, 0x20, 0x04, 0xB0, 0x06, 0x40, 0x09, 0x60, 0x0C, 0x80}};
+    Reply read_sensor_current = {.status = REPLY_OK, .length = 3, .bytes = {0, 0x06, 0x40}};
+    Reply read_current_dpi = {.status = REPLY_OK, .length = 3, .bytes = {0, 0x06, 0x40}};
+
+    Reply read_info_replies[64];
+    size_t read_info_reply_count = 0;
+    read_info_replies[read_info_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < read_control_count; i++) {
+        read_info_replies[read_info_reply_count++] = read_control_chunks[i];
+    }
+    for (size_t i = 0; i < read_profile_count; i++) {
+        read_info_replies[read_info_reply_count++] = read_profile_chunks[i];
+    }
+    ChannelRequestTestContext read_info_context = {.replies = read_info_replies,
+                                                   .reply_count = read_info_reply_count};
+    g_channel_request_test_context = &read_info_context;
+    Options read_info_options = {0};
+    read_info_options.device_index = -1;
+    read_info_options.profile = 1;
+    bool read_commands_ok = run_info(&read_info_options) == 0 && read_info_context.calls == 26;
+
+    Reply read_headers_replies[32];
+    size_t read_headers_reply_count = 0;
+    read_headers_replies[read_headers_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < read_control_count; i++) {
+        read_headers_replies[read_headers_reply_count++] = read_control_chunks[i];
+    }
+    ChannelRequestTestContext read_headers_context = {.replies = read_headers_replies,
+                                                      .reply_count = read_headers_reply_count};
+    g_channel_request_test_context = &read_headers_context;
+    Options read_headers_options = read_info_options;
+    read_headers_options.headers_only = true;
+    read_commands_ok = read_commands_ok && run_profiles(&read_headers_options) == 0 &&
+                       read_headers_context.calls == 10;
+
+    Reply read_profiles_replies[80];
+    size_t read_profiles_reply_count = 0;
+    read_profiles_replies[read_profiles_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < read_control_count; i++) {
+        read_profiles_replies[read_profiles_reply_count++] = read_control_chunks[i];
+    }
+    for (size_t i = 0; i < read_profile_count; i++) {
+        read_profiles_replies[read_profiles_reply_count++] = read_profile_chunks[i];
+    }
+    read_profiles_replies[read_profiles_reply_count++] = read_sensor_count;
+    read_profiles_replies[read_profiles_reply_count++] = read_sensor_list;
+    read_profiles_replies[read_profiles_reply_count++] = read_sensor_current;
+    ChannelRequestTestContext read_profiles_context = {.replies = read_profiles_replies,
+                                                       .reply_count = read_profiles_reply_count};
+    g_channel_request_test_context = &read_profiles_context;
+    Options read_detailed_options = read_info_options;
+    read_detailed_options.include_dpi = true;
+    read_detailed_options.summary_only = true;
+    read_commands_ok = read_commands_ok && run_profiles(&read_detailed_options) == 0;
+
+    Reply read_dpi_replies[64];
+    size_t read_dpi_reply_count = 0;
+    read_dpi_replies[read_dpi_reply_count++] = read_sensor_count;
+    read_dpi_replies[read_dpi_reply_count++] = read_sensor_list;
+    read_dpi_replies[read_dpi_reply_count++] = read_sensor_current;
+    read_dpi_replies[read_dpi_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < read_control_count; i++) {
+        read_dpi_replies[read_dpi_reply_count++] = read_control_chunks[i];
+    }
+    for (size_t i = 0; i < read_profile_count; i++) {
+        read_dpi_replies[read_dpi_reply_count++] = read_profile_chunks[i];
+    }
+    ChannelRequestTestContext read_dpi_context = {.replies = read_dpi_replies,
+                                                  .reply_count = read_dpi_reply_count};
+    g_channel_request_test_context = &read_dpi_context;
+    Options read_dpi_options = read_info_options;
+    read_commands_ok = read_commands_ok && run_dpi(&read_dpi_options) == 0;
+
+    ChannelRequestTestContext read_current_context = {.replies = &read_current_dpi,
+                                                      .reply_count = 1};
+    g_channel_request_test_context = &read_current_context;
+    read_commands_ok = read_commands_ok && run_current_dpi(&read_dpi_options) == 0 &&
+                       read_current_context.calls == 1;
+    hid_context_create_impl = hid_context_create_hardware;
+    if (!read_commands_ok) {
+        fprintf(stderr, "command read-flow seam self-test failed\n");
         return 1;
     }
 

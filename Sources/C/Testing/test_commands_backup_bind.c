@@ -1,6 +1,11 @@
 #include "internal.h"
 #include "test_doubles.h"
 
+static int create_empty_hid_context_for_backup_bind(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    return 1;
+}
+
 int test_commands_backup_bind(void) {
     uint8_t hex_byte_value = 0;
     uint16_t hex_word_value = 0;
@@ -169,6 +174,36 @@ int test_commands_backup_bind(void) {
         .devices = &bind_device, .count = 1, .result = 1};
     discover_devices_for_options_impl = discover_devices_for_options_test_double;
     g_discover_devices_test_context = &bind_discovery_context;
+
+    // Exercise run_dump through the same profile-I/O seam as bind. The
+    // command creates its own HID context, so replace only that constructor
+    // with an empty deterministic context for this command-level test.
+    Reply dump_replies[40];
+    size_t dump_reply_count = 0;
+    dump_replies[dump_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < control_chunk_count; i++) {
+        dump_replies[dump_reply_count++] = control_chunks[i];
+    }
+    for (size_t i = 0; i < data_chunk_count; i++) {
+        dump_replies[dump_reply_count++] = data_chunks[i];
+    }
+    ChannelRequestTestContext dump_channel_context = {.replies = dump_replies,
+                                                      .reply_count = dump_reply_count};
+    g_channel_request_test_context = &dump_channel_context;
+    hid_context_create_impl = create_empty_hid_context_for_backup_bind;
+    const char *dump_path = "/tmp/lomps-selftest-dump-success.logiob";
+    unlink(dump_path);
+    Options dump_success_options = {0};
+    dump_success_options.device_index = -1;
+    dump_success_options.profile = 1;
+    dump_success_options.path = dump_path;
+    bool dump_success_ok = run_dump(&dump_success_options) == 0 && access(dump_path, F_OK) == 0;
+    unlink(dump_path);
+    hid_context_create_impl = hid_context_create_hardware;
+    if (!dump_success_ok) {
+        fprintf(stderr, "run_dump seam self-test failed\n");
+        return 1;
+    }
 
     ChannelRequestTestContext bind_channel_context = {
         .replies = bind_replies, .reply_count = bind_reply_count, .calls = 0};

@@ -31,6 +31,39 @@ int test_g600(void) {
         return 1;
     }
 
+    bool g600_round_trip_ok = g600_profile_report_id(1, NULL) && !g600_profile_report_id(0, NULL) &&
+                              !g600_profile_report_id(G600_PROFILE_COUNT + 1, NULL);
+    uint8_t round_trip_codes[] = {1, 2, 3, 4, 5, 0x11, 0x12, 0x13, 0x14, 0x15, 0x17};
+    for (size_t i = 0; i < sizeof(round_trip_codes); i++) {
+        uint8_t native_code[3] = {round_trip_codes[i], 0, 0};
+        uint8_t spec[4] = {0};
+        uint8_t decoded[3] = {0};
+        g600_native_to_spec(native_code, spec);
+        g600_round_trip_ok = g600_round_trip_ok && g600_spec_to_native(spec, decoded) &&
+                             memcmp(native_code, decoded, sizeof(native_code)) == 0;
+    }
+    uint8_t disabled_spec[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t disabled_native[3] = {1, 2, 3};
+    uint8_t unsupported_mouse[4] = {0x80, 0x01, 0x00, 0x20};
+    uint8_t unsupported_consumer[4] = {0x80, 0x03, 0x00, 0x99};
+    uint8_t unsupported_function[4] = {0x90, 0x06, 0x00, 0x00};
+    g600_round_trip_ok = g600_round_trip_ok &&
+                         g600_spec_to_native(disabled_spec, disabled_native) &&
+                         memcmp(disabled_native, (uint8_t[3]){0, 0, 0}, 3) == 0 &&
+                         !g600_spec_to_native(unsupported_mouse, disabled_native) &&
+                         !g600_spec_to_native(unsupported_consumer, disabled_native) &&
+                         !g600_spec_to_native(unsupported_function, disabled_native);
+    HidInterface named_g600_interface = {0};
+    Device named_g600_device = {0};
+    named_g600_device.iface = &named_g600_interface;
+    snprintf(named_g600_interface.product, sizeof(named_g600_interface.product), "Logitech G600");
+    bool g600_edge_ok = is_g600_device(&named_g600_device) && !is_g600_device(&(Device){0}) &&
+                        !is_g600_device(NULL);
+    if (!g600_round_trip_ok || !g600_edge_ok) {
+        fprintf(stderr, "G600 mapping edge-case self-test failed\n");
+        return 1;
+    }
+
     uint8_t g600_report[G600_REPORT_BYTES] = {0};
     g600_report[0] = 0x03;
     uint8_t g600_native_codes[][3] = {
@@ -131,6 +164,34 @@ int test_g600(void) {
     memset(&g600_info_options, 0, sizeof(g600_info_options));
     g600_info_options.profile = 99;
     bool g600_range_ok = run_g600_info(&g600_info_options, &g600_apply_device) == 1;
+    g600_apply_interface.product_id = G600_PRODUCT_ID;
+    g600_info_options.profile = 1;
+    g600_range_ok = g600_range_ok && run_g600_info(&g600_info_options, &g600_apply_device) == 1;
+    Options g600_headers_options = {0};
+    g600_headers_options.headers_only = true;
+    g600_range_ok =
+        g600_range_ok && run_g600_profiles(&g600_headers_options, &g600_apply_device) == 0;
+    Options g600_dpi_options = {0};
+    g600_dpi_options.include_dpi = true;
+    g600_range_ok = g600_range_ok && run_g600_profiles(&g600_dpi_options, &g600_apply_device) == 1;
+    Options g600_all_profiles_options = {0};
+    g600_range_ok =
+        g600_range_ok && run_g600_profiles(&g600_all_profiles_options, &g600_apply_device) == 0;
+    Options g600_dump_options = {.path = "/tmp/lomps-selftest-g600-dump.logiob"};
+    g600_range_ok = g600_range_ok && run_g600_dump(&g600_dump_options, &g600_apply_device) == 1;
+    unlink(g600_dump_options.path);
+    uint8_t g600_write_report[G600_REPORT_BYTES] = {0};
+    g600_write_report[0] = G600_FIRST_PROFILE_REPORT;
+    g600_range_ok = g600_range_ok && !g600_read_profile(NULL, 1, g600_write_report) &&
+                    !g600_read_profile(&g600_apply_device, 0, g600_write_report) &&
+                    !g600_write_profile(&g600_apply_device, 1, g600_write_report) &&
+                    !g600_write_profile(&g600_apply_device, 0, g600_write_report);
+    char long_backup_directory[512];
+    memset(long_backup_directory, 'x', sizeof(long_backup_directory) - 1);
+    long_backup_directory[sizeof(long_backup_directory) - 1] = '\0';
+    g600_backup_path_options.backup_directory = long_backup_directory;
+    g600_range_ok =
+        g600_range_ok && !g600_make_backup_path(&g600_backup_path_options, "op", g600_backup_path);
     if (!g600_range_ok) {
         fprintf(stderr, "run_g600_info out-of-range self-test failed\n");
         return 1;

@@ -8,6 +8,136 @@ int test_profile_io(void) {
         return 1;
     }
 
+    Profile truncated = {0};
+    truncated.info.button_count = 1;
+    detect_button_layout(&truncated);
+    detect_gshift_button_layout(&truncated, NULL);
+    detect_dpi_layout(&truncated, NULL);
+    detect_rgb_layout(&truncated);
+    uint8_t short_data[4] = {0};
+    Profile short_profile = {0};
+    short_profile.data = short_data;
+    short_profile.data_length = sizeof(short_data);
+    short_profile.dpi_layout_supported = true;
+    short_profile.dpi_offset = 0;
+    uint16_t short_dpi[1] = {800};
+    bool malformed_profile_ok = !short_profile.layout_supported &&
+                                !short_profile.gshift_layout_supported &&
+                                !short_profile.rgb_layout_supported &&
+                                !write_dpi_stage_table(short_data, &short_profile, short_dpi, 1);
+    uint8_t short_rgb_data[RGB_PROFILE_RECORD_BYTES + 1] = {0};
+    Profile short_rgb_profile = {0};
+    short_rgb_profile.data_length = sizeof(short_rgb_data);
+    short_rgb_profile.rgb_layout_supported = true;
+    short_rgb_profile.rgb_offset = 0;
+    short_rgb_profile.rgb_zone_count = 1;
+    short_rgb_profile.rgb_zone_present[0] = true;
+    uint8_t short_rgb_zone[1] = {0};
+    uint8_t short_rgb_color[1][3] = {{0xAA, 0xBB, 0xCC}};
+    malformed_profile_ok =
+        malformed_profile_ok && !write_rgb_zone_colors(short_rgb_data, &short_rgb_profile,
+                                                       short_rgb_zone, short_rgb_color, 1);
+    sector_put_crc(NULL, 0);
+    malformed_profile_ok = malformed_profile_ok && !sector_crc_ok(NULL, 2);
+    malformed_profile_ok =
+        malformed_profile_ok && !adjustable_dpi_values(NULL, NULL, NULL, 0, NULL, NULL);
+    if (!malformed_profile_ok) {
+        fprintf(stderr, "truncated profile safety self-test failed\n");
+        return 1;
+    }
+
+    uint8_t disabled_record[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t macro_record[4] = {0x20, 0, 0, 0};
+    uint8_t mouse_record[4] = {0x80, 0x03, 0, 0};
+    uint8_t invalid_mouse_record[4] = {0x80, 0x04, 0, 0};
+    uint8_t function_record[4] = {0x90, 0x11, 0, 0};
+    uint8_t invalid_function_record[4] = {0x90, 0x12, 0, 0};
+    uint8_t unknown_record[4] = {0x30, 0, 0, 0};
+    bool spec_validation_ok =
+        spec_structurally_valid(disabled_record) && spec_structurally_valid(macro_record) &&
+        spec_structurally_valid(mouse_record) && !spec_structurally_valid(invalid_mouse_record) &&
+        spec_structurally_valid(function_record) &&
+        !spec_structurally_valid(invalid_function_record) &&
+        !spec_structurally_valid(unknown_record) && spec_known(disabled_record) &&
+        spec_known(mouse_record) && spec_known(function_record) && !spec_known(macro_record) &&
+        !spec_known(unknown_record);
+    if (!spec_validation_ok) {
+        fprintf(stderr, "profile spec validation self-test failed\n");
+        return 1;
+    }
+
+    ProfileInfo header_info = {.sector_size = 255};
+    ProfileHeader parsed_headers[MAX_HEADERS];
+    size_t parsed_header_count = 99;
+    uint8_t header_control[132] = {0};
+    header_control[0] = 0x01;
+    header_control[1] = 0x23;
+    header_control[2] = 1;
+    header_control[4] = 0x02;
+    header_control[5] = 0x00;
+    bool header_parse_ok =
+        parse_profile_headers(NULL, header_control, sizeof(header_control), parsed_headers,
+                              &parsed_header_count) == 0 &&
+        parse_profile_headers(&header_info, NULL, sizeof(header_control), parsed_headers,
+                              &parsed_header_count) == 0 &&
+        parse_profile_headers(&header_info, header_control, sizeof(header_control), NULL,
+                              &parsed_header_count) == 0 &&
+        parse_profile_headers(&header_info, header_control, sizeof(header_control), parsed_headers,
+                              NULL) == 0 &&
+        parse_profile_headers(&header_info, header_control, sizeof(header_control), parsed_headers,
+                              &parsed_header_count) == 1 &&
+        parsed_header_count == 2 && parsed_headers[0].sector == 0x0123 &&
+        parsed_headers[1].sector == 0x0200;
+    uint8_t empty_headers[4] = {0xFF, 0xFF, 0x00, 0x00};
+    header_parse_ok = header_parse_ok &&
+                      parse_profile_headers(&header_info, empty_headers, sizeof(empty_headers),
+                                            parsed_headers, &parsed_header_count) == 0 &&
+                      parsed_header_count == 0;
+    if (!header_parse_ok) {
+        fprintf(stderr, "profile header parsing self-test failed\n");
+        return 1;
+    }
+
+    HidInterface io_interface = {0};
+    Device io_device = {0};
+    io_device.iface = &io_interface;
+    io_device.feature_count = 1;
+    io_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    ProfileInfo io_info = {.sector_size = 32};
+    uint8_t zero_sector[32] = {0};
+    uint8_t first_sector[32] = {0};
+    first_sector[0] = 0x01;
+    first_sector[1] = 0x23;
+    Reply zero_chunks[4];
+    Reply first_chunks[4];
+    size_t zero_chunk_count =
+        build_sector_read_replies(zero_sector, sizeof(zero_sector), zero_chunks, 4);
+    size_t first_chunk_count =
+        build_sector_read_replies(first_sector, sizeof(first_sector), first_chunks, 4);
+    Reply fallback_replies[4];
+    memcpy(fallback_replies, zero_chunks, zero_chunk_count * sizeof(Reply));
+    memcpy(fallback_replies + zero_chunk_count, first_chunks, first_chunk_count * sizeof(Reply));
+    ChannelRequestTestContext fallback_context = {
+        .replies = fallback_replies,
+        .reply_count = zero_chunk_count + first_chunk_count,
+        .calls = 0,
+    };
+    channel_request_impl = channel_request_test_double;
+    g_channel_request_test_context = &fallback_context;
+    uint8_t control_readback[32] = {0};
+    uint16_t control_sector = 99;
+    bool control_read_ok =
+        read_profile_control(&io_device, &io_info, &control_sector, control_readback,
+                             sizeof(control_readback)) == 1 &&
+        control_sector == 1 && control_readback[0] == 0x01 &&
+        read_profile_control(NULL, &io_info, NULL, control_readback, sizeof(control_readback)) ==
+            0 &&
+        read_profile_control(&io_device, &io_info, NULL, NULL, sizeof(control_readback)) == 0;
+    if (!control_read_ok) {
+        fprintf(stderr, "profile control-sector read self-test failed\n");
+        return 1;
+    }
+
     HidInterface profile_index_interface = {0};
     Device profile_index_device = {0};
     profile_index_device.iface = &profile_index_interface;
@@ -19,6 +149,51 @@ int test_profile_io(void) {
         profile_index_ok && current_onboard_profile_number(&profile_index_device, 0) == 1;
     if (!profile_index_ok) {
         fprintf(stderr, "onboard profile-index mapping self-test failed\n");
+        return 1;
+    }
+
+    const Reply profile_info_timeout = {.status = REPLY_TIMEOUT};
+    const Reply profile_info_short = {.status = REPLY_OK, .length = 9};
+    const Reply profile_info_bad_sector = {
+        .status = REPLY_OK,
+        .length = 10,
+        .bytes = {0, 5, 0, 1, 0, 5, 1, 0, 31, 2},
+    };
+    const Reply profile_info_bad_buttons = {
+        .status = REPLY_OK,
+        .length = 10,
+        .bytes = {0, 5, 0, 1, 0, 0, 1, 0, 32, 2},
+    };
+    const Reply profile_info_valid = {
+        .status = REPLY_OK,
+        .length = 10,
+        .bytes = {3, 5, 1, 2, 4, 5, 6, 0, 32, 7},
+    };
+    ProfileInfo parsed_info;
+    const Reply *info_replies[] = {&profile_info_timeout, &profile_info_short,
+                                   &profile_info_bad_sector, &profile_info_bad_buttons,
+                                   &profile_info_valid};
+    bool profile_info_ok = true;
+    for (size_t i = 0; i < sizeof(info_replies) / sizeof(info_replies[0]); i++) {
+        ChannelRequestTestContext info_context = {
+            .replies = info_replies[i],
+            .reply_count = 1,
+            .calls = 0,
+        };
+        g_channel_request_test_context = &info_context;
+        int result = get_profile_info(&io_device, &parsed_info);
+        profile_info_ok =
+            profile_info_ok &&
+            ((i == sizeof(info_replies) / sizeof(info_replies[0]) - 1) ? result == 1 : result == 0);
+    }
+    profile_info_ok = profile_info_ok && get_profile_info(NULL, &parsed_info) == 0 &&
+                      get_profile_info(&io_device, NULL) == 0 && parsed_info.memory == 3 &&
+                      parsed_info.profile_format == 5 && parsed_info.macro_format == 1 &&
+                      parsed_info.profile_count == 2 && parsed_info.out_of_band == 4 &&
+                      parsed_info.button_count == 5 && parsed_info.sector_count == 6 &&
+                      parsed_info.sector_size == 32 && parsed_info.shift_flags == 7;
+    if (!profile_info_ok) {
+        fprintf(stderr, "profile-info validation self-test failed\n");
         return 1;
     }
 
@@ -125,6 +300,70 @@ int test_profile_io(void) {
     free(profile.data);
     if (!passed) {
         fprintf(stderr, "profile/layout self-test failed\n");
+        return 1;
+    }
+
+    uint8_t diagnostic_data[70] = {0};
+    diagnostic_data[7] = 0x80;
+    diagnostic_data[8] = 0x01;
+    diagnostic_data[10] = 0x00;
+    diagnostic_data[11] = 0x01;
+    Profile diagnostic_profile = {0};
+    diagnostic_profile.info.button_count = 1;
+    diagnostic_profile.data = diagnostic_data;
+    diagnostic_profile.data_length = sizeof(diagnostic_data);
+    detect_button_layout(&diagnostic_profile);
+    bool layout_edge_ok = !diagnostic_profile.layout_supported &&
+                          diagnostic_profile.button_offset == 7 &&
+                          diagnostic_profile.known_specs == 1;
+
+    uint8_t fallback_data[70] = {0};
+    memcpy(fallback_data + 32, specs[0], sizeof(specs[0]));
+    Profile fallback_profile = {0};
+    fallback_profile.info.profile_format = 7;
+    fallback_profile.info.button_count = 1;
+    fallback_profile.data = fallback_data;
+    fallback_profile.data_length = sizeof(fallback_data);
+    detect_button_layout(&fallback_profile);
+    layout_edge_ok = layout_edge_ok && !fallback_profile.layout_supported &&
+                     fallback_profile.button_offset == 32;
+    layout_edge_ok = layout_edge_ok && !profile_reports_gshift(NULL, NULL) && !is_g603_device(NULL);
+    Profile gshift_short = {0};
+    gshift_short.info.shift_flags = 0x02;
+    gshift_short.info.button_count = 1;
+    gshift_short.layout_supported = true;
+    gshift_short.data = short_data;
+    gshift_short.data_length = sizeof(short_data);
+    detect_gshift_button_layout(&gshift_short, NULL);
+    layout_edge_ok = layout_edge_ok && !gshift_short.gshift_layout_supported;
+
+    uint8_t invalid_dpi_data[15] = {0};
+    Profile invalid_dpi = {0};
+    invalid_dpi.info.profile_format = 5;
+    invalid_dpi.data = invalid_dpi_data;
+    invalid_dpi.data_length = sizeof(invalid_dpi_data);
+    write_le16(invalid_dpi_data + 3, 800);
+    write_le16(invalid_dpi_data + 5, 1200);
+    write_le16(invalid_dpi_data + 7, 0);
+    write_le16(invalid_dpi_data + 9, 1600);
+    invalid_dpi_data[1] = 2;
+    invalid_dpi_data[2] = 0;
+    detect_dpi_layout(&invalid_dpi, NULL);
+    bool dpi_edge_ok = !invalid_dpi.dpi_layout_supported;
+    invalid_dpi.info.profile_format = 6;
+    detect_dpi_layout(&invalid_dpi, NULL);
+    dpi_edge_ok = dpi_edge_ok && !invalid_dpi.dpi_layout_supported;
+    Profile no_rgb = {0};
+    uint8_t no_rgb_data[255] = {0};
+    no_rgb.info.profile_format = 5;
+    no_rgb.data = no_rgb_data;
+    no_rgb.data_length = sizeof(no_rgb_data);
+    memset(no_rgb_data + RGB_PROFILE_BASE_OFFSET, 0xFF,
+           RGB_PROFILE_RECORD_BYTES * RGB_PROFILE_RECORD_COUNT);
+    detect_rgb_layout(&no_rgb);
+    dpi_edge_ok = dpi_edge_ok && !no_rgb.rgb_layout_supported;
+    if (!layout_edge_ok || !dpi_edge_ok) {
+        fprintf(stderr, "profile layout edge-case self-test failed\n");
         return 1;
     }
 
@@ -338,6 +577,91 @@ int test_profile_io(void) {
     onboard_mode_ok = onboard_mode_ok && !ensure_onboard_mode_for_write(&load_selected_device);
     if (!onboard_mode_ok) {
         fprintf(stderr, "onboard-mode self-test failed\n");
+        return 1;
+    }
+
+    const Reply dpi_values_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0}},
+        (Reply){.status = REPLY_OK, .length = 7, .bytes = {0, 0x03, 0x20, 0xE0, 0x02, 0x03, 0x25}},
+        (Reply){.status = REPLY_OK, .length = 3, .bytes = {0, 0x03, 0x25}},
+    };
+    io_device.features[0] = (Feature){.id = FEATURE_ADJUSTABLE_DPI, .index = 5};
+    ChannelRequestTestContext dpi_values_context = {
+        .replies = dpi_values_replies,
+        .reply_count = 3,
+        .calls = 0,
+    };
+    g_channel_request_test_context = &dpi_values_context;
+    uint16_t adjustable_values[8] = {0};
+    size_t adjustable_value_count = 0;
+    uint8_t adjustable_sensor_count = 0;
+    uint16_t adjustable_current = 0;
+    bool adjustable_values_ok =
+        adjustable_dpi_values(&io_device, adjustable_values, &adjustable_value_count,
+                              sizeof(adjustable_values) / sizeof(adjustable_values[0]),
+                              &adjustable_sensor_count, &adjustable_current) == 1 &&
+        adjustable_value_count == 4 && adjustable_values[0] == 800 && adjustable_values[1] == 802 &&
+        adjustable_values[2] == 804 && adjustable_values[3] == 805 &&
+        adjustable_sensor_count == 1 && adjustable_current == 805;
+
+    const Reply dpi_range_no_end[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 3, .bytes = {0, 0xE0, 0x02}},
+    };
+    const Reply dpi_range_zero_step[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 7, .bytes = {0, 0x03, 0x20, 0xE0, 0x00, 0x03, 0x25}},
+    };
+    const Reply dpi_range_descending[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 7, .bytes = {0, 0x03, 0x20, 0xE0, 0x02, 0x03, 0x1F}},
+    };
+    const Reply dpi_range_first[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 5, .bytes = {0, 0xE0, 0x02, 0x03, 0x25}},
+    };
+    const Reply dpi_sensor_count_fail[] = {(Reply){.status = REPLY_TIMEOUT}};
+    const Reply dpi_list_fail[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    const Reply dpi_current_fail[] = {
+        dpi_values_replies[0],
+        dpi_values_replies[1],
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    const struct {
+        const Reply *replies;
+        size_t count;
+        size_t capacity;
+        bool expected;
+    } dpi_invalid_cases[] = {
+        {dpi_range_no_end, 2, 8, false},      {dpi_range_zero_step, 2, 8, false},
+        {dpi_range_descending, 2, 8, false},  {dpi_range_first, 2, 8, false},
+        {dpi_sensor_count_fail, 1, 8, false}, {dpi_list_fail, 2, 8, false},
+        {dpi_current_fail, 3, 8, false},      {dpi_values_replies, 3, 2, false},
+    };
+    for (size_t i = 0; i < sizeof(dpi_invalid_cases) / sizeof(dpi_invalid_cases[0]); i++) {
+        ChannelRequestTestContext invalid_dpi_context = {
+            .replies = dpi_invalid_cases[i].replies,
+            .reply_count = dpi_invalid_cases[i].count,
+            .calls = 0,
+        };
+        g_channel_request_test_context = &invalid_dpi_context;
+        size_t invalid_count = 0;
+        adjustable_values_ok =
+            adjustable_values_ok &&
+            (adjustable_dpi_values(&io_device, adjustable_values, &invalid_count,
+                                   dpi_invalid_cases[i].capacity, NULL,
+                                   &adjustable_current) == (dpi_invalid_cases[i].expected ? 1 : 0));
+    }
+    Device no_dpi_device = io_device;
+    no_dpi_device.feature_count = 0;
+    adjustable_values_ok =
+        adjustable_values_ok && adjustable_dpi_values(&no_dpi_device, adjustable_values,
+                                                      &adjustable_value_count, 8, NULL, NULL) == 0;
+    if (!adjustable_values_ok) {
+        fprintf(stderr, "adjustable DPI value decoding self-test failed\n");
         return 1;
     }
 

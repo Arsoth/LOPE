@@ -206,6 +206,12 @@ static void channel_report_callback(void *context, IOReturn result, void *sender
     pthread_mutex_unlock(&channel->lock);
 }
 
+void hid_report_callback_for_test(void *context, IOReturn result, void *sender,
+                                  IOHIDReportType type, uint32_t report_id, uint8_t *report,
+                                  CFIndex report_length) {
+    channel_report_callback(context, result, sender, type, report_id, report, report_length);
+}
+
 int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
     memset(channel, 0, sizeof(*channel));
     channel->device = device;

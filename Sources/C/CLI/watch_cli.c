@@ -61,6 +61,12 @@ static void watch_report_callback(void *context, IOReturn result, void *sender,
     }
 }
 
+void watch_report_callback_for_test(void *context, IOReturn result, void *sender,
+                                    IOHIDReportType type, uint32_t report_id, uint8_t *report,
+                                    CFIndex report_length) {
+    watch_report_callback(context, result, sender, type, report_id, report, report_length);
+}
+
 int run_watch(const Options *options) {
     HidContext context;
     if (!hid_context_create(&context)) {
@@ -179,6 +185,9 @@ int parse_decimal(const char *text, int *value) {
 }
 
 int parse_slot(const char *text, int *slot) {
+    if (text == NULL || slot == NULL) {
+        return 0;
+    }
     if (strcmp(text, "ff") == 0 || strcmp(text, "FF") == 0 || strcmp(text, "0xff") == 0 ||
         strcmp(text, "0xFF") == 0) {
         *slot = 0xFF;

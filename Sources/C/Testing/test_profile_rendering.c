@@ -73,6 +73,66 @@ int test_profile_rendering(void) {
     describe_spec_ok = describe_spec_ok && strcmp(key_name(0x04), "A") == 0 &&
                        strcmp(key_name(0xFF), "unknown key") == 0 &&
                        spec_is_back(mouse_mask_spec) && !spec_is_back(no_action_spec);
+    const struct {
+        uint8_t code;
+        const char *name;
+    } key_cases[] = {
+        {0x04, "A"},      {0x05, "B"},   {0x06, "C"},     {0x07, "D"},   {0x08, "E"},
+        {0x09, "F"},      {0x0A, "G"},   {0x0B, "H"},     {0x0C, "I"},   {0x0D, "J"},
+        {0x0E, "K"},      {0x0F, "L"},   {0x10, "M"},     {0x11, "N"},   {0x12, "O"},
+        {0x13, "P"},      {0x14, "Q"},   {0x15, "R"},     {0x16, "S"},   {0x17, "T"},
+        {0x18, "U"},      {0x19, "V"},   {0x1C, "Y"},     {0x1D, "Z"},   {0x28, "Enter"},
+        {0x29, "Escape"}, {0x2B, "Tab"}, {0x2C, "Space"}, {0x2F, "["},   {0x30, "]"},
+        {0x3A, "F1"},     {0x3B, "F2"},  {0x3C, "F3"},    {0x3D, "F4"},  {0x3E, "F5"},
+        {0x3F, "F6"},     {0x40, "F7"},  {0x41, "F8"},    {0x42, "F9"},  {0x43, "F10"},
+        {0x44, "F11"},    {0x45, "F12"}, {0x68, "F13"},   {0x69, "F14"}, {0x6A, "F15"},
+        {0x6B, "F16"},    {0x6C, "F17"}, {0x6D, "F18"},   {0x6E, "F19"}, {0x6F, "F20"},
+        {0x70, "F21"},    {0x71, "F22"}, {0x72, "F23"},   {0x73, "F24"},
+    };
+    for (size_t i = 0; i < sizeof(key_cases) / sizeof(key_cases[0]); i++) {
+        describe_spec_ok =
+            describe_spec_ok && strcmp(key_name(key_cases[i].code), key_cases[i].name) == 0;
+    }
+    for (uint8_t function = 0; function <= 0x11; function++) {
+        describe_spec_ok = describe_spec_ok &&
+                           strcmp(function_name(function), function == 0x00   ? "no action"
+                                                           : function == 0x01 ? "tilt left"
+                                                           : function == 0x02 ? "tilt right"
+                                                           : function == 0x03 ? "next DPI"
+                                                           : function == 0x04 ? "previous DPI"
+                                                           : function == 0x05 ? "cycle DPI"
+                                                           : function == 0x06 ? "default DPI"
+                                                           : function == 0x07 ? "shift DPI"
+                                                           : function == 0x08 ? "next profile"
+                                                           : function == 0x09 ? "previous profile"
+                                                           : function == 0x0A ? "cycle profile"
+                                                           : function == 0x0B ? "G-shift"
+                                                           : function == 0x0C ? "battery status"
+                                                           : function == 0x0D ? "profile select"
+                                                           : function == 0x0E ? "mode switch"
+                                                           : function == 0x0F ? "host button"
+                                                           : function == 0x10 ? "scroll down"
+                                                                              : "scroll up") == 0;
+    }
+    const uint8_t mouse_masks[] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+    for (size_t i = 0; i < sizeof(mouse_masks); i++) {
+        uint8_t mask_spec[4] = {0x80, 0x01, 0x00, mouse_masks[i]};
+        describe_spec(mask_spec, spec_description, sizeof(spec_description));
+        describe_spec_ok = describe_spec_ok && strstr(spec_description, "mask") != NULL;
+    }
+    uint8_t send_known_spec[4] = {0x80, 0x03, 0x12, 0x34};
+    uint8_t macro_zero_spec[4] = {0x00, 0, 0, 0};
+    uint8_t macro_two_spec[4] = {0x2F, 0, 0, 0};
+    uint8_t raw_spec[4] = {0x30, 0, 0, 0};
+    describe_spec(send_known_spec, spec_description, sizeof(spec_description));
+    describe_spec_ok =
+        describe_spec_ok && strstr(spec_description, "consumer usage 0x1234") != NULL;
+    describe_spec(macro_zero_spec, spec_description, sizeof(spec_description));
+    describe_spec_ok = describe_spec_ok && strstr(spec_description, "behavior 0") != NULL;
+    describe_spec(macro_two_spec, spec_description, sizeof(spec_description));
+    describe_spec_ok = describe_spec_ok && strstr(spec_description, "behavior 0x2") != NULL;
+    describe_spec(raw_spec, spec_description, sizeof(spec_description));
+    describe_spec_ok = describe_spec_ok && strcmp(spec_description, "unrecognized raw spec") == 0;
     if (!describe_spec_ok) {
         fprintf(stderr, "describe_spec/function_name/key_name self-test failed\n");
         return 1;
@@ -234,6 +294,74 @@ int test_profile_rendering(void) {
         summary_no_crc_ok && strstr(summary_no_crc_contents, "CRC: NOT_READ") != NULL;
     if (!summary_no_crc_ok) {
         fprintf(stderr, "print_profile_summary NOT_READ self-test failed\n");
+        return 1;
+    }
+
+    uint8_t edge_data[64] = {0};
+    Profile edge_profile = {0};
+    edge_profile.info.profile_format = 7;
+    edge_profile.info.profile_count = 1;
+    edge_profile.info.button_count = 1;
+    edge_profile.info.sector_count = 1;
+    edge_profile.info.sector_size = sizeof(edge_data);
+    edge_profile.headers[0].sector = 0x0042;
+    edge_profile.selected_header = 0;
+    edge_profile.data = edge_data;
+    edge_profile.data_length = sizeof(edge_data);
+    edge_profile.crc_checked = true;
+    char edge_path[] = "/tmp/lomps-selftest-summary-edge-XXXXXX";
+    int edge_fd = mkstemp(edge_path);
+    if (edge_fd < 0) {
+        fprintf(stderr, "print_profile_summary edge-case self-test failed to create temp file\n");
+        return 1;
+    }
+    close(edge_fd);
+    int edge_saved_stdout = dup(fileno(stdout));
+    bool edge_ok = edge_saved_stdout >= 0 && freopen(edge_path, "w", stdout) != NULL;
+    if (edge_ok) {
+        print_profile_summary(&edge_profile, true);
+        fflush(stdout);
+    }
+    if (edge_saved_stdout >= 0) {
+        dup2(edge_saved_stdout, fileno(stdout));
+        close(edge_saved_stdout);
+        clearerr(stdout);
+    }
+    char edge_contents[2048] = {0};
+    if (edge_ok) {
+        FILE *readback = fopen(edge_path, "r");
+        if (readback != NULL) {
+            size_t read_bytes = fread(edge_contents, 1, sizeof(edge_contents) - 1, readback);
+            edge_contents[read_bytes] = '\0';
+            fclose(readback);
+        } else {
+            edge_ok = false;
+        }
+    }
+    unlink(edge_path);
+    edge_ok = edge_ok && strstr(edge_contents, "CRC: INVALID") != NULL &&
+              strstr(edge_contents, "DPI stages: not recognized") != NULL &&
+              strstr(edge_contents, "RGB zones: not recognized") != NULL &&
+              strstr(edge_contents, "button array: not recognized") != NULL;
+
+    uint8_t rear_data[8] = {0};
+    Profile rear_profile = {0};
+    rear_profile.info.button_count = 2;
+    rear_profile.data = rear_data;
+    rear_profile.data_length = sizeof(rear_data);
+    rear_profile.layout_supported = true;
+    rear_profile.crc_ok = true;
+    rear_profile.button_offset = 0;
+    memset(rear_data, 0xFF, sizeof(rear_data));
+    bool rear_edge_ok = find_rear_thumb_button(&rear_profile) == 0;
+    memcpy(rear_data + 4, mouse_mask_spec, sizeof(mouse_mask_spec));
+    rear_edge_ok = rear_edge_ok && find_rear_thumb_button(&rear_profile) == 2;
+    memcpy(rear_data, mouse_mask_spec, sizeof(mouse_mask_spec));
+    rear_edge_ok = rear_edge_ok && find_rear_thumb_button(&rear_profile) == 0;
+    rear_profile.crc_ok = false;
+    rear_edge_ok = rear_edge_ok && find_rear_thumb_button(&rear_profile) == 0;
+    if (!edge_ok || !rear_edge_ok) {
+        fprintf(stderr, "profile rendering edge-case self-test failed\n");
         return 1;
     }
 
