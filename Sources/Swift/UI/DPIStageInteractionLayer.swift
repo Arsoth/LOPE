@@ -114,9 +114,7 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
   }
 
   final class InteractionView: NSView {
-    var targets: [DPIStageHitTarget] = [] {
-      didSet { window?.invalidateCursorRects(for: self) }
-    }
+    var targets: [DPIStageHitTarget] = []
     var onTap: ((Int) -> Void)?
     var onBackgroundClick: (() -> Void)?
     var onDragBegan: ((Int, CGFloat) -> Void)?
@@ -135,16 +133,52 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
     private var displayLink: CVDisplayLink?
     private let tickLock = NSLock()
     private var tickQueued = false
+    private var hoverTrackingArea: NSTrackingArea?
+    private var isShowingPointingHand = false
 
     override var isFlipped: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    override func resetCursorRects() {
-      super.resetCursorRects()
-      for target in targets {
-        addCursorRect(handleRect(for: target.x), cursor: .pointingHand)
+    // Cursor rects (`resetCursorRects`/`addCursorRect`) and `.cursorUpdate`
+    // tracking areas both only re-evaluate the cursor when the pointer
+    // *enters* a registered region; neither reacts as the pointer glides
+    // between a handle and the bare track within this one large view. A
+    // `.mouseMoved` tracking area gets a callback on every move so the
+    // handles can show a pointing hand exactly while over them.
+    override func updateTrackingAreas() {
+      super.updateTrackingAreas()
+      if let hoverTrackingArea {
+        removeTrackingArea(hoverTrackingArea)
       }
+      let area = NSTrackingArea(
+        rect: bounds,
+        options: [.activeInKeyWindow, .mouseMoved, .mouseEnteredAndExited, .inVisibleRect],
+        owner: self,
+        userInfo: nil
+      )
+      addTrackingArea(area)
+      hoverTrackingArea = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+      super.mouseMoved(with: event)
+      updateHoverCursor(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+      super.mouseExited(with: event)
+      setPointingHand(false)
+    }
+
+    private func updateHoverCursor(at point: CGPoint) {
+      setPointingHand(target(at: point) != nil)
+    }
+
+    private func setPointingHand(_ showPointingHand: Bool) {
+      guard showPointingHand != isShowingPointingHand else { return }
+      isShowingPointingHand = showPointingHand
+      (showPointingHand ? NSCursor.pointingHand : NSCursor.arrow).set()
     }
 
     override func mouseDown(with event: NSEvent) {

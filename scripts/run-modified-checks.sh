@@ -203,6 +203,14 @@ if [[ "$run_c_tests" -eq 1 ]]; then
   make self-test
 fi
 
+if [[ "$run_full_swift" -eq 1 || -n "$swift_filters" ]]; then
+  # Swift package tests deliberately exercise the no-bundled-engine path
+  # (see the `test` target). The C self-test step above, or a stale build
+  # from outside this script, can leave a bundled engine binary behind;
+  # remove it so those tests see the environment they expect.
+  rm -f lope bin/lope
+fi
+
 if [[ "$run_full_swift" -eq 1 ]]; then
   echo "modified-test gate: running the full Swift test suite"
   scripts/run-swift-test-quiet.sh --summary

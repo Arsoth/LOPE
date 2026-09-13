@@ -4,26 +4,6 @@
 import AppKit
 import SwiftUI
 
-private struct PointerCursorModifier: ViewModifier {
-  let enabled: Bool
-
-  func body(content: Content) -> some View {
-    content.onHover { isHovering in
-      guard isHovering else {
-        NSCursor.arrow.set()
-        return
-      }
-      (enabled ? NSCursor.pointingHand : NSCursor.arrow).set()
-    }
-  }
-}
-
-extension View {
-  func pointerCursor(enabled: Bool = true) -> some View {
-    modifier(PointerCursorModifier(enabled: enabled))
-  }
-}
-
 struct ScrollViewScrollerInset: NSViewRepresentable {
   let rightInset: CGFloat
 

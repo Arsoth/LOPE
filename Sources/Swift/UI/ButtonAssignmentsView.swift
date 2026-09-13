@@ -60,7 +60,6 @@ struct ButtonAssignmentsView: View {
             }
             .labelsHidden()
             .frame(width: 190, alignment: .trailing)
-            .pointerCursor()
             if model.showAdvancedFields {
               TextField(
                 "8 hex digits",
@@ -153,7 +152,6 @@ struct ButtonAssignmentsView: View {
     .font(.caption)
     .fixedSize()
     .help(label)
-    .pointerCursor()
   }
 
   private func keyboardRecordingBox(_ buttonID: Int) -> some View {
@@ -179,7 +177,6 @@ struct ButtonAssignmentsView: View {
       }
       .buttonStyle(.plain)
       .contentShape(Rectangle())
-      .pointerCursor(enabled: !isRecording)
 
       if isRecording {
         Button {
@@ -192,7 +189,6 @@ struct ButtonAssignmentsView: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .help("Cancel recording")
-        .pointerCursor()
       }
     }
     .frame(width: 190, height: 26, alignment: .leading)
@@ -234,6 +230,5 @@ struct ButtonAssignmentsView: View {
     .labelsHidden()
     .frame(width: 150)
     .help("Insert an extended HID keyboard usage directly.")
-    .pointerCursor()
   }
 }

@@ -30,7 +30,6 @@ extension DPIStageBar {
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .pointerCursor()
 
       Divider()
 
@@ -48,7 +47,6 @@ extension DPIStageBar {
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .pointerCursor()
 
       Divider()
 
@@ -63,7 +61,6 @@ extension DPIStageBar {
       .buttonStyle(.plain)
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .pointerCursor(enabled: canDelete)
       .disabled(!canDelete)
 
       Text("Dragging snaps to the mouse’s supported DPI values.")

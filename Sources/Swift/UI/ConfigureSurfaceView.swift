@@ -77,7 +77,6 @@ struct ConfigureSurfaceView: View {
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .accessibilityHidden(true)
-        .pointerCursor()
 
       CenteredAppModal(
         title: "Wake \(model.currentDeviceName)",
@@ -93,7 +92,6 @@ struct ConfigureSurfaceView: View {
           Button("Refresh", action: refreshFromWakeModal)
             .buttonStyle(.borderedProminent)
             .disabled(model.busy)
-            .pointerCursor(enabled: !model.busy)
         }
       }
     }
@@ -158,7 +156,6 @@ struct EmptyStateView: View {
         .frame(maxWidth: 560)
       if !model.inputMonitoringAuthorized {
         Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
-          .pointerCursor()
       }
       Spacer()
     }

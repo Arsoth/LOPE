@@ -20,28 +20,22 @@ struct BackupsPane: View {
       .fixedSize(horizontal: false, vertical: true)
       HStack {
         Button("Save selected profile backup") { model.dumpBackup() }
-          .pointerCursor()
         Button("Export JSON…") {
           if let url = model.chooseJSONExport() {
             model.exportCurrentJSON(to: url)
           }
         }
-        .pointerCursor()
         Button("Import JSON…") {
           if let url = model.chooseJSONBackup() {
             model.loadEditableBackup(url)
           }
         }
-        .pointerCursor()
         Button("Choose another backup…") {
           restoreURL = model.chooseRestoreBackup()
           confirmRestore = restoreURL != nil
         }
-        .pointerCursor()
         Button("Refresh list", action: model.refreshBackups)
-          .pointerCursor()
         Button("Open in Finder", action: model.openBackupDirectoryInFinder)
-          .pointerCursor()
       }
       Toggle(
         "Show backups for all mice",
@@ -50,7 +44,6 @@ struct BackupsPane: View {
           set: { model.setShowAllBackups($0) })
       )
       .toggleStyle(.checkbox)
-      .pointerCursor()
       Text(
         model.showAllBackups
           ? "Showing every backup. Unknown-device files require review before restore or import."
@@ -88,13 +81,11 @@ struct BackupsPane: View {
                   Button("Load") {
                     model.loadEditableBackup(backup.url)
                   }
-                  .pointerCursor()
                 } else {
                   Button("Restore") {
                     restoreURL = backup.url
                     confirmRestore = true
                   }
-                  .pointerCursor()
                 }
               }
               .padding(.vertical, 2)

@@ -68,7 +68,6 @@ struct RGBEditorView: View {
         .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
     }
     .help("Click to choose a color. Shift-click to apply the chosen color to all RGB zones.")
-    .pointerCursor()
     .popover(
       isPresented: Binding(
         get: { presentedZoneID == zone.id },
@@ -85,7 +84,6 @@ struct RGBEditorView: View {
         Text(model.rgbEditingAllZones ? "All RGB zones" : zone.name)
           .font(.headline)
         ColorPicker("Color", selection: rgbColorBinding(zoneID: zone.id), supportsOpacity: false)
-          .pointerCursor()
         if let current = model.rgbZones.first(where: { $0.id == zone.id })?.draft {
           Text(current.hex)
             .font(.caption.monospaced())

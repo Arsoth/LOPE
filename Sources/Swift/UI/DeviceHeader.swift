@@ -27,29 +27,21 @@ struct DeviceHeader: View {
         .labelsHidden()
         .frame(width: 180)
         .disabled(model.devices.isEmpty)
-        .pointerCursor(enabled: !model.devices.isEmpty)
       }
       Button("Refresh", action: model.refresh)
         .keyboardShortcut("r", modifiers: [.command])
         .disabled(model.busy)
-        .pointerCursor(enabled: !model.busy)
       if model.busy {
         ProgressView().controlSize(.small)
       }
       Spacer()
       if !hidesEditingActions {
         Button("Revert edits") { model.reloadSelectedProfile() }
-          .pointerCursor()
         Button("Save to mouse", action: onSave)
           .buttonStyle(.borderedProminent)
           .disabled(
             !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave
               || (model.hasDPIChanges && !model.canApplyDPI)
-          )
-          .pointerCursor(
-            enabled: model.hasPendingChanges && !model.busy
-              && model.currentMouseProfile.profileIO.canSave
-              && (!model.hasDPIChanges || model.canApplyDPI)
           )
       }
     }

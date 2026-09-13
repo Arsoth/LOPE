@@ -28,9 +28,7 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
             .frame(width: 200)
           Spacer()
           Button("Import profile…", action: model.importProfileEditorDraft)
-            .pointerCursor()
           Button("Export profile…", action: model.exportProfileEditorDraft)
-            .pointerCursor()
         }
         .padding(.horizontal, 20)
         Text(
@@ -74,7 +72,6 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
           Spacer()
           Button("Save as custom profile") { model.saveProfileEditorDraft() }
             .buttonStyle(.borderedProminent)
-            .pointerCursor()
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 8)

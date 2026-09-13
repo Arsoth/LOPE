@@ -43,7 +43,6 @@ extension DPIStageBar {
     .frame(width: 84, height: 62)
     .buttonStyle(.plain)
     .contentShape(Rectangle())
-    .pointerCursor()
     .accessibilityLabel("DPI stage \(index + 1)")
     .accessibilityValue(parsedValue.map { "\(formattedDPIValue($0)) DPI" } ?? "Invalid value")
     .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")

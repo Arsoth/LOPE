@@ -34,8 +34,6 @@ struct StatusArea: View {
     VStack(alignment: .leading, spacing: 14) {
       Divider()
         .frame(maxWidth: .infinity)
-        .background(background)
-        .shadow(color: .black.opacity(0.22), radius: 6, y: -2)
 
       HStack(alignment: .top) {
         Button {
@@ -45,7 +43,6 @@ struct StatusArea: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(showsHistoryHeader ? "Close recent events" : "Show recent events")
-        .pointerCursor()
         if showsHistoryHeader {
           Text("Recent events")
             .font(.headline)
@@ -77,8 +74,6 @@ struct StatusArea: View {
 
       Divider()
         .frame(maxWidth: .infinity)
-        .background(background)
-        .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
 
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0) {

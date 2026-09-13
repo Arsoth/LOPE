@@ -71,7 +71,6 @@ struct ButtonEditorPane: View {
           confirmRecoveryRestore = true
         }
         .buttonStyle(.bordered)
-        .pointerCursor()
       }
       .padding(8)
       .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
@@ -102,7 +101,6 @@ struct ButtonEditorPane: View {
         Spacer()
         Button("Create profile") { model.createGeneratedProfile() }
           .buttonStyle(.bordered)
-          .pointerCursor()
       }
       .padding(8)
       .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
@@ -135,7 +133,6 @@ struct ProfileControlsView: View {
           .labelsHidden()
           .pickerStyle(.segmented)
           .frame(width: 150)
-          .pointerCursor()
         }
         if model.profiles.count > 1 {
           Text("Profile:")
@@ -148,7 +145,6 @@ struct ProfileControlsView: View {
           .labelsHidden()
           .frame(width: 150)
           .disabled(model.busy)
-          .pointerCursor(enabled: !model.busy)
 
           Text("Enable:")
             .font(.callout.weight(.medium))
@@ -215,7 +211,6 @@ struct ProfileControlsView: View {
         .toggleStyle(.checkbox)
         .controlSize(.small)
         .disabled(model.busy || !model.canEditProfileState)
-        .pointerCursor(enabled: !model.busy && model.canEditProfileState)
       Text(crcLabel)
         .font(.caption)
         .foregroundStyle(crcColor)

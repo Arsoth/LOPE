@@ -28,12 +28,8 @@ struct SettingsPane: View {
                 model.setConfigurationDirectory(directory)
               }
             }
-            .pointerCursor()
             Button("Use default") { model.resetConfigurationDirectory() }
               .disabled(model.configurationDirectoryPath == model.defaultConfigurationDirectoryPath)
-              .pointerCursor(
-                enabled: model.configurationDirectoryPath != model.defaultConfigurationDirectoryPath
-              )
           }
         }
         .padding(4)
@@ -52,7 +48,6 @@ struct SettingsPane: View {
           .font(.caption)
           .foregroundStyle(.secondary)
           Button("Open custom profiles folder", action: model.openCustomProfilesDirectoryInFinder)
-            .pointerCursor()
         }
         .padding(4)
       }
@@ -65,7 +60,6 @@ struct SettingsPane: View {
               set: { model.setShowAdvancedFields($0) })
           )
           .toggleStyle(.checkbox)
-          .pointerCursor()
           Text(
             "Shows the 8-digit button records and profile sector numbers. Leave this off for the normal editing view."
           )
@@ -83,7 +77,6 @@ struct SettingsPane: View {
               set: { model.setShowNonStandardKeyboardKeys($0) })
           )
           .toggleStyle(.checkbox)
-          .pointerCursor()
           Text(
             "Shows the optional extended-key override for usages such as Insert, F13–F24, and Sleep. Recording captures modifiers automatically."
           )
@@ -106,7 +99,6 @@ struct SettingsPane: View {
             }
           }
           .pickerStyle(.segmented)
-          .pointerCursor()
           Text(
             "System follows macOS. Light mode uses a soft off-white background; the DPI colors remain unchanged."
           )

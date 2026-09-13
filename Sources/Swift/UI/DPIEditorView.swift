@@ -40,7 +40,6 @@ struct DPIEditorView: View {
             .controlSize(.small)
             .frame(width: 105)
             .disabled(model.busy || model.loadingProfile)
-            .pointerCursor(enabled: !model.busy && !model.loadingProfile)
             .help("Choose a polling rate, then Save to write it to the selected onboard profile.")
           }
           Text("Active stages")
@@ -56,7 +55,6 @@ struct DPIEditorView: View {
           .buttonStyle(.bordered)
           .controlSize(.small)
           .disabled(model.dpiCount <= 1)
-          .pointerCursor(enabled: model.dpiCount > 1)
           .accessibilityLabel("Remove DPI stage")
           Text("\(model.dpiCount) of 5")
             .font(.callout.monospacedDigit())
@@ -71,7 +69,6 @@ struct DPIEditorView: View {
           .buttonStyle(.bordered)
           .controlSize(.small)
           .disabled(model.dpiCount >= 5)
-          .pointerCursor(enabled: model.dpiCount < 5)
           .accessibilityLabel("Add DPI stage")
         }
       }

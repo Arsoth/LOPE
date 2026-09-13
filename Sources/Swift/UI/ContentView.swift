@@ -63,8 +63,6 @@ struct ContentView: View {
               .padding(.horizontal, 20)
               Divider()
                 .frame(maxWidth: .infinity)
-                .background(appBackground)
-                .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
             }
           }
           TabView(selection: $selectedTab) {
@@ -75,24 +73,24 @@ struct ContentView: View {
                 presentedRGBZoneID: $presentedRGBZoneID
               )
             }
-            .tabItem { Label("Configure", systemImage: "cursorarrow.click").pointerCursor() }
+            .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
             .tag(AppTab.configure)
             BackupsPane(
               model: model,
               restoreURL: $restoreURL,
               confirmRestore: $confirmRestore
             )
-            .tabItem { Label("Backups", systemImage: "archivebox").pointerCursor() }
+            .tabItem { Label("Backups", systemImage: "archivebox") }
             .tag(AppTab.backups)
             ProfileEditorPane(
               model: model,
               loadingState: LoadingProfileStateView(model: model),
               emptyState: EmptyStateView(model: model)
             )
-            .tabItem { Label("Profile Editor", systemImage: "square.and.pencil").pointerCursor() }
+            .tabItem { Label("Profile Editor", systemImage: "square.and.pencil") }
             .tag(AppTab.profileEditor)
             SettingsPane(model: model)
-              .tabItem { Label("Settings", systemImage: "gearshape").pointerCursor() }
+              .tabItem { Label("Settings", systemImage: "gearshape") }
               .tag(AppTab.settings)
           }
         }
@@ -128,36 +126,6 @@ struct ContentView: View {
     .frame(minWidth: 960, minHeight: 520)
     .background(appBackground)
     .preferredColorScheme(preferredColorScheme)
-    .overlay {
-      ZStack {
-        if primaryClickModalPresented {
-          ZStack {
-            Color.black.opacity(0.24)
-              .ignoresSafeArea()
-              .onTapGesture { primaryClickModalPresented = false }
-              .pointerCursor()
-            CenteredAppModal(
-              title: "Primary click required",
-              message: model.primaryClickValidationMessage
-                ?? "Choose “Left click” for the primary-click button, then save again.",
-              symbol: "exclamationmark.triangle",
-              onDefaultAction: { primaryClickModalPresented = false },
-              onCancel: { primaryClickModalPresented = false }
-            ) {
-              Button("Return to editor", role: .cancel) {
-                primaryClickModalPresented = false
-              }
-              .keyboardShortcut(.defaultAction)
-              .buttonStyle(.borderedProminent)
-              .pointerCursor()
-            }
-          }
-          .transition(.opacity)
-          .zIndex(10)
-        }
-      }
-    }
-    .animation(.easeInOut(duration: 0.16), value: primaryClickModalPresented)
     .animation(.easeInOut(duration: 0.2), value: statusHistoryPresented)
     .task(id: model.status) {
       statusMessageOpacity = 1
@@ -187,9 +155,7 @@ struct ContentView: View {
     }
     .alert("Allow wired mice", isPresented: $model.wiredAccessInstructionsPresented) {
       Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
-        .pointerCursor()
       Button("Cancel", role: .cancel) {}
-        .pointerCursor()
     } message: {
       Text(
         "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, enable LOPE in System Settings > Privacy & Security > Input Monitoring, then return and choose Refresh."
@@ -197,25 +163,29 @@ struct ContentView: View {
     }
     .alert("Restore this backup?", isPresented: $confirmRestore) {
       Button("Cancel", role: .cancel) { restoreURL = nil }
-        .pointerCursor()
       Button("Restore and verify", role: .destructive) {
         if let restoreURL { model.restore(restoreURL) }
         restoreURL = nil
       }
-      .pointerCursor()
     } message: {
       Text(restoreURL?.lastPathComponent ?? "Selected backup")
     }
     .alert("Restore backups from this save?", isPresented: $confirmRecoveryRestore) {
       Button("Cancel", role: .cancel) {}
-        .pointerCursor()
       Button("Restore and verify", role: .destructive) {
         model.restoreLastSaveBackups()
       }
-      .pointerCursor()
     } message: {
       Text(
         "LOPE will restore the exact pre-save sectors captured by the failed operation. Any sector that was already unchanged will be skipped safely."
+      )
+    }
+    .alert("Primary click required", isPresented: $primaryClickModalPresented) {
+      Button("Return to editor", role: .cancel) {}
+    } message: {
+      Text(
+        model.primaryClickValidationMessage
+          ?? "Choose “Left click” for the primary-click button, then save again."
       )
     }
   }
