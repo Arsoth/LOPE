@@ -6,7 +6,7 @@ C_INCLUDE_FLAGS := -I Sources/C/Core -I Sources/C/HID -I Sources/C/Profiles \
 	-I Sources/C/Backup -I Sources/C/Commands -I Sources/C/CLI -I Sources/C/Testing
 GUI_APP := LOPE.app
 GUI_BIN := bin/LOPEGUI
-GUI_SRC := $(shell find Sources/Swift -type f -name '*.swift' -print | sort)
+GUI_SRC := $(shell find Sources/Swift -type f -name '*.swift' ! -path 'Sources/Swift/Tests/*' -print | sort)
 PROFILE_FILES := $(wildcard Profiles/*.json)
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
@@ -55,7 +55,7 @@ test: $(APP)
 	swift test
 
 SWIFT_FORMAT_CONFIG := .swift-format
-SWIFT_FORMAT_PATHS := Sources Tests Package.swift
+SWIFT_FORMAT_PATHS := Sources/Swift Package.swift
 
 format:
 	xcrun swift-format format --configuration $(SWIFT_FORMAT_CONFIG) --in-place --recursive $(SWIFT_FORMAT_PATHS)

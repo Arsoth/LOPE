@@ -1,0 +1,282 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026
+
+import AppKit
+import CoreVideo
+import SwiftUI
+
+struct DPIStageOutsideClickMonitor: NSViewRepresentable {
+  let isActive: Bool
+  let excludedFrame: CGRect?
+  let onOutsideClick: () -> Void
+
+  final class Coordinator {
+    weak var view: NSView?
+    var isActive = false
+    var excludedFrame: CGRect?
+    var onOutsideClick: () -> Void = {}
+    var monitor: Any?
+
+    func install() {
+      guard monitor == nil else { return }
+      monitor = NSEvent.addLocalMonitorForEvents(
+        matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+      ) { [weak self] event in
+        guard let self, self.isActive, let view = self.view else { return event }
+        let point = view.convert(event.locationInWindow, from: nil)
+        if let excludedFrame = self.excludedFrame, excludedFrame.contains(point) {
+          return event
+        }
+        self.onOutsideClick()
+        return event
+      }
+    }
+
+    func remove() {
+      if let monitor {
+        NSEvent.removeMonitor(monitor)
+        self.monitor = nil
+      }
+    }
+
+    deinit { remove() }
+  }
+
+  func makeCoordinator() -> Coordinator {
+    Coordinator()
+  }
+
+  func makeNSView(context: Context) -> NSView {
+    let view = NSView()
+    update(view, coordinator: context.coordinator)
+    context.coordinator.install()
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    update(nsView, coordinator: context.coordinator)
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    coordinator.remove()
+  }
+
+  private func update(_ view: NSView, coordinator: Coordinator) {
+    coordinator.view = view
+    coordinator.isActive = isActive
+    coordinator.excludedFrame = excludedFrame
+    coordinator.onOutsideClick = onOutsideClick
+  }
+}
+
+struct DPIStageHitTarget: Equatable {
+  let index: Int
+  let x: CGFloat
+}
+
+/// Owns pointer interaction for the entire stage bar. Keeping click arbitration,
+/// drag thresholding, and display-linked cursor sampling in one native view avoids
+/// competing SwiftUI tap/drag recognizers and keeps the active handle under the
+/// physical pointer even while the stage model is being reordered.
+
+struct DPIStageInteractionLayer: NSViewRepresentable {
+  let isActive: Bool
+  let targets: [DPIStageHitTarget]
+  let onTap: (Int) -> Void
+  let onBackgroundClick: () -> Void
+  let onDragBegan: (Int, CGFloat) -> Void
+  let onDragChanged: (CGFloat) -> Void
+  let onDragEnded: (CGFloat) -> Void
+
+  func makeNSView(context: Context) -> InteractionView {
+    let view = InteractionView()
+    update(view)
+    view.setSamplingActive(isActive)
+    return view
+  }
+
+  func updateNSView(_ nsView: InteractionView, context: Context) {
+    update(nsView)
+  }
+
+  static func dismantleNSView(_ nsView: InteractionView, coordinator: ()) {
+    nsView.cancelInteraction()
+  }
+
+  private func update(_ view: InteractionView) {
+    view.targets = targets
+    view.onTap = onTap
+    view.onBackgroundClick = onBackgroundClick
+    view.onDragBegan = onDragBegan
+    view.onDragChanged = onDragChanged
+    view.onDragEnded = onDragEnded
+    view.setSamplingActive(isActive)
+  }
+
+  final class InteractionView: NSView {
+    var targets: [DPIStageHitTarget] = [] {
+      didSet { window?.invalidateCursorRects(for: self) }
+    }
+    var onTap: ((Int) -> Void)?
+    var onBackgroundClick: (() -> Void)?
+    var onDragBegan: ((Int, CGFloat) -> Void)?
+    var onDragChanged: ((CGFloat) -> Void)?
+    var onDragEnded: ((CGFloat) -> Void)?
+
+    private let dragThreshold: CGFloat = 5
+    private let handleSize = CGSize(width: 84, height: 62)
+    private let handleCenterY: CGFloat = 58
+    private let trackRange: ClosedRange<CGFloat> = 24...65
+    private var mouseDownPoint: CGPoint?
+    private var pendingStage: Int?
+    private var pendingStageWasHandle = false
+    private var isDraggingStage = false
+    private var isSamplingActive = false
+    private var displayLink: CVDisplayLink?
+    private let tickLock = NSLock()
+    private var tickQueued = false
+
+    override var isFlipped: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func resetCursorRects() {
+      super.resetCursorRects()
+      for target in targets {
+        addCursorRect(handleRect(for: target.x), cursor: .pointingHand)
+      }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+      let point = convert(event.locationInWindow, from: nil)
+      mouseDownPoint = point
+      pendingStageWasHandle = target(at: point) != nil
+      pendingStage = target(at: point)?.index ?? nearestTarget(to: point.x)?.index
+      isDraggingStage = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+      guard let mouseDownPoint, let pendingStage else { return }
+      let point = convert(event.locationInWindow, from: nil)
+      let distance = hypot(point.x - mouseDownPoint.x, point.y - mouseDownPoint.y)
+      guard isDraggingStage || distance >= dragThreshold else { return }
+
+      if !isDraggingStage {
+        isDraggingStage = true
+        onDragBegan?(pendingStage, point.x)
+        startDisplayLink()
+      }
+      // This gives immediate feedback between display-link callbacks and
+      // is also the fallback on systems where a display link is unavailable.
+      onDragChanged?(point.x)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+      let point = convert(event.locationInWindow, from: nil)
+      if isDraggingStage {
+        onDragChanged?(point.x)
+        onDragEnded?(point.x)
+      } else if pendingStageWasHandle, let pendingStage {
+        onTap?(pendingStage)
+      } else {
+        onBackgroundClick?()
+      }
+      cancelInteraction()
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+      guard !isHidden, alphaValue > 0 else { return nil }
+      let hit = target(at: point) != nil || trackRange.contains(point.y)
+      return hit ? self : nil
+    }
+
+    func cancelInteraction() {
+      stopDisplayLink()
+      isSamplingActive = false
+      mouseDownPoint = nil
+      pendingStage = nil
+      pendingStageWasHandle = false
+      isDraggingStage = false
+    }
+
+    func setSamplingActive(_ active: Bool) {
+      guard active != isSamplingActive else { return }
+      isSamplingActive = active
+      if active {
+        startDisplayLink()
+      } else {
+        stopDisplayLink()
+      }
+    }
+
+    private func target(at point: CGPoint) -> DPIStageHitTarget? {
+      targets.last { handleRect(for: $0.x).contains(point) }
+    }
+
+    private func nearestTarget(to x: CGFloat) -> DPIStageHitTarget? {
+      targets.min { abs($0.x - x) < abs($1.x - x) }
+    }
+
+    private func handleRect(for x: CGFloat) -> CGRect {
+      CGRect(
+        x: x - handleSize.width / 2,
+        y: handleCenterY - handleSize.height / 2,
+        width: handleSize.width,
+        height: handleSize.height
+      )
+    }
+
+    private func startDisplayLink() {
+      guard displayLink == nil else { return }
+      var link: CVDisplayLink?
+      guard CVDisplayLinkCreateWithActiveCGDisplays(&link) == kCVReturnSuccess,
+        let link
+      else { return }
+      displayLink = link
+      CVDisplayLinkSetOutputCallback(
+        link,
+        { _, _, _, _, _, context in
+          guard let context else { return kCVReturnSuccess }
+          let view = Unmanaged<InteractionView>
+            .fromOpaque(context)
+            .takeUnretainedValue()
+          view.queueTick()
+          return kCVReturnSuccess
+        },
+        Unmanaged.passUnretained(self).toOpaque()
+      )
+      CVDisplayLinkStart(link)
+    }
+
+    private func stopDisplayLink() {
+      if let displayLink {
+        CVDisplayLinkStop(displayLink)
+        self.displayLink = nil
+      }
+    }
+
+    private func queueTick() {
+      tickLock.lock()
+      guard !tickQueued else {
+        tickLock.unlock()
+        return
+      }
+      tickQueued = true
+      tickLock.unlock()
+
+      DispatchQueue.main.async { [weak self] in
+        guard let self else { return }
+        self.tickLock.lock()
+        self.tickQueued = false
+        self.tickLock.unlock()
+        guard self.isSamplingActive, let window = self.window else { return }
+        let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        self.onDragChanged?(self.convert(windowPoint, from: nil).x)
+      }
+    }
+
+    deinit {
+      stopDisplayLink()
+    }
+  }
+}

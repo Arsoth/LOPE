@@ -274,7 +274,7 @@ make coverage-check   # fails, listing every file below threshold
 
 `make test` runs the C engine self-test (`./lope self-test`) and the Swift
 XCTest suite (`swift test`, defined by `Package.swift` and
-`Tests/*.swift`). The Swift tests validate profile metadata, device
+`Sources/Swift/Tests/*.swift`). The Swift tests validate profile metadata, device
 classification, appearance choices, sleep guidance, DPI/polling-rate
 parsing, backup-storage paths, RGB handling, and the write-validation guards
 in `AppModel`.

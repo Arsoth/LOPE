@@ -16,17 +16,15 @@ let package = Package(
       name: "LOPECore",
       path: "Sources/Swift",
       exclude: [
-        "App/AppMain.swift",
-        "UI/ContentView.swift",
-        "UI/ContentViewControls.swift",
-        "UI/ContentViewSections.swift",
-        "UI/ProfileEditorPane.swift",
+        "App",
+        "UI",
+        "Tests",
       ]
     ),
     .testTarget(
       name: "LOPECoreTests",
       dependencies: ["LOPECore"],
-      path: "Tests"
+      path: "Sources/Swift/Tests"
     ),
   ]
 )

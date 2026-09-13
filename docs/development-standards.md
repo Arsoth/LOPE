@@ -57,12 +57,12 @@ setup, see
 
 ## Testing conventions
 
-- Swift tests are XCTest cases under `Tests/`, run with `swift test` against
+- Swift tests are XCTest cases under `Sources/Swift/Tests/`, run with `swift test` against
   the `LOPECore` library target, mirroring `Sources/Swift/Model/` one file
   at a time (e.g. `DPIModelTests.swift` for `DPIModel.swift`,
   `AppModelWritesTests.swift` for `AppModel+Writes.swift`). Add new test
   methods to the relevant `XCTestCase`, or a new `XCTestCase` file under
-  `Tests/` named after the production file it covers — any `.swift` file
+  `Sources/Swift/Tests/` named after the production file it covers — any `.swift` file
   there is picked up automatically by the `LOPECoreTests` target, no
   Makefile changes needed. `AppModelTestFixtures.swift` holds
   `configureFixtureDevice(_:)`, a fixture shared by the several
@@ -124,7 +124,7 @@ setup, see
   report and the threshold check. That directory is test infrastructure —
   the `test_<module>.c` files, `selftest.c`'s dispatcher, and
   `test_doubles.c`'s mocking seams — not production code, so it is scored
-  the same way `Tests/` is already excluded from the Swift side. Self-test
+  the same way `Sources/Swift/Tests/` is already excluded from the Swift side. Self-test
   files built from `&&`-chained assertions (`ok = a() && b() && !c(); if
   (!ok) { ...; return 1; }`) structurally cap their own branch coverage
   well under 90%: once every chained condition passes, the early-bail
