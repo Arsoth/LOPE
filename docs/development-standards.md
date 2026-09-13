@@ -57,17 +57,36 @@ setup, see
 
 ## Testing conventions
 
-- Swift tests are XCTest cases under `Tests/` (`ProfileOutputParserTests.swift`,
-  `ProfileWriteTests.swift`), run with `swift test` against the `LOPECore`
-  library target. Add new test methods to the relevant `XCTestCase`, or a
-  new `XCTestCase` file under `Tests/` — any `.swift` file there is picked
-  up automatically by the `LOPECoreTests` target, no Makefile changes
-  needed.
-- C tests remain plain functions that `fprintf(stderr, ...)` and return a
-  nonzero status, run via `./lope self-test` (see
-  `Sources/C/Testing/selftest.c`). Add new cases there for
-  new C core logic; there is no XCTest/GoogleTest equivalent wired up for the
-  C side.
+- Swift tests are XCTest cases under `Tests/`, run with `swift test` against
+  the `LOPECore` library target, mirroring `Sources/Swift/Model/` one file
+  at a time (e.g. `DPIModelTests.swift` for `DPIModel.swift`,
+  `AppModelWritesTests.swift` for `AppModel+Writes.swift`). Add new test
+  methods to the relevant `XCTestCase`, or a new `XCTestCase` file under
+  `Tests/` named after the production file it covers — any `.swift` file
+  there is picked up automatically by the `LOPECoreTests` target, no
+  Makefile changes needed. `AppModelTestFixtures.swift` holds
+  `configureFixtureDevice(_:)`, a fixture shared by the several
+  `AppModel*Tests.swift` files that need a configured device/profile; add
+  further cross-file fixtures there rather than duplicating setup code.
+- C self-tests mirror `Sources/C/` the same way, one `test_<module>.c` file
+  per production module (e.g. `test_report_rate.c` for `report_rate.c`),
+  each exposing a single `int test_<module>(void)` entry point declared in
+  `selftest_modules.h`. Each test function is a plain function that
+  `fprintf(stderr, ...)` and returns a nonzero status on the first failing
+  case, matching the existing C self-test convention; there is no
+  XCTest/GoogleTest equivalent wired up for the C side.
+  `Sources/C/Testing/selftest.c` is now just the `run_self_test()`
+  dispatcher that calls each module's test function in turn and is what
+  `./lope self-test` invokes. `Sources/C/Testing/test_doubles.c` holds the
+  shared mocking seams (`channel_request_test_double`,
+  `discover_devices_for_options_test_double`) and canned fixture builders
+  (`build_mock_onboard_sector`, `build_mock_control_sector`,
+  `k_mock_get_info_reply`) that more than one module's self-test needs;
+  add further cross-module fixtures there rather than duplicating them.
+  Add new cases to the relevant `test_<module>.c`, or a new
+  `test_<module>.c` file plus a matching declaration in
+  `selftest_modules.h` and a call from `run_self_test()`, for new C core
+  logic.
 - A type named identically to an Apple system type (e.g. `RGBColor`, which
   collides with the legacy QuickDraw `RGBColor` in `ApplicationServices`)
   can become ambiguous in test code once any file in the same target
