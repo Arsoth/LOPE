@@ -156,6 +156,19 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(rejectedButtonsModel.status.contains("Left click"))
   }
 
+  func testApplyButtonsRejectsWhileBusy() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
+    let recorder = RecordingEngine()
+    model.engineRunnerOverride = recorder.run
+    model.busy = true
+
+    model.applyButtons()
+
+    XCTAssertTrue(recorder.calls.isEmpty)
+  }
+
   func testApplyButtonsRejectsWhenNoButtonChanges() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -190,6 +203,18 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(recorder.calls.isEmpty)
   }
 
+  func testApplyDPIRejectsWhileBusy() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    let recorder = RecordingEngine()
+    model.engineRunnerOverride = recorder.run
+    model.busy = true
+
+    model.applyDPI()
+
+    XCTAssertTrue(recorder.calls.isEmpty)
+  }
+
   func testApplyDPIRejectsWhenProfileIsReadOnly() {
     let model = AppModel(startInitialRefresh: false)
     configureReadOnlyFixtureDevice(model)
@@ -215,6 +240,28 @@ final class AppModelWritesTests: XCTestCase {
     model.applyDPI()
     XCTAssertTrue(recorder.calls.isEmpty)
     XCTAssertEqual(model.status, "Onboard DPI editing is unavailable for this legacy profile path.")
+  }
+
+  func testApplyDPIRejectsWhenPrimaryClickValidationFails() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    // Scroll-down instead of the fixture's usual primary-click raw, so
+    // validatePrimaryClickBeforeWrite() fails and applyDPI() must bail out
+    // before ever invoking the engine.
+    model.buttons[0].draftRaw = "90100000"
+    model.dpiCapabilities = DPICapabilities(
+      supportedValues: [400, 800, 1200], minimum: 400, maximum: 1200)
+    model.dpiCount = 1
+    model.dpiStages = ["800", "", "", "", ""]
+    model.defaultStage = 1
+    model.shiftStage = 1
+    let recorder = RecordingEngine()
+    model.engineRunnerOverride = recorder.run
+
+    model.applyDPI()
+
+    XCTAssertTrue(recorder.calls.isEmpty)
+    XCTAssertTrue(model.status.contains("has no primary click assigned"))
   }
 
   func testApplyDPISucceedsWithValidStagesInvokesWriteEngine() {
@@ -326,6 +373,76 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertEqual(model.status, "No changes to apply.")
   }
 
+  func testApplyAllRejectsWhileBusy() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
+    model.busy = true
+    let recorder = RecordingEngine()
+    model.engineRunnerOverride = recorder.run
+
+    model.applyAll()
+
+    XCTAssertTrue(recorder.calls.isEmpty)
+  }
+
+  func testApplyAllRejectsWhenPrimaryClickValidationFails() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.baselineDPIStages = model.dpiStages
+    model.baselineDPICount = model.dpiCount
+    model.baselineDefaultStage = model.defaultStage
+    model.baselineShiftStage = model.shiftStage
+    // A button change (so applyAll has something to apply) that is not a
+    // primary click, so validatePrimaryClickBeforeWrite() fails.
+    model.buttons[0].draftRaw = "90100000"
+    let recorder = RecordingEngine()
+    model.engineRunnerOverride = recorder.run
+
+    model.applyAll()
+
+    XCTAssertTrue(recorder.calls.isEmpty)
+    XCTAssertTrue(model.status.contains("has no primary click assigned"))
+  }
+
+  func testApplyAllWithMultipleProfileStateChangesSortsAndOmitsPollingRateWhenUnchanged() {
+    // Covers three related gaps in applyAll(): the profileChanges
+    // `.filter`'s `?? $0.enabled` fallback (profile 4 has no
+    // baselineProfileEnabled entry at all), the `.sorted` comparator
+    // actually running (needs >= 2 changed profiles), and the
+    // `pollingRateChanged ? pollingRateDraft : nil` false branch (no
+    // polling rate change is staged here, unlike the "every change type"
+    // test above).
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
+    model.baselineDPIStages = model.dpiStages
+    model.baselineDPICount = model.dpiCount
+    model.baselineDefaultStage = model.defaultStage
+    model.baselineShiftStage = model.shiftStage
+    model.profiles = [
+      ProfileChoice(id: 2, sector: "0x0100", enabled: false, crcValid: true),
+      ProfileChoice(id: 3, sector: "0x0110", enabled: true, crcValid: true),
+      ProfileChoice(id: 4, sector: "0x0120", enabled: true, crcValid: true),
+    ]
+    model.baselineProfileEnabled = [2: true, 3: false]
+    var calls = [[String]]()
+    model.engineRunnerOverride = { arguments in
+      calls.append(arguments)
+      return "Verified sector 0x0100\nVerified sector 0x0110\nVerified sector 0x0120\n"
+    }
+
+    model.applyAll()
+
+    guard let applyCall = calls.first(where: { $0.contains("apply") }) else {
+      return XCTFail("apply was never invoked")
+    }
+    XCTAssertTrue(applyCall.contains("2:disable"))
+    XCTAssertTrue(applyCall.contains("3:enable"))
+    XCTAssertFalse(applyCall.contains { $0.hasPrefix("4:") })
+    XCTAssertFalse(applyCall.contains("--report-rate"))
+  }
+
   func testApplyAllRejectsWhenDPIStagesInvalidBeforeSaving() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -396,6 +513,23 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(validCalls.contains(where: { $0.contains("apply") }))
   }
 
+  func testPrimaryClickValidationFallsBackToCurrentDeviceNameWhenSelectedDeviceIsMissing() {
+    // Covers primaryClickValidationMessage's `: currentDeviceName` branch,
+    // taken when the live `devices` list has no entry matching
+    // `selectedDeviceIndex` (runtimeMouseName is nil) -- every other
+    // validation test resolves a real device name from `devices`.
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.selectedDeviceIndex = 999
+    model.buttons[0].draftRaw = "90100000"
+
+    XCTAssertEqual(
+      model.primaryClickValidationMessage,
+      "Profile 2 on G502 X / X LIGHTSPEED / X PLUS has no primary click assigned. Choose "
+        + "\u{201C}Left click\u{201D} for one of its buttons, then save again."
+    )
+  }
+
   func testPrimaryClickValidationWarnsWhenPrimaryClickOnlyOnInaccessibleGShiftLayer() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -448,6 +582,26 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertFalse(model.status.contains("Unrelated diagnostic noise"))
   }
 
+  func testFailedSaveSkipsBackupSavedLineWithNoPath() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
+    let backupPath = "/tmp/lope-test-backups/g502-x-profile-2-save-1.logiob"
+    let failureMessage = """
+      Save operation profile-2-save-1 failed.
+      Backup saved:
+      Backup saved: \(backupPath) (sha256 abcd1234)
+      Save operation stopped before any sector write completed for the remaining profile(s).
+      """
+    model.engineRunnerOverride = { _ in
+      throw EngineError.failed(failureMessage)
+    }
+
+    model.applyButtons()
+
+    XCTAssertEqual(model.recoveryBackups, [URL(fileURLWithPath: backupPath)])
+  }
+
   func testFailedSaveWithoutBackupsFallsBackToRawErrorDetails() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -459,6 +613,18 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(model.recoveryBackups.isEmpty)
     XCTAssertNil(model.recoveryDeviceKey)
     XCTAssertEqual(model.status, "The mouse disconnected mid-write.")
+  }
+
+  func testApplyPollingRateRejectsWhileBusy() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.pollingRateCapabilities = PollingRateCapabilities(
+      supportedRates: [125, 500], currentRate: 125)
+    model.busy = true
+
+    model.applyPollingRate(500)
+
+    XCTAssertNil(model.pollingRateDraft)
   }
 
   func testSupportedPollingRateChangeIsStagedForProfileSave() {

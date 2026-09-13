@@ -11,7 +11,7 @@ extension AppModel {
       return
     }
     do {
-      let backup = makeEditableBackup(binaryBackup: nil, useDrafts: true)
+      let backup = makeEditableBackup()
       try writeEditableBackup(backup, to: url)
       refreshBackups()
       status = "Exported profile \(profileNumber) to \(url.path)."
@@ -150,11 +150,18 @@ extension AppModel {
     try data.write(to: url, options: .atomic)
   }
 
-  private func makeEditableBackup(binaryBackup: URL?, useDrafts: Bool) -> EditableBackup {
+  // Always builds from the current draft state, never the pre-edit
+  // baseline: this is only ever called from exportCurrentJSON(), which
+  // exports what's currently in the editor. It used to also support a
+  // baseline/"current value" mode and an `exactBinaryBackup` source URL
+  // for a since-removed caller; both parameters were always passed the
+  // same way at the one remaining call site, so they were removed rather
+  // than kept as permanently-unreachable branches.
+  private func makeEditableBackup() -> EditableBackup {
     let selectedDevice = devices.first(where: { $0.id == selectedDeviceIndex })
     let selectedProfile = profiles.first(where: { $0.id == profileNumber })
     let profileButtons = allButtonRowsForSave().map { button in
-      let raw = normalize(useDrafts ? button.draftRaw : button.currentRaw)
+      let raw = normalize(button.draftRaw)
       return EditableBackup.Button(
         number: button.id,
         physicalControl: button.displayLabel,
@@ -163,29 +170,19 @@ extension AppModel {
         layer: button.layer.rawValue
       )
     }
-    let dpi: EditableBackup.DPI?
-    if useDrafts {
-      let values = dpiStages.prefix(dpiCount).compactMap(Int.init)
-      dpi =
-        values.count == dpiCount
-        ? EditableBackup.DPI(stages: values, defaultStage: defaultStage, shiftStage: shiftStage)
-        : nil
-    } else {
-      let values = baselineDPIStages.prefix(baselineDPICount).compactMap(Int.init)
-      dpi =
-        values.count == baselineDPICount
-        ? EditableBackup.DPI(
-          stages: values, defaultStage: baselineDefaultStage, shiftStage: baselineShiftStage) : nil
-    }
+    let dpiValues = dpiStages.prefix(dpiCount).compactMap(Int.init)
+    let dpi: EditableBackup.DPI? =
+      dpiValues.count == dpiCount
+      ? EditableBackup.DPI(stages: dpiValues, defaultStage: defaultStage, shiftStage: shiftStage)
+      : nil
     let rgb: [EditableBackup.Profile.RGB]?
     if let capability = rgbCapabilities(), !rgbZones.isEmpty {
       let colors = rgbZones.compactMap { zone -> EditableBackup.Profile.RGB? in
-        let color = useDrafts ? zone.draft : zone.current
         guard capability.zones.contains(where: { $0.index == zone.id }) else { return nil }
         return EditableBackup.Profile.RGB(
           zone: zone.id,
           name: zone.name,
-          color: color.hex
+          color: zone.draft.hex
         )
       }
       rgb = colors.isEmpty ? nil : colors
@@ -193,11 +190,7 @@ extension AppModel {
       rgb = nil
     }
     let states = profiles.map { profile in
-      EditableBackup.ProfileState(
-        number: profile.id,
-        enabled: useDrafts
-          ? profile.enabled : (baselineProfileEnabled[profile.id] ?? profile.enabled)
-      )
+      EditableBackup.ProfileState(number: profile.id, enabled: profile.enabled)
     }
     return EditableBackup(
       formatVersion: 1,
@@ -210,13 +203,12 @@ extension AppModel {
       profile: EditableBackup.Profile(
         number: profileNumber,
         sector: selectedProfile?.sector,
-        enabled: useDrafts
-          ? (selectedProfile?.enabled ?? false) : (baselineProfileEnabled[profileNumber] ?? false),
+        enabled: selectedProfile?.enabled ?? false,
         buttons: profileButtons,
         dpi: dpi,
         rgb: rgb
       ),
-      exactBinaryBackup: binaryBackup?.lastPathComponent
+      exactBinaryBackup: nil
     )
   }
 

@@ -180,6 +180,38 @@ final class AppModelProfileEditorTests: XCTestCase {
     XCTAssertEqual(model.status, "Enter a profile ID before exporting.")
   }
 
+  func testBuildProfileEditorDescriptorFallsBackWhenDeviceNameControlAndNameAreAllBlank() {
+    // Covers several related fallbacks in buildProfileEditorDescriptor()
+    // that no other test hits together: an empty currentDeviceName with no
+    // matching selected device (deviceName/productID end up ""), a button
+    // number with no profileEditorButtonNames entry and no catalog match
+    // (control/aliases fall back to defaults), and a blank
+    // profileEditorName (falls back to the sanitized id).
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: model.buttons
+        + [
+          ButtonRow(
+            id: 42, label: "Button 42", currentRaw: "FFFFFFFF", draftRaw: "FFFFFFFF",
+            draftChoice: "FFFFFFFF", layer: .normal)
+        ], gShift: [])
+    model.profileEditorButtonNames.removeValue(forKey: 42)
+    model.currentDeviceName = ""
+    model.selectedDeviceIndex = 999
+    model.profileEditorName = "   "
+
+    guard let descriptor = model.buildProfileEditorDescriptor() else {
+      return XCTFail("expected a descriptor")
+    }
+
+    XCTAssertEqual(descriptor.name, descriptor.id)
+    XCTAssertEqual(descriptor.match.nameContains, [])
+    XCTAssertEqual(descriptor.match.productIDs, [])
+    XCTAssertEqual(descriptor.button(for: 42)?.control, "Button 42")
+    XCTAssertEqual(descriptor.button(for: 42)?.aliases, [])
+  }
+
   func testWriteProfileEditorExportWritesEncodedDescriptorAndReportsSuccess() throws {
     // Covers the logic exportProfileEditorDraft() (Shims/) delegates to
     // once NSSavePanel returns a URL -- exercised here directly with a
@@ -234,8 +266,12 @@ final class AppModelProfileEditorTests: XCTestCase {
           ButtonRow(
             id: 3, label: "Button 3", currentRaw: "90100000", draftRaw: "90100000",
             draftChoice: "90100000", layer: .normal),
+          ButtonRow(
+            id: 4, label: "Button 4", currentRaw: "90100000", draftRaw: "90100000",
+            draftChoice: "90100000", layer: .normal),
         ], gShift: [])
     model.profileEditorButtonNames[3] = "Existing name"
+    model.profileEditorButtonNames.removeValue(forKey: 4)
 
     let descriptor = MouseProfileDescriptor(
       schemaVersion: 1,
@@ -266,6 +302,9 @@ final class AppModelProfileEditorTests: XCTestCase {
     XCTAssertEqual(model.profileEditorButtonNames[2], "Imported scroll")
     // Button 3: not present in the import, so its prior name is kept.
     XCTAssertEqual(model.profileEditorButtonNames[3], "Existing name")
+    // Button 4: not present in the import and no prior name either, so it
+    // falls all the way back to a generic "Button N" label.
+    XCTAssertEqual(model.profileEditorButtonNames[4], "Button 4")
     XCTAssertEqual(model.status, "Loaded imported-profile.json as a template.")
   }
 

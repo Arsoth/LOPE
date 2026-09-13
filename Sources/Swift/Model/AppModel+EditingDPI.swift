@@ -126,6 +126,9 @@ extension AppModel {
     guard (1...dpiCount).contains(stage) else { return }
     defaultStage = stage
     guard dpiCount > 1, shiftStage == stage else { return }
+    // `?? stage` is unreachable: the guard above already established
+    // dpiCount > 1, so 1...dpiCount has at least two elements and always
+    // contains something other than `stage`.
     shiftStage = (1...dpiCount).first(where: { $0 != stage }) ?? stage
   }
 
@@ -133,6 +136,8 @@ extension AppModel {
     guard (1...dpiCount).contains(stage) else { return }
     shiftStage = stage
     guard dpiCount > 1, defaultStage == stage else { return }
+    // `?? stage` is unreachable for the same reason as in
+    // setDefaultDPIStage above.
     defaultStage = (1...dpiCount).first(where: { $0 != stage }) ?? stage
   }
 

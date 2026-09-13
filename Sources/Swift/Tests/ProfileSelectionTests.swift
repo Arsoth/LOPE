@@ -22,4 +22,13 @@ final class ProfileSelectionTests: XCTestCase {
       XCTAssertEqual(actual, testCase.3, "profile selection case \(index + 1)")
     }
   }
+
+  func testProfileSelectionReturnsNilWhenNoProfilesAreAvailable() {
+    let actual = ProfileSelection.resolvedProfileNumber(
+      selectedProfileNumber: 1,
+      availableProfileIDs: [],
+      preferredProfileNumber: 1
+    )
+    XCTAssertNil(actual)
+  }
 }

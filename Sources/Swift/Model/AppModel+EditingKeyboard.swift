@@ -198,14 +198,4 @@ extension AppModel {
     if code == 0 { return "" }
     return keyboardKeys.first(where: { $0.id == code })?.label ?? String(format: "0x%02X", code)
   }
-
-  private func keyboardKeyCode(for text: String) -> UInt8? {
-    let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-    if let key = keyboardKeys.first(where: { $0.label.uppercased() == normalized }) {
-      return key.id
-    }
-    let hexText = normalized.hasPrefix("0X") ? String(normalized.dropFirst(2)) : normalized
-    guard hexText.count == 2 else { return nil }
-    return UInt8(hexText, radix: 16)
-  }
 }

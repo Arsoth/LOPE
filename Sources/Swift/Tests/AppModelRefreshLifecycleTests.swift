@@ -214,6 +214,55 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     model.stopLiveDPIPolling()
   }
 
+  func testStartInitialRefreshBeginsKnownDevicePollingWhenCachedKeyIsStaleForACatalogedDevice()
+    async
+  {
+    // The inverse of FallsBackToFullDiscoveryWhenCachedKeyIsStale above:
+    // "G502 X" *is* cataloged with onboard-profile support, so a
+    // permanently-failing read on the stale cached key must hand off to
+    // beginKnownDeviceRefresh() (the "wait for it to wake up" path)
+    // instead of a full device re-discovery.
+    let tempDir = TestTempDirectory.make()
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    FakeEngine.write(to: tempDir)
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", "not yet awake")
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_EXIT", "1")
+    defer { FakeEngineEnvironment.clearAll() }
+
+    let model = AppModel(startInitialRefresh: false)
+    let cached = fixtureDevice()
+
+    await withFakeEngineDirectory(tempDir.path) {
+      model.startInitialRefresh(cachedDevice: cached)
+      await waitUntil(timeout: 5) { model.waitingForKnownDevice }
+    }
+
+    XCTAssertEqual(model.knownDisconnectedDevice, cached)
+    XCTAssertNotNil(model.knownDevicePollTask)
+    model.knownDevicePollTask?.cancel()
+    model.knownDevicePollTask = nil
+  }
+
+  func testStartInitialRefreshUsesProfileOneWhenPreferredProfileNumberIsZero() async {
+    // prepareLoadingEditor(profileNumber:) runs synchronously before the
+    // async profile read, so its 0 -> 1 fallback is observable right after
+    // the call returns -- but only once past the `guard let engine` check,
+    // hence the fake engine here (a real device response isn't needed).
+    let tempDir = TestTempDirectory.make()
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    FakeEngine.write(to: tempDir)
+    defer { FakeEngineEnvironment.clearAll() }
+
+    let model = AppModel(startInitialRefresh: false)
+    model.profileNumber = 0
+
+    await withFakeEngineDirectory(tempDir.path) {
+      model.startInitialRefresh(cachedDevice: fixtureDevice())
+      XCTAssertEqual(model.profileNumber, 1)
+    }
+    model.refreshTask?.cancel()
+  }
+
   // MARK: - startRefresh
 
   func testStartRefreshReportsEngineUnavailable() {
@@ -245,6 +294,31 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
 
     XCTAssertEqual(model.status, "Onboard Profile read successfully.")
     XCTAssertEqual(model.currentDeviceName, "G502 X")
+    model.stopLiveDPIPolling()
+  }
+
+  func testStartRefreshUsesProfileOneWhenPreferredProfileNumberIsZero() async {
+    // Covers both `preferredProfileNumber == 0 ? 1 : ...` fallbacks in
+    // startRefresh(): the first (synchronous, before device enumeration)
+    // and the second (after a device is actually found), unlike every
+    // other startRefresh test, which always passes a real profile number.
+    let tempDir = TestTempDirectory.make()
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    FakeEngine.write(to: tempDir)
+    FakeEngineEnvironment.set("LOPE_TEST_LIST_OUTPUT", fakeDeviceListLine() + "\n")
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    defer { FakeEngineEnvironment.clearAll() }
+
+    let model = AppModel(startInitialRefresh: false)
+
+    await withFakeEngineDirectory(tempDir.path) {
+      model.startRefresh(preferredDeviceIndex: 1, preferredProfileNumber: 0)
+      XCTAssertEqual(model.profileNumber, 1)
+      await waitUntil { !model.profiles.isEmpty }
+      await waitUntil { !model.busy }
+    }
+
+    XCTAssertEqual(model.status, "Onboard Profile read successfully.")
     model.stopLiveDPIPolling()
   }
 

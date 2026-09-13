@@ -24,15 +24,15 @@ extension AppModel {
     if let engineRunnerOverride {
       return try engineRunnerOverride(arguments)
     }
-    return try runEngine(arguments, selectingDevice: true)
+    return try runEngineSelectingDevice(arguments)
   }
 
-  private func runEngine(_ arguments: [String], selectingDevice: Bool) throws -> String {
+  private func runEngineSelectingDevice(_ arguments: [String]) throws -> String {
     guard let engine else { throw EngineError.unavailable }
     let process = Process()
     let pipe = Pipe()
     process.executableURL = engine
-    if selectingDevice, let selected = devices.first(where: { $0.id == selectedDeviceIndex }) {
+    if let selected = devices.first(where: { $0.id == selectedDeviceIndex }) {
       let selector =
         selected.deviceKey.isEmpty
         ? ["--device", String(selectedDeviceIndex)]
@@ -81,6 +81,11 @@ extension AppModel {
       else { continue }
       let descriptor = capture(match, in: line, index: 2)
       let pieces = descriptor.components(separatedBy: "  ").filter { !$0.isEmpty }
+      // `?? "Logitech HID++"` is unreachable: the surrounding regex's lazy
+      // `(.+?)` always backtracks to a 1-character descriptor when the
+      // remainder is whitespace-only, and a single space is a non-empty
+      // `pieces` element, so `pieces` can never actually be empty here
+      // (verified empirically against the compiled NSRegularExpression).
       let connection = pieces.first ?? "Logitech HID++"
       let name =
         pieces.dropFirst().joined(separator: " ").isEmpty
@@ -191,6 +196,11 @@ extension AppModel {
       if let profile = currentProfile,
         let parsedRGB = ProfileOutputParser.rgbZone(from: line)
       {
+        // `default: []` is unreachable: `currentProfile` is only ever set
+        // together with `rgb[id] = []` (and the rows/gShiftRows
+        // equivalents below) at the "Profile N (...)" header match, so
+        // `rgb[profile]` is always already present by the time this line
+        // runs.
         rgb[profile, default: []].append(parsedRGB)
         continue
       }
@@ -217,6 +227,9 @@ extension AppModel {
         draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke",
         layer: layer
       )
+      // Both `default: []` fallbacks below are unreachable for the same
+      // reason as the `rgb` one above: `currentProfile` is only ever set
+      // together with pre-seeding `rows[id]`/`gShiftRows[id]` to `[]`.
       if layer == .normal {
         rows[profile, default: []].append(row)
       } else {

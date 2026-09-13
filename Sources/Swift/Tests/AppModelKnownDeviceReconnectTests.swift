@@ -197,6 +197,107 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     XCTAssertEqual(model.knownDisconnectedDevice, secondDevice)
   }
 
+  func testBeginKnownDeviceRefreshPollLoopStopsWhenDeviceChangesMidWait() async {
+    // Covers the first per-attempt guard's `else { return }`: by the time
+    // the 1-second poll interval elapses, `knownDisconnectedDevice` no
+    // longer matches the device the loop was tracking, so it must bail
+    // out instead of probing.
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.beginKnownDeviceRefresh(device)
+    model.knownDisconnectedDevice = DeviceChoice(
+      id: 2, name: "Different Mouse", connection: "Wired", productID: "0xFFFF",
+      deviceKey: "aaaa-0002")
+
+    try? await Task.sleep(nanoseconds: 1_300_000_000)
+
+    XCTAssertEqual(model.knownDevicePollAttempts, 0)
+    XCTAssertFalse(model.busy)
+    model.knownDevicePollTask?.cancel()
+  }
+
+  func testBeginKnownDeviceRefreshPollLoopSkipsProbeWhileBusy() async {
+    // Covers the busy guard's `continue`: the attempt counter and status
+    // still advance, but startKnownDeviceProbe() (which would set `busy`
+    // itself) must not run while already busy.
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.beginKnownDeviceRefresh(device)
+    model.busy = true
+
+    try? await Task.sleep(nanoseconds: 1_300_000_000)
+
+    XCTAssertEqual(model.knownDevicePollAttempts, 1)
+    model.knownDevicePollTask?.cancel()
+  }
+
+  func testBeginKnownDeviceRefreshPollLoopProbesMatchingDeviceWhenNotBusy() async {
+    // Covers the success path through both guards: the poll loop actually
+    // invokes startKnownDeviceProbe(), which spawns the (fake) engine --
+    // observed here via a counter file rather than the `busy` flag, since
+    // the probe's own async chain can reset `busy` again before this test
+    // gets a chance to check it.
+    let counterFile = makeTemporaryDirectory().appendingPathComponent("count")
+    installFakeEngine(
+      """
+      printf '.' >> "\(counterFile.path)"
+      exit 1
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.beginKnownDeviceRefresh(device)
+
+    try? await Task.sleep(nanoseconds: 1_300_000_000)
+
+    XCTAssertEqual(model.knownDevicePollAttempts, 1)
+    let attempts = (try? String(contentsOf: counterFile)) ?? ""
+    XCTAssertFalse(attempts.isEmpty, "expected the poll loop to have probed the fake engine")
+    model.knownDevicePollTask?.cancel()
+    model.refreshTask?.cancel()
+  }
+
+  func testBeginKnownDeviceRefreshPollLoopGivesUpAfterMaximumAttempts() async {
+    // Covers the tail after the for loop runs out of attempts without a
+    // match: waiting state clears, the poll task is dropped, and the
+    // status switches to its expired wording. Shrinks the policy so the
+    // test does not have to wait out the real ~60-second default.
+    let model = makeModel()
+    model.knownDevicePollPolicy = (intervalNanoseconds: 10_000_000, maximumAttempts: 2)
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+
+    model.beginKnownDeviceRefresh(device)
+    await model.knownDevicePollTask?.value
+
+    XCTAssertFalse(model.waitingForKnownDevice)
+    XCTAssertNil(model.knownDevicePollTask)
+    XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: true))
+  }
+
+  func testBeginKnownDeviceRefreshPollLoopStopsWhenCancelledDuringSleep() async {
+    // Covers the do/catch around Task.sleep: cancelling the poll task
+    // while it is still waiting out the interval makes Task.sleep throw
+    // CancellationError, which the catch block turns into a plain return.
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.beginKnownDeviceRefresh(device)
+    let task = model.knownDevicePollTask
+
+    task?.cancel()
+    await task?.value
+
+    XCTAssertEqual(model.knownDevicePollAttempts, 0)
+  }
+
   // MARK: - finishKnownDeviceProbe
 
   func testFinishKnownDeviceProbeResetsBusyWhenGenerationMatches() {
@@ -579,6 +680,62 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
 
     XCTAssertEqual(model.status, "Connect a Logitech mouse, then choose Refresh.")
     XCTAssertNil(model.refreshTask)
+  }
+
+  func testStartReconnectMonitorMarksDeviceUnreachableThenDetectsItsReturn() async {
+    // Covers the `!reachable` branch (wasReachable flips to false while
+    // already initialized) by using a non-matching device rather than an
+    // empty list, so the device-read retry loop in
+    // AppModel+DeviceDiscovery.swift never engages and the timing stays
+    // predictable. The middle "unreachable" phase is otherwise invisible
+    // from the outside, so the third phase proves it actually ran: if
+    // wasReachable had not been reset to false, the device's return would
+    // not be treated as a reconnect.
+    let modeFile = makeTemporaryDirectory().appendingPathComponent("mode")
+    try! "present".write(to: modeFile, atomically: true, encoding: .utf8)
+    installFakeEngine(
+      """
+      mode=$(cat "\(modeFile.path)" 2>/dev/null || echo present)
+      if [ "$1" = "list" ]; then
+        if [ "$mode" = "absent" ]; then
+          echo '[1] Wireless  Other Widget (HID++ 4.5, product 0xBBBB, key bbbb-0001)'
+        else
+          echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        fi
+      else
+        echo 'Selected profile: 1'
+      fi
+      exit 0
+      """)
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    model.devices = [device]
+    model.selectedDeviceIndex = device.id
+
+    model.startReconnectMonitor()
+    // Iteration 1 only calibrates `wasReachable` to true (the fake engine
+    // reports the matching device).
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    // Iteration 2 sees a different device instead of the selected one, so
+    // matching fails and `wasReachable` must flip to false.
+    try! "absent".write(to: modeFile, atomically: true, encoding: .utf8)
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    // Iteration 3: the original device is visible again. Whether this
+    // reads as a reconnect depends entirely on `wasReachable` actually
+    // having been set to false in iteration 2: if it had incorrectly
+    // stayed true, `!wasReachable || identityChanged` would be false
+    // (the key is unchanged), `startRefresh` would never run, and
+    // `status`/`currentDeviceName` would stay at their untouched
+    // defaults instead of reflecting the (fake) read that follows.
+    try! "present".write(to: modeFile, atomically: true, encoding: .utf8)
+    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    await model.refreshTask?.value
+    model.reconnectMonitorTask?.cancel()
+
+    XCTAssertEqual(model.currentDeviceName, "Recon Mouse")
+    XCTAssertNotEqual(model.status, "Connect a Logitech mouse, then choose Refresh.")
   }
 
   func testStartReconnectMonitorDetectsIdentityChangeAfterCalibration() async {

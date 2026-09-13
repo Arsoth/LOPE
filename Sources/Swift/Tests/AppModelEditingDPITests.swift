@@ -632,6 +632,46 @@ final class AppModelEditingDPITests: XCTestCase {
     XCTAssertEqual(Array(model.dpiStages.prefix(2)), ["4000", "4001"])
   }
 
+  func testSetDPIStageCountIncreaseUsesUInt16MaxWhenCapabilitiesReportNoMaximum() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    // A fully-empty/unknown DPICapabilities (no supportedValues, no
+    // minimum/maximum/step) so `dpiCapabilities.maximum` is genuinely nil,
+    // forcing setDPIStageCount's own `?? Int(UInt16.max)` fallback --
+    // DPICapabilities.init would otherwise auto-derive maximum from
+    // supportedValues.last.
+    model.dpiCapabilities = DPICapabilities()
+    model.dpiCount = 2
+    model.dpiStages = ["400", "800", "", "", ""]
+    model.defaultStage = 1
+    model.shiftStage = 2
+
+    model.setDPIStageCount(3)
+
+    XCTAssertEqual(model.dpiCount, 3)
+    XCTAssertEqual(Array(model.dpiStages.prefix(3)), ["400", "800", "1800"])
+  }
+
+  func testSetDPIStageCountIncreaseWithIncompleteTrailingStageBasesFallbackOnEarlierParsedStage() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.dpiCapabilities = stageCapabilities()
+    model.dpiCount = 2
+    // Stage 1's text is unparseable (mid-edit), so `activeValues` has only
+    // one element while oldCount is 2 -- the same "incomplete trailing
+    // stage" branch as the test below, but this time stage 2 (index
+    // count-2 for the requested count of 3) *does* parse, so the fallback
+    // is based on it (800 + 1000) rather than the plain 1000 default.
+    model.dpiStages = ["", "800", "", "", ""]
+    model.defaultStage = 1
+    model.shiftStage = 2
+
+    model.setDPIStageCount(3)
+
+    XCTAssertEqual(model.dpiCount, 3)
+    XCTAssertEqual(model.dpiStages[2], "1800")
+  }
+
   func testSetDPIStageCountIncreaseWithIncompleteTrailingStageUsesFallback() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)

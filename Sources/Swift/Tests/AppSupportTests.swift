@@ -84,6 +84,25 @@ final class AppSupportTests: XCTestCase {
     XCTAssertEqual(collector.lines, ["a", "b", "c"])
   }
 
+  func testEngineRunnerRunFallsBackToEmptyStringWhenOutputIsNotValidUTF8() throws {
+    let output = try EngineRunner.run(
+      executable: URL(fileURLWithPath: "/bin/sh"),
+      arguments: ["-c", "printf '\\xff\\xfe'"],
+      currentDirectory: FileManager.default.temporaryDirectory
+    )
+    XCTAssertEqual(output, "")
+  }
+
+  func testEngineRunnerLineProgressFallsBackToEmptyStringWhenOutputIsNotValidUTF8() throws {
+    let output = try EngineRunner.runWithLineProgress(
+      executable: URL(fileURLWithPath: "/bin/sh"),
+      arguments: ["-c", "printf '\\xff\\xfe'"],
+      currentDirectory: FileManager.default.temporaryDirectory,
+      onLine: { _ in }
+    )
+    XCTAssertEqual(output, "")
+  }
+
   func testEngineRunnerLineProgressThrowsTrimmedFailureMessage() {
     XCTAssertThrowsError(
       try EngineRunner.runWithLineProgress(

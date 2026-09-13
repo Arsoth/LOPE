@@ -8,11 +8,7 @@ import XCTest
 @testable import LOPECore
 
 // Mirrors AppModel+EditingKeyboard.swift, which had no dedicated coverage
-// before this file. `keyboardKeyCode(for:)` at the bottom of the production
-// file is `private` and has no caller anywhere in the module (verified with
-// a repo-wide search), so it is unreachable dead code that no test — in this
-// file or any other — can exercise through the public/internal API; that is
-// the one known gap left below 100% in this file.
+// before this file.
 @MainActor
 final class AppModelEditingKeyboardTests: XCTestCase {
   private func keyEvent(
@@ -274,6 +270,18 @@ final class AppModelEditingKeyboardTests: XCTestCase {
     XCTAssertEqual(model.buttons[0].draftRaw, "80020249")
   }
 
+  func testSetKeyboardKeyChoiceDefaultsModifierToZeroWhenButtonIsNotAlreadyAKeyboardChord() {
+    // The fixture button's draftRaw ("80010002") is a primary-click record,
+    // not a keyboard chord, so keyboardBytes(_:) returns nil here and the
+    // modifier falls back to 0 instead of being read from existing bytes.
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.setKeyboardKeyChoice(buttonIndex: 0, key: 0x04)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "80020004")
+  }
+
   // MARK: beginKeyboardRecording / cancelKeyboardRecording / recordKeyboardEvent
 
   func testBeginKeyboardRecordingIgnoresOutOfBoundsIndex() {
@@ -430,6 +438,15 @@ final class AppModelEditingKeyboardTests: XCTestCase {
     XCTAssertEqual(model.buttons[0].draftRaw, "80020168")
   }
 
+  func testSetFunctionKeyDefaultsModifierToZeroWhenButtonIsNotAlreadyAKeyboardChord() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.setFunctionKey(buttonIndex: 0, number: 1)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "8002003A")
+  }
+
   // MARK: setSpecialKey / setKeyboardKey
 
   func testSetSpecialKeyIgnoresNonPositiveKey() {
@@ -452,6 +469,15 @@ final class AppModelEditingKeyboardTests: XCTestCase {
     XCTAssertEqual(model.buttons[0].draftRaw, "80020849")
   }
 
+  func testSetSpecialKeyDefaultsModifierToZeroWhenButtonIsNotAlreadyAKeyboardChord() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.setSpecialKey(buttonIndex: 0, key: 0x49)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "80020049")
+  }
+
   func testSetKeyboardKeySetsClampedKeyPreservingModifier() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -460,6 +486,15 @@ final class AppModelEditingKeyboardTests: XCTestCase {
     model.setKeyboardKey(buttonIndex: 0, key: 999)
 
     XCTAssertEqual(model.buttons[0].draftRaw, "800204FF")
+  }
+
+  func testSetKeyboardKeyDefaultsModifierToZeroWhenButtonIsNotAlreadyAKeyboardChord() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.setKeyboardKey(buttonIndex: 0, key: 999)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "800200FF")
   }
 
   // MARK: keyboardKeyLabel

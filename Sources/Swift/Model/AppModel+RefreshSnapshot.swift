@@ -79,18 +79,29 @@ extension AppModel {
       status = "The mouse was found, but no onboard profiles were readable."
       return
     }
+    // `resolvedProfileNumber` only returns nil when `availableProfileIDs`
+    // is empty (see ProfileSelection.swift), which the `profiles.isEmpty`
+    // guard above already ruled out, so it always returns a member of
+    // `profiles.map(\.id)` here -- force-unwrapping documents that
+    // guarantee instead of a `?? profiles[0].id` fallback that could never
+    // actually run.
     profileNumber =
       ProfileSelection.resolvedProfileNumber(
         selectedProfileNumber: snapshot.selectedProfileNumber,
         availableProfileIDs: profiles.map(\.id),
         preferredProfileNumber: profileNumber
-      ) ?? profiles[0].id
+      )!
+    // `parseProfiles` unconditionally seeds `rows[id]`/`gShiftRows[id]`/
+    // `rgb[id]` to `[]` for every profile it discovers (see
+    // AppModel+Parsing.swift), and `profileNumber` above is always one of
+    // those discovered ids, so each dictionary already has an entry here
+    // -- force-unwrapping documents that instead of an unreachable `?? []`.
     setButtonRows(
-      normal: parsed.rowsByProfile[profileNumber] ?? [],
-      gShift: parsed.gShiftRowsByProfile[profileNumber] ?? []
+      normal: parsed.rowsByProfile[profileNumber]!,
+      gShift: parsed.gShiftRowsByProfile[profileNumber]!
     )
     applyRGBZones(
-      parsed.rgbByProfile[profileNumber] ?? [],
+      parsed.rgbByProfile[profileNumber]!,
       profileFormat: parsed.profileFormatsByProfile[profileNumber]
     )
     dpiDetails = ""

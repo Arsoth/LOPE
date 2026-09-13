@@ -98,10 +98,11 @@ extension AppModel {
     status = knownDeviceRefreshStatus(for: device, expired: false)
 
     guard knownDevicePollTask == nil else { return }
+    let policy = knownDevicePollPolicy
     knownDevicePollTask = Task { @MainActor [weak self] in
-      for attempt in 1...OnboardProfileRefreshPolicy.maximumPollAttempts {
+      for attempt in 1...policy.maximumAttempts {
         do {
-          try await Task.sleep(nanoseconds: OnboardProfileRefreshPolicy.pollIntervalNanoseconds)
+          try await Task.sleep(nanoseconds: policy.intervalNanoseconds)
         } catch {
           return
         }

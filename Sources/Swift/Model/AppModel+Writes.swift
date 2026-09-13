@@ -210,9 +210,11 @@ extension AppModel {
     var result: [URL] = []
     for line in message.components(separatedBy: "\n") where line.hasPrefix("Backup saved: ") {
       let value = String(line.dropFirst("Backup saved: ".count))
+      // `?? ""` is unreachable: `String.components(separatedBy:)` always
+      // returns at least one element (even for "", it returns [""]), so
+      // `.first` is never nil here.
       let path =
-        value.components(separatedBy: " (").first?.trimmingCharacters(in: .whitespacesAndNewlines)
-        ?? ""
+        value.components(separatedBy: " (").first!.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !path.isEmpty else { continue }
       let url = URL(fileURLWithPath: path)
       if !result.contains(url) { result.append(url) }

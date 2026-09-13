@@ -105,6 +105,13 @@ final class AppModel: ObservableObject {
   // changing the production HID++ command construction.
   var engineRunnerOverride: (([String]) throws -> String)?
 
+  // Tests can shrink the interval/attempt count to exercise the poll loop's
+  // exhaustion path without waiting out the real ~60-second timeout.
+  var knownDevicePollPolicy: (intervalNanoseconds: UInt64, maximumAttempts: Int) = (
+    OnboardProfileRefreshPolicy.pollIntervalNanoseconds,
+    OnboardProfileRefreshPolicy.maximumPollAttempts
+  )
+
   var currentMouseProfile: MouseProfileDescriptor {
     currentCatalogProfile ?? MouseProfileCatalog.genericProfile
   }
@@ -180,7 +187,18 @@ final class AppModel: ObservableObject {
   }
 
   var engine: URL? {
-    if let bundled = Bundle.main.url(forResource: AppConstants.engineName, withExtension: nil) {
+    resolvedEngineURL(
+      bundled: Bundle.main.url(forResource: AppConstants.engineName, withExtension: nil))
+  }
+
+  // Bundle.main never has a bundled engine resource in the `swift test`
+  // sandbox (there is no real .app bundle), so `engine` above always calls
+  // this with `bundled: nil` in tests, only ever exercising the fallback
+  // search. Taking the already-resolved bundled URL as a plain argument
+  // keeps that fallback search itself testable, and a direct call with a
+  // non-nil `bundled` covers the pass-through branch.
+  func resolvedEngineURL(bundled: URL?) -> URL? {
+    if let bundled {
       return bundled
     }
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)

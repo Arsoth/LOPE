@@ -220,4 +220,44 @@ final class AppModelParsingTests: XCTestCase {
     XCTAssertEqual(model.baselineDPICount, 3)
     XCTAssertEqual(model.baselineDPIStages, ["400", "800", "1200", "", ""])
   }
+
+  func testParseDPIKeepsPreviousStageIndexesWhenReportedIndexOverflowsInt() {
+    // The regex constrains default/shift to `\d+`, so `Int(...)` can only
+    // fail on overflow (not on malformed non-digit text) -- exercised here
+    // with an absurdly long digit run standing in for garbled firmware
+    // output.
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.defaultStage = 2
+    model.shiftStage = 1
+    model.parseDPI(
+      "Onboard profile 2 DPI stages: 400, 800, 1200 (default 99999999999999999999, shift 99999999999999999999)"
+    )
+    XCTAssertEqual(model.dpiCount, 3)
+    XCTAssertEqual(model.defaultStage, 2)
+    XCTAssertEqual(model.shiftStage, 1)
+  }
+
+  func testLoadDPIWithoutProfileTextFallsBackToEmptyString() {
+    // Covers loadDPI's default `profileText: String? = nil` -- the
+    // `profileText ?? ""` fallback only fires when a caller omits it.
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.engineRunnerOverride = { _ in "DPI stages: 400, 800 (default 1, shift 2)" }
+    model.loadDPI()
+    XCTAssertEqual(model.dpiCount, 2)
+  }
+
+  func testRunEngineWithoutOverrideFallsBackToEmptyStringWhenOutputIsNotValidUTF8() throws {
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '\\xff\\xfe'
+        exit 0
+        """
+    ) { model in
+      let output = try model.runEngine(["--sensor-only", "dpi"])
+      XCTAssertEqual(output, "")
+    }
+  }
 }

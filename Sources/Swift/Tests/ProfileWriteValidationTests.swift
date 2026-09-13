@@ -47,4 +47,17 @@ final class ProfileWriteValidationTests: XCTestCase {
     )
     XCTAssertNil(boundGShiftMessage, "bound G-Shift button was incorrectly treated as inaccessible")
   }
+
+  func testInaccessibleGShiftPrimaryClickMessageFallsBackToProfileNumberWhenNameIsBlank() {
+    let message = ProfileWriteValidation.inaccessibleGShiftPrimaryClickMessage(
+      profileNumber: 3,
+      profileName: "   ",
+      normalButtonRaws: ["FFFFFFFF"],
+      gShiftButtonRaws: ["80010001"]
+    )
+    XCTAssertEqual(
+      message,
+      "Profile 3 has primary click assigned only on the G-Shift layer, but no Normal-layer button activates G-Shift. Assign G-Shift to a Normal button or add a primary click to the Normal layer, then save again."
+    )
+  }
 }

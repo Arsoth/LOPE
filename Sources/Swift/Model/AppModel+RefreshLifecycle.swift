@@ -283,7 +283,11 @@ extension AppModel {
       }
     }
 
-    throw lastError ?? EngineError.failed("The selected onboard profile could not be read.")
+    // `?? EngineError.failed(...)` is unreachable: `profileReadAttempts`
+    // (AppModel+Refresh.swift) is a fixed constant > 0, so the loop above
+    // always runs at least once, and every iteration that doesn't already
+    // `return` sets `lastError` before falling through here.
+    throw lastError!
   }
 
   nonisolated static func errorMessage(for error: Error) -> String {

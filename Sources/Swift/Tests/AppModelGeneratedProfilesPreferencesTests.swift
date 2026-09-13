@@ -126,6 +126,42 @@ final class AppModelGeneratedProfilesPreferencesTests: XCTestCase {
     XCTAssertTrue(model.status.contains("No onboard button records"))
   }
 
+  func testCreateGeneratedProfileFallsBackToProductIDWhenDeviceNameIsEmpty() throws {
+    // Covers the `deviceName.isEmpty ? productID : deviceName` branch used
+    // to build the sanitized identifier base -- exercised here with an
+    // empty device name (both currentDeviceName and the selected device's
+    // own name), unlike every other createGeneratedProfile test, which
+    // always has a real name.
+    let model = AppModel(startInitialRefresh: false)
+    try withIsolatedConfigurationDirectory(model) { _ in
+      model.devices = [
+        DeviceChoice(
+          id: 1, name: "", connection: "Wired", productID: "0xF00D", deviceKey: "nameless")
+      ]
+      model.selectedDeviceIndex = 1
+      model.currentDeviceName = ""
+      model.profiles = [ProfileChoice(id: 1, sector: "0x0100", enabled: true, crcValid: true)]
+      model.normalButtonRows = [
+        ButtonRow(
+          id: 1, label: "Button 1", currentRaw: "FFFFFFFF", draftRaw: "FFFFFFFF",
+          draftChoice: "FFFFFFFF", layer: .normal)
+      ]
+
+      guard let url = model.createGeneratedProfile() else {
+        XCTFail("expected a generated profile to be written")
+        return
+      }
+      defer { try? FileManager.default.removeItem(at: url) }
+
+      let data = try Data(contentsOf: url)
+      let descriptor = try JSONDecoder().decode(MouseProfileDescriptor.self, from: data)
+      XCTAssertTrue(descriptor.id.hasPrefix("auto-0xF00D"))
+      XCTAssertEqual(descriptor.match.nameContains, [])
+      XCTAssertEqual(descriptor.match.productIDs, ["0xF00D"])
+      XCTAssertEqual(descriptor.name, "Unnamed mouse (needs button names)")
+    }
+  }
+
   func testCreateGeneratedProfileWritesDescriptorWithDPIRangeAndUnionOfButtonLayers() throws {
     let model = AppModel(startInitialRefresh: false)
     try withIsolatedConfigurationDirectory(model) { _ in

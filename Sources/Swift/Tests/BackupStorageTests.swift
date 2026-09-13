@@ -6,6 +6,18 @@ import XCTest
 
 @testable import LOPECore
 
+/// A FileManager stub whose `urls(for:in:)` always returns an empty array,
+/// so tests can exercise `BackupStorage.documentsDirectory`'s
+/// home-directory fallback without needing a machine that lacks a real
+/// Documents directory.
+private final class EmptyURLsFileManager: FileManager {
+  override func urls(
+    for directory: FileManager.SearchPathDirectory, in domainMask: FileManager.SearchPathDomainMask
+  ) -> [URL] {
+    []
+  }
+}
+
 final class BackupStorageTests: XCTestCase {
   func testBackupStorageDirectoryAndFilenameHandling() throws {
     let fileManager = FileManager.default
@@ -63,5 +75,29 @@ final class BackupStorageTests: XCTestCase {
 
     let expectedDocuments = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
     XCTAssertEqual(BackupStorage.documentsDirectory(fileManager: fileManager), expectedDocuments)
+  }
+
+  func testUniqueBackupURLStripsLeadingDotFromFileExtension() {
+    let testRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("lope-backup-storage-dot-ext-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: testRoot) }
+
+    let url = BackupStorage.uniqueBackupURL(
+      root: testRoot,
+      mouseIdentifier: "G502 X",
+      prefix: "profile-1-save",
+      fileExtension: ".logiob",
+      timestamp: "20260912-120000"
+    )
+    XCTAssertEqual(url.pathExtension, "logiob")
+    XCTAssertFalse(url.lastPathComponent.contains("..logiob"))
+  }
+
+  func testDocumentsDirectoryFallsBackToHomeDirectoryWhenNoDocumentsURLIsReported() {
+    let fileManager = EmptyURLsFileManager()
+    XCTAssertEqual(
+      BackupStorage.documentsDirectory(fileManager: fileManager),
+      fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Documents", isDirectory: true)
+    )
   }
 }

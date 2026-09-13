@@ -78,6 +78,11 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
       ButtonRow(
         id: 5, label: "G5", currentRaw: "80020000", draftRaw: "80020000",
         draftChoice: "keystroke", layer: .normal),
+      // bytes[3] == 0xFF is not a cataloged keyboard key, so this falls
+      // back to a raw hex label instead of a catalog name.
+      ButtonRow(
+        id: 6, label: "G6", currentRaw: "800200FF", draftRaw: "800200FF",
+        draftChoice: "keystroke", layer: .normal),
     ]
     let url = makeTempJSONURL()
     defer { try? FileManager.default.removeItem(at: url) }
@@ -96,6 +101,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     // bytes[3] == 0 fails the keyboard-chord guard even though bytes[0..1]
     // match the 0x8002 shape, so this also falls back to "Custom".
     XCTAssertEqual(outputsByNumber[5], "Custom")
+    XCTAssertEqual(outputsByNumber[6], "0xFF")
     XCTAssertEqual(decoded.device.name, "G502 X")
     XCTAssertNil(decoded.profile.rgb)
   }
@@ -121,6 +127,57 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
       uniqueKeysWithValues: (decoded.profile.rgb ?? []).map { ($0.zone, $0.color) })
     XCTAssertEqual(colorsByZone[0], RGBColor(red: 255, green: 0, blue: 0).hex)
     XCTAssertEqual(colorsByZone[1], RGBColor(red: 0, green: 255, blue: 0).hex)
+  }
+
+  func testExportCurrentJSONIncludesDPIAndFiltersRGBZoneOutsideDeviceCapability() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBFixtureDevice(model)
+    model.dpiCount = 2
+    model.dpiStages = ["400", "800", "", "", ""]
+    model.defaultStage = 1
+    model.shiftStage = 2
+    model.rgbZones = [
+      RGBZoneState(
+        id: 0, name: "Primary", current: RGBColor(red: 0, green: 0, blue: 0),
+        draft: RGBColor(red: 255, green: 0, blue: 0)),
+      // Not one of G502 HERO's actual RGB zones -- exercises the branch
+      // that filters an unsupported zone out of the export instead of
+      // including it.
+      RGBZoneState(
+        id: 99, name: "Unsupported", current: RGBColor(red: 0, green: 0, blue: 0),
+        draft: RGBColor(red: 1, green: 2, blue: 3)),
+    ]
+    let url = makeTempJSONURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    model.exportCurrentJSON(to: url)
+
+    let decoded = try JSONDecoder().decode(EditableBackup.self, from: Data(contentsOf: url))
+    XCTAssertEqual(decoded.profile.dpi?.stages, [400, 800])
+    XCTAssertEqual(decoded.profile.dpi?.defaultStage, 1)
+    XCTAssertEqual(decoded.profile.dpi?.shiftStage, 2)
+    let zoneIDs = Set((decoded.profile.rgb ?? []).map(\.zone))
+    XCTAssertEqual(zoneIDs, [0])
+  }
+
+  func testExportCurrentJSONFallsBackToDefaultsWhenDeviceOrProfileIsMissing() throws {
+    // Covers the `selectedDevice?.name/productID ?? ...` and
+    // `selectedProfile?.enabled ?? false` fallbacks: selectedDeviceIndex
+    // does not match any entry in `devices`, and profileNumber does not
+    // match any entry in `profiles`, unlike every other export test.
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBFixtureDevice(model)
+    model.selectedDeviceIndex = 999
+    model.profileNumber = 7
+    let url = makeTempJSONURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    model.exportCurrentJSON(to: url)
+
+    let decoded = try JSONDecoder().decode(EditableBackup.self, from: Data(contentsOf: url))
+    XCTAssertEqual(decoded.device.name, "G502 HERO")
+    XCTAssertEqual(decoded.device.productID, "")
+    XCTAssertEqual(decoded.profile.enabled, false)
   }
 
   func testExportCurrentJSONFailsWhenWriteTargetIsUnwritable() {
@@ -475,6 +532,37 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     XCTAssertEqual(model.gShiftButtonRows[0].draftRaw, "80010002")
     // The active (normal) layer's rows are untouched (fixture default).
     XCTAssertEqual(model.buttons[0].draftRaw, "80010002")
+  }
+
+  func testLoadEditableBackupSuccessOnNormalLayerWhileGShiftIsActiveUpdatesNormalRows() throws {
+    // The inverse of the test above: the imported button is on the Normal
+    // layer, but the editor's *active* layer is G-Shift, so
+    // loadEditableBackup must fall back to `normalButtonRows` rather than
+    // the active `buttons` array.
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.gShiftButtonRows = [
+      ButtonRow(
+        id: 1, label: "G1 G-Shift", currentRaw: "80010004", draftRaw: "80010004",
+        draftChoice: "80010004", layer: .gShift)
+    ]
+    model.selectButtonLayer(.gShift)
+    let url = makeTempJSONURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+    try write(
+      makeBaseBackup(
+        buttons: [
+          EditableBackup.Button(
+            number: 1, physicalControl: "G1", output: "Right click", raw: "80010002",
+            layer: ButtonLayer.normal.rawValue)
+        ]),
+      to: url)
+
+    model.loadEditableBackup(url)
+
+    XCTAssertEqual(model.normalButtonRows[0].draftRaw, "80010002")
+    // The active (G-Shift) layer's rows are untouched.
+    XCTAssertEqual(model.buttons[0].draftRaw, "80010004")
   }
 
   func testLoadEditableBackupJSONRawFallbackAcceptsAltTabAliasesAndCustomRaw() throws {

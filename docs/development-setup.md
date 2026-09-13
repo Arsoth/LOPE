@@ -62,3 +62,44 @@ make coverage  # llvm-cov reports for both
 If any of these fail with a "command not found", re-check the install
 steps above rather than working around it — the Makefile does not fall
 back to alternate tools.
+
+## GitHub Actions signing and releases
+
+The repository's release workflow is for direct distribution outside the Mac
+App Store. It requires a paid Apple Developer Program team and these GitHub
+Actions secrets:
+
+- `DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64`: a base64-encoded `.p12`
+  export containing the `Developer ID Application` certificate and private
+  key.
+- `DEVELOPER_ID_APPLICATION_CERTIFICATE_PASSWORD`: the password used for that
+  `.p12` export.
+- `APPLE_ID`: the Apple ID email used for notarization.
+- `APPLE_APP_SPECIFIC_PASSWORD`: an app-specific password generated for that
+  Apple ID.
+- `APPLE_TEAM_ID`: the Apple Developer Team ID.
+
+Create the Developer ID Application certificate in the Apple Developer
+account, export it from Keychain Access as a password-protected `.p12`, and
+base64-encode that file before saving it as the first secret. Keep the
+certificate and notarization credentials only in GitHub Actions secrets; do
+not commit them to the repository. The workflow creates an ephemeral
+keychain on the macOS runner, signs with hardened runtime and a secure
+timestamp, and deletes the keychain after the job.
+
+`Apple Development` is suitable for local development but is not the
+distribution identity used here. For a downloadable app, Apple expects a
+`Developer ID Application` signature and notarization. The release workflow
+does not need a provisioning profile because this app is built directly with
+the Makefile and is not sandboxed.
+
+After configuring the secrets, publish a release from the desired `main`
+commit with:
+
+```sh
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+The tag version becomes `CFBundleShortVersionString`; the GitHub Actions run
+number becomes `CFBundleVersion`.

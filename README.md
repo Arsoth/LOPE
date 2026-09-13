@@ -107,3 +107,20 @@ required tooling, [the development reference](docs/REFERENCE.md) for the
 source layout, device behavior, troubleshooting, and command-line details.
 Protocol notes are in [docs/PROTOCOL.md](docs/PROTOCOL.md), and descriptor
 maintenance is covered by [Profiles/README.md](Profiles/README.md).
+
+## Continuous integration and releases
+
+Pull requests targeting `main`, and pushes to `main`, run
+[the CI workflow](.github/workflows/ci.yml). It checks formatting, runs the C
+and Swift test suites, and runs `make coverage-check`, which enforces the
+repository's configured per-file coverage minimums.
+
+To make that check merge-blocking, add `LOPE CI / Format, test, and coverage
+gate` under the required status checks in the branch ruleset for `main`.
+
+Releases are cut by pushing a `vX.Y.Z` tag from `main`. The release workflow
+builds the native arm64 app, signs it with a Developer ID Application
+certificate, submits it to Apple's notary service, staples the ticket, and
+publishes a ZIP plus SHA-256 checksum to the GitHub release. See
+[development setup](docs/development-setup.md) for the required GitHub
+secrets.

@@ -227,13 +227,6 @@ extension AppModel {
     }
   }
 
-  private var keyboardOutputPresets: [OutputPreset] {
-    keyboardOutputKeys.map { key in
-      let raw = String(format: "800200%02X", key.id)
-      return OutputPreset(id: raw, label: key.label, raw: raw)
-    }
-  }
-
   var presets: [OutputPreset] {
     [
       OutputPreset(id: "FFFFFFFF", label: "Disabled", raw: "FFFFFFFF"),

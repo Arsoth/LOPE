@@ -126,6 +126,15 @@ final class AppModelTests: XCTestCase {
     XCTAssertNil(model.engine)
   }
 
+  func testResolvedEngineURLReturnsBundledURLWhenProvided() {
+    // Covers the pass-through branch in resolvedEngineURL(bundled:), which
+    // `engine` above only ever reaches with `bundled: nil` in this test
+    // sandbox (there is no real .app bundle to resolve a resource from).
+    let model = AppModel(startInitialRefresh: false)
+    let bundled = URL(fileURLWithPath: "/tmp/pretend-bundled-lope")
+    XCTAssertEqual(model.resolvedEngineURL(bundled: bundled), bundled)
+  }
+
   func testDefaultConfigurationDirectoryPathMatchesDefaultConfigurationDirectory() {
     let model = AppModel(startInitialRefresh: false)
     XCTAssertEqual(
@@ -161,6 +170,29 @@ final class AppModelTests: XCTestCase {
     XCTAssertEqual(model.isDarkAppearance, expectedSystemIsDark)
   }
 
+  func testSetAppearancePreferenceUpdatesEveryOpenWindow() {
+    // Covers applyWindowAppearance's `for window in NSApp.windows` loop.
+    // `NSWindow` registers itself into `NSApp.windows` on init even without
+    // a real app run loop, so a plain instance kept alive for the duration
+    // of this test is enough to exercise the loop body.
+    _ = NSApplication.shared
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 10, height: 10), styleMask: [.titled],
+      backing: .buffered, defer: false)
+    window.contentView = NSView()
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.setAppearancePreference(.dark)
+
+    XCTAssertEqual(window.appearance, NSAppearance(named: .darkAqua))
+    XCTAssertEqual(window.contentView?.appearance, NSAppearance(named: .darkAqua))
+
+    model.setAppearancePreference(.light)
+
+    XCTAssertEqual(window.appearance, NSAppearance(named: .aqua))
+  }
+
   func testHasRGBChangesReflectsZoneEdits() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -178,6 +210,32 @@ final class AppModelTests: XCTestCase {
     ]
     XCTAssertTrue(model.hasRGBChanges)
     XCTAssertFalse(model.shouldShowRGBEditor)
+  }
+
+  func testInitWithStartInitialRefreshTrueAppliesAppearanceAndSchedulesBackgroundWork() async {
+    // Covers the `if startInitialRefresh` branch in init(): every other
+    // test in this file passes startInitialRefresh: false specifically to
+    // stay isolated from this branch's background work, so it otherwise
+    // has no coverage. Lets it run once here, then tears down the
+    // background Task it schedules (which would otherwise keep polling
+    // every 2 seconds for the rest of the test run).
+    _ = NSApplication.shared
+    let model = AppModel(startInitialRefresh: true)
+    defer {
+      model.reconnectMonitorTask?.cancel()
+      model.refreshTask?.cancel()
+    }
+
+    let expectedIsDarkAppearance =
+      (NSApp.windows.first?.effectiveAppearance ?? NSApp.effectiveAppearance)
+      .bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    XCTAssertEqual(model.isDarkAppearance, expectedIsDarkAppearance)
+
+    // The appearance/isDarkAppearance assignments happen synchronously in
+    // init(); initialRefresh()/startReconnectMonitor() run inside the
+    // Task it schedules right after, so give that a moment to start.
+    try? await Task.sleep(nanoseconds: 200_000_000)
+    XCTAssertNotNil(model.reconnectMonitorTask)
   }
 
   func testHasProfileChangesTracksEnabledStateDivergingFromBaseline() {

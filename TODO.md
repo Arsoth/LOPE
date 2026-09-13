@@ -11,6 +11,12 @@
 
 # LOPE todo list
 
+### 0: Remove references to highlighting all standard mouse buttons
+
+- [ ] Remove references to highlighting all standard mouse buttons anywhere in the swift or C code
+
+**Done when:** there's no more hidden or commented code or features regarding showing all buttons
+
 ### 1: Detect connected mice blocked by missing permissions
 
 - [ ] Detect a connected wired mouse that the app cannot query, preferably identifying Logitech devices, and show a permission request modal with an “Open System Settings” button, replacing the device picker’s generic no-mouse-detected state.
@@ -66,26 +72,3 @@
 **Done when:** Increasing the stage count always produces exactly the requested number of stages with valid default values, including multi-stage jumps.
 
 # Ignore below item(s):
-
-### 0: Detect and highlight all standard mouse buttons when possible
-
-**Status: Deferred.** AppKit testing on G502 X and G604 exposed only buttons
-1–3, and the attempted HID report monitor did not provide a dependable
-button-to-profile-row mapping. The experimental implementation was removed;
-the UI location is preserved as a commented future expansion below the footer.
-Some Logitech controls (DPI, profile, G-Shift, and vendor-specific buttons) may
-not generate ordinary macOS mouse-button events at all. A lower-level HID event
-path would require more permission handling and may still not reveal the
-firmware’s logical profile-record number.
-
-**Implementation tasks:**
-
-- [x] Capture the AppKit limitation on representative G502 X/G604 hardware.
-- [x] Evaluate the existing HID-level watch path and the experimental app
-      monitor; neither produced a sufficiently reliable profile-row mapping for
-      this UI.
-- [x] Remove the experimental monitor and comment out the UI with a future-
-      expansion note rather than shipping misleading highlighting.
-- [ ] Revisit only when a reliable standard/vendor event-to-profile mapping is
-      available, with regression coverage for buttons 1–8 and unsupported
-      controls.
