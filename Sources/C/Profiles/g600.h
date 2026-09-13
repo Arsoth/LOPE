@@ -12,6 +12,17 @@
 #define G600_FIRST_PROFILE_REPORT 0xF3
 #define G600_BACKUP_PROFILE_FORMAT 0xFF
 
+typedef bool (*G600FeatureReportGetFn)(HidChannel *channel, uint8_t report_id, uint8_t *report,
+                                       size_t capacity, size_t *length);
+typedef bool (*G600FeatureReportSetFn)(HidChannel *channel, uint8_t report_id, uint8_t *report,
+                                       size_t length);
+
+// Test seam for the legacy feature-report transport. Production code leaves
+// these pointed at the HID transport wrappers; self-tests replace them with
+// deterministic fixture-backed functions.
+extern G600FeatureReportGetFn g600_get_feature_report_impl;
+extern G600FeatureReportSetFn g600_set_feature_report_impl;
+
 bool is_g600_device(const Device *device);
 bool g600_profile_report_id(int profile_number, uint8_t *report_id);
 uint16_t g600_profile_sector(int profile_number);

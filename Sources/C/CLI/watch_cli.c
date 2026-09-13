@@ -1,5 +1,14 @@
 #include "internal.h"
 
+WatchDeviceOpenFn watch_device_open_impl = IOHIDDeviceOpen;
+WatchDeviceCloseFn watch_device_close_impl = IOHIDDeviceClose;
+WatchBufferAllocateFn watch_buffer_allocate_impl = calloc;
+WatchRegisterInputReportFn watch_register_input_report_impl =
+    IOHIDDeviceRegisterInputReportCallback;
+WatchRunLoopScheduleFn watch_schedule_with_run_loop_impl = IOHIDDeviceScheduleWithRunLoop;
+WatchRunLoopScheduleFn watch_unschedule_from_run_loop_impl = IOHIDDeviceUnscheduleFromRunLoop;
+WatchRunLoopFn watch_run_loop_impl = CFRunLoopRunInMode;
+
 typedef struct {
     uint8_t *callback_buffer;
     uint8_t previous_buttons;
@@ -90,33 +99,34 @@ int run_watch(const Options *options) {
         hid_context_release(&context);
         return 1;
     }
-    if (IOHIDDeviceOpen(mouse->device, kIOHIDOptionsTypeNone) != kIOReturnSuccess) {
+    if (watch_device_open_impl(mouse->device, kIOHIDOptionsTypeNone) != kIOReturnSuccess) {
         fprintf(stderr, "could not open the mouse input interface\n");
         hid_context_release(&context);
         return 1;
     }
     WatchState state;
     memset(&state, 0, sizeof(state));
-    state.callback_buffer = (uint8_t *)calloc(MAX_REPORT_BYTES, 1);
+    state.callback_buffer = (uint8_t *)watch_buffer_allocate_impl(MAX_REPORT_BYTES, 1);
     snprintf(state.label, sizeof(state.label), "%s",
              mouse->product[0] ? mouse->product : "Logitech mouse");
     if (state.callback_buffer == NULL) {
-        IOHIDDeviceClose(mouse->device, kIOHIDOptionsTypeNone);
+        watch_device_close_impl(mouse->device, kIOHIDOptionsTypeNone);
         hid_context_release(&context);
         return 1;
     }
-    IOHIDDeviceRegisterInputReportCallback(mouse->device, state.callback_buffer, MAX_REPORT_BYTES,
-                                           watch_report_callback, &state);
-    IOHIDDeviceScheduleWithRunLoop(mouse->device, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+    watch_register_input_report_impl(mouse->device, state.callback_buffer, MAX_REPORT_BYTES,
+                                     watch_report_callback, &state);
+    watch_schedule_with_run_loop_impl(mouse->device, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
     signal(SIGINT, on_sigint);
     printf("Watching %s. Press the rear thumb button once; Ctrl-C stops.\n", state.label);
     printf("A standard Logitech mouse report commonly identifies the rear thumb as HID button 4 / "
            "Back (bit 3).\n");
     while (!g_stop_watch) {
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.10, true);
+        watch_run_loop_impl(kCFRunLoopDefaultMode, 0.10, true);
     }
-    IOHIDDeviceUnscheduleFromRunLoop(mouse->device, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
-    IOHIDDeviceClose(mouse->device, kIOHIDOptionsTypeNone);
+    watch_unschedule_from_run_loop_impl(mouse->device, CFRunLoopGetCurrent(),
+                                        kCFRunLoopDefaultMode);
+    watch_device_close_impl(mouse->device, kIOHIDOptionsTypeNone);
     free(state.callback_buffer);
     hid_context_release(&context);
     g_stop_watch = 0;

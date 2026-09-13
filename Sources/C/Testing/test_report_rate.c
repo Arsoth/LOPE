@@ -1,6 +1,16 @@
 #include "internal.h"
 #include "test_doubles.h"
 
+static int report_rate_context_create_empty(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    return 1;
+}
+
+static int report_rate_context_create_failure(HidContext *context) {
+    (void)context;
+    return 0;
+}
+
 int test_report_rate(void) {
     bool interval_conversion_ok =
         report_rate_hertz_from_interval(0) == 0 && report_rate_hertz_from_interval(8) == 125 &&
@@ -301,6 +311,183 @@ int test_report_rate(void) {
         fprintf(stderr, "run_set_report_rate invalid-input self-test failed\n");
         return 1;
     }
+
+    HidInterface run_rate_interface = {0};
+    Device run_rate_device = {0};
+    run_rate_device.iface = &run_rate_interface;
+    run_rate_device.device_number = 1;
+    run_rate_device.protocol = 2.0;
+    run_rate_interface.product_id = 0xC539;
+    Device run_rate_devices[1] = {run_rate_device};
+    DiscoverDevicesTestContext run_rate_discovery = {
+        .devices = run_rate_devices, .count = 1, .result = 1};
+    Options run_rate_options = {0};
+    run_rate_options.positionals[0] = "1000";
+    run_rate_options.positional_count = 1;
+
+    hid_context_create_impl = report_rate_context_create_failure;
+    bool run_rate_ok = run_set_report_rate(&run_rate_options) == 1;
+
+    hid_context_create_impl = report_rate_context_create_empty;
+    discover_devices_for_options_impl = discover_devices_for_options_test_double;
+    g_discover_devices_test_context = &run_rate_discovery;
+    run_rate_discovery.count = 0;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+
+    run_rate_discovery.count = 1;
+    run_rate_device.feature_count = 0;
+    run_rate_devices[0] = run_rate_device;
+    run_rate_options.device_index = 1;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+    run_rate_options.device_index = -1;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+
+    run_rate_device.feature_count = 1;
+    run_rate_device.features[0] = (Feature){.id = FEATURE_EXTENDED_REPORT_RATE, .index = 1};
+    run_rate_devices[0] = run_rate_device;
+    const Reply run_rate_unsupported_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x01}},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext run_rate_context = {
+        .replies = run_rate_unsupported_replies, .reply_count = 2, .calls = 0};
+    g_channel_request_test_context = &run_rate_context;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+
+    const Reply run_rate_set_fail_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x03}},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    run_rate_context.replies = run_rate_set_fail_replies;
+    run_rate_context.reply_count = 3;
+    run_rate_context.calls = 0;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+
+    const Reply run_rate_verify_fail_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x03}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x00}},
+    };
+    run_rate_context.replies = run_rate_verify_fail_replies;
+    run_rate_context.reply_count = 5;
+    run_rate_context.calls = 0;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+
+    const Reply run_rate_verify_read_fail_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x03}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    run_rate_context.replies = run_rate_verify_read_fail_replies;
+    run_rate_context.reply_count = 4;
+    run_rate_context.calls = 0;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 1;
+
+    const Reply run_rate_extended_success_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x03}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x03}},
+    };
+    run_rate_context.replies = run_rate_extended_success_replies;
+    run_rate_context.reply_count = 5;
+    run_rate_context.calls = 0;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 0;
+
+    run_rate_device.features[0] = (Feature){.id = FEATURE_ADJUSTABLE_REPORT_RATE, .index = 1};
+    run_rate_devices[0] = run_rate_device;
+    const Reply run_rate_adjustable_success_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x81}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x01}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x81}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x01}},
+    };
+    run_rate_context.replies = run_rate_adjustable_success_replies;
+    run_rate_context.reply_count = 5;
+    run_rate_context.calls = 0;
+    run_rate_ok = run_rate_ok && run_set_report_rate(&run_rate_options) == 0;
+
+    // Keep the edge cases below independent of the aggregate assertions above.
+    // A failed expected case must not short-circuit execution of later cases,
+    // otherwise LLVM branch coverage hides the paths that are being checked.
+    ReportRateEntry limited_entries[1] = {{0}};
+    bool targeted_report_rate_ok =
+        report_rate_entries_from_mask(FEATURE_EXTENDED_REPORT_RATE, 0x7F, limited_entries, 1) == 1;
+    targeted_report_rate_ok = report_rate_entries_from_mask(FEATURE_ADJUSTABLE_REPORT_RATE, 0xFF,
+                                                            limited_entries, 1) == 1 &&
+                              targeted_report_rate_ok;
+
+    Device no_interface_device = {0};
+    targeted_report_rate_ok =
+        report_rate_connection_type(&no_interface_device) == 0 && targeted_report_rate_ok;
+
+    const Reply adjustable_read_error = {.status = REPLY_TIMEOUT};
+    ChannelRequestTestContext adjustable_read_error_context = {
+        .replies = &adjustable_read_error, .reply_count = 1, .calls = 0};
+    capability_device.features[0] = (Feature){.id = FEATURE_ADJUSTABLE_REPORT_RATE, .index = 1};
+    g_channel_request_test_context = &adjustable_read_error_context;
+    targeted_report_rate_ok =
+        !read_report_rate_capabilities(&capability_device, &adjustable_capabilities) &&
+        targeted_report_rate_ok;
+
+    const Reply adjustable_read_short[] = {
+        (Reply){.status = REPLY_OK, .length = 0},
+    };
+    ChannelRequestTestContext adjustable_read_short_context = {
+        .replies = adjustable_read_short, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &adjustable_read_short_context;
+    targeted_report_rate_ok =
+        !read_report_rate_capabilities(&capability_device, &adjustable_capabilities) &&
+        targeted_report_rate_ok;
+
+    const Reply adjustable_current_error[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x01}},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext adjustable_current_error_context = {
+        .replies = adjustable_current_error, .reply_count = 2, .calls = 0};
+    g_channel_request_test_context = &adjustable_current_error_context;
+    targeted_report_rate_ok =
+        read_report_rate_capabilities(&capability_device, &adjustable_capabilities) &&
+        !adjustable_capabilities.current_valid && targeted_report_rate_ok;
+
+    targeted_report_rate_ok =
+        !parse_report_rate_hertz("abc", &parsed_hertz) && targeted_report_rate_ok;
+
+    const Reply verify_invalid_current_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x03}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x09}},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {0x01}},
+    };
+    ChannelRequestTestContext verify_invalid_current_context = {
+        .replies = verify_invalid_current_replies, .reply_count = 5, .calls = 0};
+    run_rate_device.features[0] = (Feature){.id = FEATURE_EXTENDED_REPORT_RATE, .index = 1};
+    run_rate_devices[0] = run_rate_device;
+    g_channel_request_test_context = &verify_invalid_current_context;
+    run_rate_options.device_index = -1;
+    targeted_report_rate_ok =
+        run_set_report_rate(&run_rate_options) == 1 && targeted_report_rate_ok;
+
+    if (!run_rate_ok || !targeted_report_rate_ok) {
+        fprintf(stderr, "report-rate command-path self-test failed\n");
+        return 1;
+    }
+    if (!run_rate_ok) {
+        fprintf(stderr, "run_set_report_rate command-path self-test failed\n");
+        return 1;
+    }
+    hid_context_create_impl = hid_context_create_hardware;
+    discover_devices_for_options_impl = discover_devices_for_options_hardware;
+    g_discover_devices_test_context = NULL;
+    g_channel_request_test_context = NULL;
 
     return 0;
 }

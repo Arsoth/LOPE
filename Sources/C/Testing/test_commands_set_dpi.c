@@ -1,6 +1,11 @@
 #include "internal.h"
 #include "test_doubles.h"
 
+static int set_dpi_context_create_failure(HidContext *context) {
+    (void)context;
+    return 0;
+}
+
 int test_commands_set_dpi(void) {
     uint16_t dpi_list_values[MAX_DPI_VALUES] = {800, 1600, 2400};
     bool dpi_value_in_list_ok =
@@ -410,6 +415,120 @@ int test_commands_set_dpi(void) {
     set_dpi_multi_header.device_index = -1;
     if (run_set_dpi(&set_dpi_multi_header) != 1) {
         fprintf(stderr, "run_set_dpi implicit-profile-with-multiple-slots self-test failed\n");
+        return 1;
+    }
+
+    // Exercise the remaining inexpensive command branches: constructor
+    // failure, valid-CRC profiles with an invalid DPI layout, zero-based
+    // index rejection, and a successful write followed by a bad read-back.
+    hid_context_create_impl = set_dpi_context_create_failure;
+    Options set_dpi_context_failure = {0};
+    set_dpi_context_failure.positional_count = 1;
+    set_dpi_context_failure.positionals[0] = "800,1600";
+    if (run_set_dpi(&set_dpi_context_failure) != 1) {
+        fprintf(stderr, "run_set_dpi context-failure self-test failed\n");
+        return 1;
+    }
+    hid_context_create_impl = hid_context_create_hardware;
+
+    uint8_t set_dpi_bad_layout_sector[255];
+    memcpy(set_dpi_bad_layout_sector, mock_sector, sizeof(set_dpi_bad_layout_sector));
+    set_dpi_bad_layout_sector[3] = 0;
+    set_dpi_bad_layout_sector[4] = 0;
+    sector_put_crc(set_dpi_bad_layout_sector, sizeof(set_dpi_bad_layout_sector));
+    Reply set_dpi_bad_layout_chunks[32];
+    size_t set_dpi_bad_layout_chunk_count =
+        build_sector_read_replies(set_dpi_bad_layout_sector, sizeof(set_dpi_bad_layout_sector),
+                                  set_dpi_bad_layout_chunks, 32);
+    Reply set_dpi_bad_layout_replies[64];
+    size_t set_dpi_bad_layout_reply_count = 0;
+    set_dpi_bad_layout_replies[set_dpi_bad_layout_reply_count++] = set_dpi_sensor_count_1;
+    set_dpi_bad_layout_replies[set_dpi_bad_layout_reply_count++] = set_dpi_sensor_list;
+    set_dpi_bad_layout_replies[set_dpi_bad_layout_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < control_chunk_count; i++) {
+        set_dpi_bad_layout_replies[set_dpi_bad_layout_reply_count++] = control_chunks[i];
+    }
+    for (size_t i = 0; i < set_dpi_bad_layout_chunk_count; i++) {
+        set_dpi_bad_layout_replies[set_dpi_bad_layout_reply_count++] = set_dpi_bad_layout_chunks[i];
+    }
+    ChannelRequestTestContext set_dpi_bad_layout_channel = {.replies = set_dpi_bad_layout_replies,
+                                                            .reply_count =
+                                                                set_dpi_bad_layout_reply_count,
+                                                            .calls = 0};
+    g_channel_request_test_context = &set_dpi_bad_layout_channel;
+    Options set_dpi_bad_layout = {0};
+    set_dpi_bad_layout.positional_count = 1;
+    set_dpi_bad_layout.positionals[0] = "800,1600";
+    set_dpi_bad_layout.device_index = -1;
+    if (run_set_dpi(&set_dpi_bad_layout) != 1) {
+        fprintf(stderr, "run_set_dpi invalid-DPI-layout self-test failed\n");
+        return 1;
+    }
+
+    // Both zero values reach the two lower-bound sides of the index check.
+    set_dpi_out_of_range_channel.calls = 0;
+    g_channel_request_test_context = &set_dpi_out_of_range_channel;
+    Options set_dpi_default_zero = set_dpi_out_of_range;
+    set_dpi_default_zero.dpi_default = 0;
+    set_dpi_default_zero.dpi_shift = -1;
+    if (run_set_dpi(&set_dpi_default_zero) != 1) {
+        fprintf(stderr, "run_set_dpi zero-default-index self-test failed\n");
+        return 1;
+    }
+
+    set_dpi_out_of_range_channel.calls = 0;
+    g_channel_request_test_context = &set_dpi_out_of_range_channel;
+    Options set_dpi_shift_zero = set_dpi_out_of_range;
+    set_dpi_shift_zero.dpi_default = 1;
+    set_dpi_shift_zero.dpi_shift = 0;
+    if (run_set_dpi(&set_dpi_shift_zero) != 1) {
+        fprintf(stderr, "run_set_dpi zero-shift-index self-test failed\n");
+        return 1;
+    }
+
+    uint8_t set_dpi_wrong_readback[255];
+    memcpy(set_dpi_wrong_readback, mock_sector, sizeof(set_dpi_wrong_readback));
+    set_dpi_wrong_readback[3] ^= 0x01;
+    sector_put_crc(set_dpi_wrong_readback, sizeof(set_dpi_wrong_readback));
+    Reply set_dpi_wrong_chunks[32];
+    size_t set_dpi_wrong_chunk_count = build_sector_read_replies(
+        set_dpi_wrong_readback, sizeof(set_dpi_wrong_readback), set_dpi_wrong_chunks, 32);
+    Reply set_dpi_readback_fail_replies[192];
+    size_t set_dpi_readback_fail_count = 0;
+    for (size_t i = 0; i < set_dpi_loaded_prefix_count; i++) {
+        set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = set_dpi_loaded_replies[i];
+    }
+    set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = k_mock_onboard_mode_reply;
+    set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = k_mock_generic_ok_reply;
+    for (size_t i = 0; i < 16; i++) {
+        set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = k_mock_generic_ok_reply;
+    }
+    set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = k_mock_generic_ok_reply;
+    for (size_t attempt = 0; attempt < 5; attempt++) {
+        for (size_t i = 0; i < set_dpi_wrong_chunk_count; i++) {
+            set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = set_dpi_wrong_chunks[i];
+        }
+    }
+    set_dpi_readback_fail_replies[set_dpi_readback_fail_count++] = k_mock_generic_ok_reply;
+    ChannelRequestTestContext set_dpi_readback_fail_channel = {
+        .replies = set_dpi_readback_fail_replies,
+        .reply_count = set_dpi_readback_fail_count,
+        .calls = 0};
+    g_channel_request_test_context = &set_dpi_readback_fail_channel;
+    const char *set_dpi_readback_backup = "/tmp/lomps-selftest-set-dpi-readback-fail.logiob";
+    unlink(set_dpi_readback_backup);
+    Options set_dpi_readback_fail = {0};
+    set_dpi_readback_fail.positional_count = 1;
+    set_dpi_readback_fail.positionals[0] = "800,1600";
+    set_dpi_readback_fail.device_index = -1;
+    set_dpi_readback_fail.dpi_default = 1;
+    set_dpi_readback_fail.dpi_shift = 1;
+    set_dpi_readback_fail.yes = true;
+    set_dpi_readback_fail.backup_path = set_dpi_readback_backup;
+    int set_dpi_readback_result = run_set_dpi(&set_dpi_readback_fail);
+    unlink(set_dpi_readback_backup);
+    if (set_dpi_readback_result != 1) {
+        fprintf(stderr, "run_set_dpi readback-failure self-test failed\n");
         return 1;
     }
 

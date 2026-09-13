@@ -5,6 +5,51 @@
 
 extern volatile sig_atomic_t g_stop_watch;
 
+typedef IOReturn (*HidDeviceOpenFn)(IOHIDDeviceRef device, IOOptionBits options);
+typedef IOReturn (*HidDeviceCloseFn)(IOHIDDeviceRef device, IOOptionBits options);
+typedef void (*HidDeviceRegisterInputReportCallbackFn)(IOHIDDeviceRef device, uint8_t *report,
+                                                       CFIndex report_length,
+                                                       IOHIDReportCallback callback, void *context);
+typedef void (*HidDeviceScheduleWithRunLoopFn)(IOHIDDeviceRef device, CFRunLoopRef run_loop,
+                                               CFStringRef mode);
+typedef void (*HidDeviceUnscheduleFromRunLoopFn)(IOHIDDeviceRef device, CFRunLoopRef run_loop,
+                                                 CFStringRef mode);
+typedef IOReturn (*HidDeviceSetReportFn)(IOHIDDeviceRef device, IOHIDReportType type,
+                                         CFIndex report_id, const uint8_t *report,
+                                         CFIndex report_length);
+typedef IOReturn (*HidDeviceGetReportFn)(IOHIDDeviceRef device, IOHIDReportType type,
+                                         CFIndex report_id, uint8_t *report,
+                                         CFIndex *report_length);
+typedef CFTypeRef (*HidDeviceGetPropertyFn)(IOHIDDeviceRef device, CFStringRef key);
+typedef io_service_t (*HidDeviceGetServiceFn)(IOHIDDeviceRef device);
+typedef kern_return_t (*HidRegistryEntryGetIDFn)(io_registry_entry_t service,
+                                                 uint64_t *registry_id);
+typedef CFArrayRef (*HidDeviceCopyMatchingElementsFn)(IOHIDDeviceRef device,
+                                                      CFDictionaryRef matching,
+                                                      IOOptionBits options);
+typedef CFIndex (*HidArrayGetCountFn)(CFArrayRef array);
+typedef const void *(*HidArrayGetValueAtIndexFn)(CFArrayRef array, CFIndex index);
+typedef uint32_t (*HidElementGetUsagePageFn)(IOHIDElementRef element);
+typedef uint32_t (*HidElementGetReportIDFn)(IOHIDElementRef element);
+typedef FILE *(*HidDebugFileOpenFn)(const char *path, const char *mode);
+
+extern HidDeviceOpenFn hid_device_open_impl;
+extern HidDeviceCloseFn hid_device_close_impl;
+extern HidDeviceRegisterInputReportCallbackFn hid_device_register_input_report_callback_impl;
+extern HidDeviceScheduleWithRunLoopFn hid_device_schedule_with_run_loop_impl;
+extern HidDeviceUnscheduleFromRunLoopFn hid_device_unschedule_from_run_loop_impl;
+extern HidDeviceSetReportFn hid_device_set_report_impl;
+extern HidDeviceGetReportFn hid_device_get_report_impl;
+extern HidDeviceGetPropertyFn hid_device_get_property_impl;
+extern HidDeviceGetServiceFn hid_device_get_service_impl;
+extern HidRegistryEntryGetIDFn hid_registry_entry_get_id_impl;
+extern HidDeviceCopyMatchingElementsFn hid_device_copy_matching_elements_impl;
+extern HidArrayGetCountFn hid_array_get_count_impl;
+extern HidArrayGetValueAtIndexFn hid_array_get_value_at_index_impl;
+extern HidElementGetUsagePageFn hid_element_get_usage_page_impl;
+extern HidElementGetReportIDFn hid_element_get_report_id_impl;
+extern HidDebugFileOpenFn hid_debug_file_open_impl;
+
 typedef Reply (*ChannelRequestFn)(HidChannel *channel, uint8_t device_number, uint16_t request_id,
                                   const uint8_t *params, size_t params_length, bool prefer_long,
                                   double timeout_seconds);

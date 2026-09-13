@@ -665,5 +665,721 @@ int test_profile_io(void) {
         return 1;
     }
 
+    io_device.feature_count = 2;
+    io_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    io_device.features[1] = (Feature){.id = FEATURE_ADJUSTABLE_DPI, .index = 6};
+    uint8_t final_sector[32] = {0};
+    bool final_profile_io_ok =
+        !read_sector(NULL, 0, sizeof(final_sector), final_sector) &&
+        !read_sector(&io_device, 0, 1, final_sector) &&
+        !read_sector(&io_device, 0, MAX_SECTOR_BYTES + 1, final_sector) &&
+        !read_sector(&io_device, 0, sizeof(final_sector), NULL) &&
+        !verify_sector_readback(NULL, 0, final_sector, sizeof(final_sector)) &&
+        !verify_sector_readback(&io_device, 0, NULL, sizeof(final_sector)) &&
+        !verify_sector_readback(&io_device, 0, final_sector, 1) &&
+        !verify_sector_readback(&io_device, 0, final_sector, MAX_SECTOR_BYTES + 1);
+
+    const Reply final_short_read = {.status = REPLY_OK, .length = 8};
+    ChannelRequestTestContext final_short_read_context = {
+        .replies = &final_short_read, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_short_read_context;
+    final_profile_io_ok =
+        final_profile_io_ok && !read_sector(&io_device, 0, sizeof(final_sector), final_sector);
+
+    uint8_t final_mode = 0;
+    const Reply final_mode_timeout = {.status = REPLY_TIMEOUT};
+    const Reply final_mode_short = {.status = REPLY_OK, .length = 0};
+    const Reply final_mode_onboard = {
+        .status = REPLY_OK, .length = 1, .bytes = {ONBOARD_MODE_ONBOARD}};
+    ChannelRequestTestContext final_mode_context = {
+        .replies = &final_mode_timeout, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_mode_context;
+    final_profile_io_ok = final_profile_io_ok && !get_onboard_mode(&io_device, &final_mode);
+    final_mode_context.replies = &final_mode_short;
+    final_mode_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok && !get_onboard_mode(&io_device, &final_mode);
+    final_mode_context.replies = &final_mode_onboard;
+    final_mode_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok && get_onboard_mode(&io_device, &final_mode) &&
+                          final_mode == ONBOARD_MODE_ONBOARD &&
+                          !get_onboard_mode(NULL, &final_mode) &&
+                          !get_onboard_mode(&io_device, NULL);
+
+    ChannelRequestTestContext final_set_mode_context = {
+        .replies = &final_mode_timeout, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_set_mode_context;
+    final_profile_io_ok = final_profile_io_ok && !set_onboard_mode(NULL, ONBOARD_MODE_ONBOARD) &&
+                          !set_onboard_mode(&io_device, ONBOARD_MODE_ONBOARD);
+    final_set_mode_context.replies = &final_mode_onboard;
+    final_set_mode_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok && set_onboard_mode(&io_device, ONBOARD_MODE_ONBOARD);
+
+    uint8_t final_profile_index = 0;
+    const Reply final_profile_index_short = {.status = REPLY_OK, .length = 1};
+    const Reply final_profile_index_ok = {.status = REPLY_OK, .length = 2, .bytes = {0, 1}};
+    ChannelRequestTestContext final_profile_index_context = {
+        .replies = &final_mode_timeout, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_profile_index_context;
+    final_profile_io_ok =
+        final_profile_io_ok && !get_current_onboard_profile(&io_device, &final_profile_index);
+    final_profile_index_context.replies = &final_profile_index_short;
+    final_profile_index_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok && !get_current_onboard_profile(&io_device, &final_profile_index);
+    final_profile_index_context.replies = &final_profile_index_ok;
+    final_profile_index_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok && get_current_onboard_profile(&io_device, &final_profile_index) &&
+        final_profile_index == 1 && !get_current_onboard_profile(NULL, &final_profile_index) &&
+        !get_current_onboard_profile(&io_device, NULL);
+
+    const Reply final_dpi_index_ok = {.status = REPLY_OK, .length = 1, .bytes = {1}};
+    ChannelRequestTestContext final_dpi_index_context = {
+        .replies = &final_mode_timeout, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_dpi_index_context;
+    final_profile_io_ok = final_profile_io_ok && !set_current_onboard_dpi_index(NULL, 1) &&
+                          !set_current_onboard_dpi_index(&io_device, 1);
+    final_dpi_index_context.replies = &final_mode_onboard;
+    final_dpi_index_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok && set_current_onboard_dpi_index(&io_device, 1);
+
+    uint8_t final_dpi_index = 0;
+    final_dpi_index_context.replies = &final_mode_timeout;
+    final_dpi_index_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok &&
+                          !get_current_onboard_dpi_index(NULL, &final_dpi_index) &&
+                          !get_current_onboard_dpi_index(&io_device, NULL) &&
+                          !get_current_onboard_dpi_index(&io_device, &final_dpi_index);
+    final_dpi_index_context.replies = &final_dpi_index_ok;
+    final_dpi_index_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok &&
+                          get_current_onboard_dpi_index(&io_device, &final_dpi_index) &&
+                          final_dpi_index == 1;
+    const Reply final_dpi_index_short = {.status = REPLY_OK, .length = 0};
+    final_dpi_index_context.replies = &final_dpi_index_short;
+    final_dpi_index_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok && !get_current_onboard_dpi_index(&io_device, &final_dpi_index);
+
+    uint16_t final_sensor_dpi = 0;
+    const Reply final_sensor_short = {.status = REPLY_OK, .length = 2};
+    const Reply final_sensor_ok = {.status = REPLY_OK, .length = 3, .bytes = {0, 0x04, 0xB0}};
+    ChannelRequestTestContext final_sensor_context = {
+        .replies = &final_mode_timeout, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_sensor_context;
+    final_profile_io_ok = final_profile_io_ok &&
+                          !get_current_sensor_dpi(NULL, 0, &final_sensor_dpi) &&
+                          !get_current_sensor_dpi(&io_device, 0, NULL) &&
+                          !get_current_sensor_dpi(&io_device, 0, &final_sensor_dpi);
+    final_sensor_context.replies = &final_sensor_short;
+    final_sensor_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok && !get_current_sensor_dpi(&io_device, 0, &final_sensor_dpi);
+    final_sensor_context.replies = &final_sensor_ok;
+    final_sensor_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok &&
+                          get_current_sensor_dpi(&io_device, 0, &final_sensor_dpi) &&
+                          final_sensor_dpi == 1200;
+
+    const uint16_t final_stages[] = {800, 1200, 1600};
+    final_profile_io_ok = final_profile_io_ok && !profile_contains_dpi(NULL, 3, 1200) &&
+                          !profile_contains_dpi(final_stages, 3, 999) &&
+                          profile_contains_dpi(final_stages, 3, 1200);
+
+    const Reply final_live_replies[] = {
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 3, .bytes = {0, 0x04, 0xB0}},
+    };
+    ChannelRequestTestContext final_live_context = {
+        .replies = final_live_replies, .reply_count = 3, .calls = 0};
+    g_channel_request_test_context = &final_live_context;
+    final_profile_io_ok = final_profile_io_ok && set_live_dpi_index_and_verify(&io_device, 1, 1200);
+    ChannelRequestTestContext final_live_sensor_context = {
+        .replies = &final_sensor_ok, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_live_sensor_context;
+    final_profile_io_ok = final_profile_io_ok && live_dpi_matches(&io_device, 1200);
+    final_live_sensor_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok && !live_dpi_matches(&io_device, 1600);
+
+    const Reply final_active_profile_other = {.status = REPLY_OK, .length = 2, .bytes = {0, 0}};
+    ChannelRequestTestContext final_sync_context = {
+        .replies = &final_active_profile_other, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &final_sync_context;
+    final_profile_io_ok =
+        final_profile_io_ok && (sync_active_profile_default_dpi(&io_device, 2, 2, 1200), true);
+    final_sync_context.replies = &final_mode_timeout;
+    final_sync_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok && (sync_active_profile_default_dpi(&io_device, 1, 2, 1200), true);
+
+    HidInterface final_g502x_interface = {0};
+    Device final_g502x_device = {0};
+    final_g502x_device.iface = &final_g502x_interface;
+    final_g502x_device.feature_count = 2;
+    final_g502x_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    final_g502x_device.features[1] = (Feature){.id = FEATURE_ADJUSTABLE_DPI, .index = 6};
+    final_g502x_interface.product_id = 0xC099;
+    const Reply final_sync_success_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0, 1}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 3, .bytes = {0, 0x04, 0xB0}},
+    };
+    final_sync_context.replies = final_sync_success_replies;
+    final_sync_context.reply_count = 4;
+    final_sync_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok &&
+                          (sync_active_profile_default_dpi(&final_g502x_device, 1, 2, 1200), true);
+
+    const Reply final_sync_failure_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0, 1}},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    final_sync_context.replies = final_sync_failure_replies;
+    final_sync_context.reply_count = 5;
+    final_sync_context.calls = 0;
+    sync_active_profile_default_dpi(&final_g502x_device, 1, 2, 1200);
+    final_profile_io_ok = final_profile_io_ok && final_sync_context.calls == 5;
+
+    final_sync_context.replies = &final_active_profile_other;
+    final_sync_context.reply_count = 1;
+    final_sync_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 2, 1200);
+    const Reply final_active_profile_one = {.status = REPLY_OK, .length = 2, .bytes = {0, 1}};
+    final_sync_context.replies = &final_active_profile_one;
+    final_sync_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 2, 800);
+    final_sync_context.replies = final_sync_success_replies;
+    final_sync_context.reply_count = 4;
+    final_sync_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 2, 999);
+    final_sync_context.replies = final_sync_failure_replies;
+    final_sync_context.reply_count = 5;
+    final_sync_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 2, 999) &&
+        final_sync_context.calls == 5;
+    final_profile_io_ok =
+        final_profile_io_ok && !recover_live_dpi_if_needed(NULL, 1, final_stages, 3, 2, 999) &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, NULL, 3, 2, 999) &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 0, 2, 999) &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 0, 999) &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 4, 999) &&
+        !recover_live_dpi_if_needed(&final_g502x_device, 0, final_stages, 3, 2, 999);
+
+    io_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    ProfileHeader final_headers[1] = {{.sector = 0x0123, .enabled = 0}};
+    Profile final_loaded = {0};
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !load_profile_with_headers(NULL, &io_info, final_headers, 1, 0, &final_loaded) &&
+        !load_profile_with_headers(&io_device, NULL, final_headers, 1, 0, &final_loaded) &&
+        !load_profile_with_headers(&io_device, &io_info, NULL, 1, 0, &final_loaded) &&
+        !load_profile_with_headers(&io_device, &io_info, final_headers, 0, 0, &final_loaded) &&
+        !load_profile_with_headers(&io_device, &io_info, final_headers, 1, 0, NULL) &&
+        !load_profile_with_headers(&io_device, &io_info, final_headers, MAX_HEADERS + 1, 0,
+                                   &final_loaded) &&
+        !load_profile_with_headers(&io_device, &io_info, final_headers, 1, 2, &final_loaded);
+    ChannelRequestTestContext final_load_context = {
+        .replies = first_chunks, .reply_count = first_chunk_count, .calls = 0};
+    g_channel_request_test_context = &final_load_context;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        load_profile_with_headers(&io_device, &io_info, final_headers, 1, 0, &final_loaded);
+    if (final_loaded.data != NULL) {
+        free(final_loaded.data);
+    }
+    final_load_context.replies = &final_mode_timeout;
+    final_load_context.reply_count = 1;
+    final_load_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !load_profile_with_headers(&io_device, &io_info, final_headers, 1, 1, &final_loaded);
+
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !load_profile_summary_with_headers(NULL, &io_info, final_headers, 1, 0, &final_loaded) &&
+        !load_profile_summary_with_headers(&io_device, NULL, final_headers, 1, 0, &final_loaded) &&
+        !load_profile_summary_with_headers(&io_device, &io_info, NULL, 1, 0, &final_loaded) &&
+        !load_profile_summary_with_headers(&io_device, &io_info, final_headers, 0, 0,
+                                           &final_loaded) &&
+        !load_profile_summary_with_headers(&io_device, &io_info, final_headers, 1, 0, NULL) &&
+        !load_profile_summary_with_headers(&io_device, &io_info, final_headers, MAX_HEADERS + 1, 0,
+                                           &final_loaded) &&
+        !load_profile_summary_with_headers(&io_device, &io_info, final_headers, 1, 2,
+                                           &final_loaded);
+    final_load_context.replies = first_chunks;
+    final_load_context.reply_count = first_chunk_count;
+    final_load_context.calls = 0;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        load_profile_summary_with_headers(&io_device, &io_info, final_headers, 1, 0, &final_loaded);
+    if (final_loaded.data != NULL) {
+        free(final_loaded.data);
+    }
+    final_load_context.replies = &final_mode_timeout;
+    final_load_context.reply_count = 1;
+    final_load_context.calls = 0;
+    final_profile_io_ok = final_profile_io_ok &&
+                          !load_profile_summary_with_headers(&io_device, &io_info, final_headers, 1,
+                                                             1, &final_loaded);
+
+    final_profile_io_ok = final_profile_io_ok && !load_selected_profile(NULL, 0, &final_loaded) &&
+                          !load_selected_profile(&io_device, 0, NULL);
+
+    Profile final_rgb_profile = {0};
+    uint8_t final_rgb_data[255] = {0};
+    uint8_t final_rgb_zone[1] = {0};
+    uint8_t final_rgb_color[1][3] = {{1, 2, 3}};
+    final_rgb_profile.data_length = sizeof(final_rgb_data);
+    final_rgb_profile.rgb_offset = RGB_PROFILE_BASE_OFFSET;
+    final_rgb_profile.rgb_zone_count = 2;
+    final_rgb_profile.rgb_zone_present[0] = true;
+    final_rgb_profile.rgb_zone_present[1] = true;
+    final_rgb_profile.rgb_layout_supported = true;
+    final_profile_io_ok =
+        final_profile_io_ok &&
+        !write_rgb_zone_colors(NULL, &final_rgb_profile, final_rgb_zone, final_rgb_color, 1) &&
+        !write_rgb_zone_colors(final_rgb_data, NULL, final_rgb_zone, final_rgb_color, 1) &&
+        !write_rgb_zone_colors(final_rgb_data, &final_rgb_profile, NULL, final_rgb_color, 1) &&
+        !write_rgb_zone_colors(final_rgb_data, &final_rgb_profile, final_rgb_zone, NULL, 1) &&
+        !write_rgb_zone_colors(final_rgb_data, &final_rgb_profile, final_rgb_zone, final_rgb_color,
+                               0);
+    uint8_t final_bad_zone[1] = {2};
+    final_profile_io_ok =
+        final_profile_io_ok && !write_rgb_zone_colors(final_rgb_data, &final_rgb_profile,
+                                                      final_bad_zone, final_rgb_color, 1);
+    uint8_t final_duplicate_zones[2] = {0, 0};
+    uint8_t final_two_colors[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    final_profile_io_ok =
+        final_profile_io_ok && !write_rgb_zone_colors(final_rgb_data, &final_rgb_profile,
+                                                      final_duplicate_zones, final_two_colors, 2);
+    final_rgb_profile.rgb_zone_present[1] = false;
+    final_rgb_zone[0] = 1;
+    final_profile_io_ok =
+        final_profile_io_ok && !write_rgb_zone_colors(final_rgb_data, &final_rgb_profile,
+                                                      final_rgb_zone, final_rgb_color, 1);
+
+    final_profile_io_ok =
+        final_profile_io_ok && !write_dpi_stage_table(NULL, &final_rgb_profile, final_stages, 1) &&
+        !write_dpi_stage_table(final_rgb_data, NULL, final_stages, 1) &&
+        !write_dpi_stage_table(final_rgb_data, &final_rgb_profile, NULL, 1) &&
+        !write_dpi_stage_table(final_rgb_data, &final_rgb_profile, final_stages, 0);
+
+    detect_button_layout(NULL);
+    detect_gshift_button_layout(NULL, NULL);
+    detect_dpi_layout(NULL, NULL);
+    detect_rgb_layout(NULL);
+    uint8_t invalid_layout_data[70] = {0};
+    invalid_layout_data[32] = 0x30;
+    Profile invalid_layout = {.info = {.button_count = 1},
+                              .data = invalid_layout_data,
+                              .data_length = sizeof(invalid_layout_data)};
+    detect_button_layout(&invalid_layout);
+
+    // Exercise the remaining inexpensive defensive and firmware-variant
+    // paths. Keep these cases local to the profile-I/O test so production
+    // behavior remains unchanged.
+    bool edge_coverage_ok = true;
+    uint8_t one_byte = 0;
+    edge_coverage_ok = edge_coverage_ok && !sector_crc_ok(&one_byte, 1);
+    sector_put_crc(&one_byte, 1);
+
+    const Reply profile_info_huge_sector = {
+        .status = REPLY_OK,
+        .length = 10,
+        .bytes = {0, 5, 0, 1, 0, 5, 1, 0xFF, 0xFF, 0},
+    };
+    ChannelRequestTestContext edge_context = {
+        .replies = &profile_info_huge_sector, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &edge_context;
+    edge_coverage_ok = edge_coverage_ok && !get_profile_info(&io_device, &parsed_info);
+
+    edge_coverage_ok = edge_coverage_ok &&
+                       !write_sector(NULL, 0, mock_sector, sizeof(mock_sector)) &&
+                       !write_sector(&io_device, 0, NULL, sizeof(mock_sector));
+
+    uint8_t bad_crc_sector[255];
+    memcpy(bad_crc_sector, mock_sector, sizeof(bad_crc_sector));
+    bad_crc_sector[sizeof(bad_crc_sector) - 1] ^= 0x01;
+    Reply bad_crc_chunks[32];
+    size_t bad_crc_chunk_count =
+        build_sector_read_replies(bad_crc_sector, sizeof(bad_crc_sector), bad_crc_chunks, 32);
+    ChannelRequestTestContext bad_crc_context = {
+        .replies = bad_crc_chunks, .reply_count = bad_crc_chunk_count, .calls = 0};
+    g_channel_request_test_context = &bad_crc_context;
+    edge_coverage_ok = edge_coverage_ok && !verify_sector_readback(&io_device, 0x0123, mock_sector,
+                                                                   sizeof(bad_crc_sector));
+
+    Reply retry_readback_chunks[64];
+    memcpy(retry_readback_chunks, bad_crc_chunks, bad_crc_chunk_count * sizeof(Reply));
+    memcpy(retry_readback_chunks + bad_crc_chunk_count, data_chunks,
+           data_chunk_count * sizeof(Reply));
+    ChannelRequestTestContext retry_readback_context = {
+        .replies = retry_readback_chunks,
+        .reply_count = bad_crc_chunk_count + data_chunk_count,
+        .calls = 0,
+    };
+    g_channel_request_test_context = &retry_readback_context;
+    edge_coverage_ok = edge_coverage_ok && verify_sector_readback(&io_device, 0x0123, mock_sector,
+                                                                  sizeof(bad_crc_sector));
+
+    HidInterface mapping_interface = {0};
+    Device mapping_device = {0};
+    mapping_device.iface = &mapping_interface;
+    bool mapping_ok = current_onboard_profile_number(NULL, 1) == 2;
+    mapping_device.iface = NULL;
+    mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 1) == 2;
+    mapping_device.iface = &mapping_interface;
+    const uint16_t g502x_products[] = {0xC095, 0xC098, 0x4099, 0x409F};
+    for (size_t i = 0; i < sizeof(g502x_products) / sizeof(g502x_products[0]); i++) {
+        mapping_interface.product_id = g502x_products[i];
+        mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
+    }
+    mapping_interface.product_id = 0xFFFF;
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G502 X LIGHTSPEED");
+    mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G502X LIGHTSPEED");
+    mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "Other mouse");
+    mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 0) == 1;
+    edge_coverage_ok = edge_coverage_ok && mapping_ok;
+
+    uint8_t variant_dpi_data[255] = {0};
+    Profile variant_dpi_profile = {.info = {.profile_format = 5},
+                                   .data = variant_dpi_data,
+                                   .data_length = sizeof(variant_dpi_data)};
+    variant_dpi_data[1] = 0;
+    variant_dpi_data[2] = 0;
+    uint16_t variant_dpis[] = {800, 1200, 1600, 2400, 3200};
+    for (size_t i = 0; i < 5; i++) {
+        write_le16(variant_dpi_data + 3 + i * 2, variant_dpis[i]);
+    }
+    const uint16_t zero_dpi_products[] = {0xC084, 0xC092, 0xB01C};
+    for (size_t i = 0; i < sizeof(zero_dpi_products) / sizeof(zero_dpi_products[0]); i++) {
+        mapping_interface.product_id = zero_dpi_products[i];
+        detect_dpi_layout(&variant_dpi_profile, &mapping_device);
+        edge_coverage_ok = edge_coverage_ok && variant_dpi_profile.dpi_layout_supported;
+    }
+    mapping_interface.product_id = 0xFFFF;
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G102 gaming mouse");
+    detect_dpi_layout(&variant_dpi_profile, &mapping_device);
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G203 gaming mouse");
+    detect_dpi_layout(&variant_dpi_profile, &mapping_device);
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G603 gaming mouse");
+    detect_dpi_layout(&variant_dpi_profile, &mapping_device);
+
+    Profile rgb_edges = {0};
+    uint8_t rgb_edge_data[255] = {0};
+    uint8_t rgb_edge_zone[1] = {0};
+    uint8_t rgb_edge_color[1][3] = {{1, 2, 3}};
+    rgb_edges.data = rgb_edge_data;
+    rgb_edges.data_length = sizeof(rgb_edge_data);
+    rgb_edges.rgb_offset = RGB_PROFILE_BASE_OFFSET;
+    rgb_edges.rgb_zone_count = 1;
+    rgb_edges.rgb_zone_present[0] = true;
+    rgb_edges.rgb_layout_supported = true;
+    Profile rgb_edge_case = rgb_edges;
+    rgb_edge_case.rgb_layout_supported = false;
+    edge_coverage_ok = edge_coverage_ok && !write_rgb_zone_colors(rgb_edge_data, &rgb_edge_case,
+                                                                  rgb_edge_zone, rgb_edge_color, 1);
+    rgb_edge_case = rgb_edges;
+    edge_coverage_ok =
+        edge_coverage_ok && !write_rgb_zone_colors(rgb_edge_data, &rgb_edge_case, rgb_edge_zone,
+                                                   rgb_edge_color, RGB_PROFILE_RECORD_COUNT + 1);
+    rgb_edge_case = rgb_edges;
+    rgb_edge_case.rgb_zone_count = 0;
+    edge_coverage_ok = edge_coverage_ok && !write_rgb_zone_colors(rgb_edge_data, &rgb_edge_case,
+                                                                  rgb_edge_zone, rgb_edge_color, 1);
+    rgb_edge_case = rgb_edges;
+    rgb_edge_case.rgb_zone_count = RGB_PROFILE_RECORD_COUNT + 1;
+    edge_coverage_ok = edge_coverage_ok && !write_rgb_zone_colors(rgb_edge_data, &rgb_edge_case,
+                                                                  rgb_edge_zone, rgb_edge_color, 1);
+    rgb_edge_case = rgb_edges;
+    rgb_edge_case.rgb_offset = sizeof(rgb_edge_data) + 1;
+    edge_coverage_ok = edge_coverage_ok && !write_rgb_zone_colors(rgb_edge_data, &rgb_edge_case,
+                                                                  rgb_edge_zone, rgb_edge_color, 1);
+    rgb_edge_case = rgb_edges;
+    rgb_edge_case.data_length = RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES;
+    edge_coverage_ok = edge_coverage_ok && !write_rgb_zone_colors(rgb_edge_data, &rgb_edge_case,
+                                                                  rgb_edge_zone, rgb_edge_color, 1);
+
+    Profile dpi_table_edges = {0};
+    uint8_t dpi_table_data[32] = {0};
+    dpi_table_edges.data_length = sizeof(dpi_table_data);
+    dpi_table_edges.dpi_offset = 3;
+    dpi_table_edges.dpi_layout_supported = true;
+    dpi_table_edges.dpi_unused_value = UINT16_MAX;
+    edge_coverage_ok = edge_coverage_ok &&
+                       !write_dpi_stage_table(dpi_table_data, &dpi_table_edges, variant_dpis, 6);
+    dpi_table_edges.dpi_offset = sizeof(dpi_table_data) + 1;
+    edge_coverage_ok = edge_coverage_ok &&
+                       !write_dpi_stage_table(dpi_table_data, &dpi_table_edges, variant_dpis, 1);
+    dpi_table_edges = (Profile){.data_length = 6,
+                                .dpi_offset = 3,
+                                .dpi_layout_supported = true,
+                                .dpi_unused_value = UINT16_MAX};
+    edge_coverage_ok = edge_coverage_ok &&
+                       !write_dpi_stage_table(dpi_table_data, &dpi_table_edges, variant_dpis, 1);
+
+    uint16_t edge_values[4] = {0};
+    size_t edge_value_count = 0;
+    io_device.features[0] = (Feature){.id = FEATURE_ADJUSTABLE_DPI, .index = 5};
+    g_channel_request_test_context = &edge_context;
+    edge_coverage_ok = edge_coverage_ok &&
+                       !adjustable_dpi_values(&io_device, NULL, &edge_value_count, 4, NULL, NULL);
+    edge_coverage_ok =
+        edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values, NULL, 4, NULL, NULL);
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 0, NULL, NULL);
+    const Reply sensor_count_short = {.status = REPLY_OK, .length = 0};
+    edge_context.replies = &sensor_count_short;
+    edge_context.reply_count = 1;
+    edge_context.calls = 0;
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 4, NULL, NULL);
+    const Reply sensor_list_short[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0, 0x03}},
+    };
+    edge_context.replies = sensor_list_short;
+    edge_context.reply_count = 2;
+    edge_context.calls = 0;
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 4, NULL, NULL);
+    const Reply sensor_list_zero[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 3, .bytes = {0, 0, 0}},
+    };
+    edge_context.replies = sensor_list_zero;
+    edge_context.reply_count = 2;
+    edge_context.calls = 0;
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 4, NULL, NULL);
+    const Reply sensor_list_plain[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 5, .bytes = {0, 0x03, 0x20, 0x03, 0x21}},
+    };
+    edge_context.replies = sensor_list_plain;
+    edge_context.reply_count = 2;
+    edge_context.calls = 0;
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 1, NULL, NULL);
+
+    const Reply sensor_list_with_terminator[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 5, .bytes = {0, 0x03, 0x20, 0x00, 0x00}},
+    };
+    edge_context.replies = sensor_list_with_terminator;
+    edge_context.reply_count = 2;
+    edge_context.calls = 0;
+    edge_coverage_ok =
+        edge_coverage_ok &&
+        adjustable_dpi_values(&io_device, edge_values, &edge_value_count, 4, NULL, NULL) == 1 &&
+        edge_value_count == 1 && edge_values[0] == 800;
+
+    const Reply mode_switch_query_failure[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {ONBOARD_MODE_HOST}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    final_mode_context.replies = mode_switch_query_failure;
+    final_mode_context.reply_count = 3;
+    final_mode_context.calls = 0;
+    g_channel_request_test_context = &final_mode_context;
+    edge_coverage_ok = edge_coverage_ok && !ensure_onboard_mode_for_write(&final_g502x_device);
+
+    const Reply mode_switch_wrong_mode[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {ONBOARD_MODE_HOST}},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {ONBOARD_MODE_HOST}},
+    };
+    final_mode_context.replies = mode_switch_wrong_mode;
+    final_mode_context.reply_count = 3;
+    final_mode_context.calls = 0;
+    g_channel_request_test_context = &final_mode_context;
+    edge_coverage_ok = edge_coverage_ok && !ensure_onboard_mode_for_write(&final_g502x_device);
+
+    uint8_t invalid_gshift_data[255] = {0};
+    Profile invalid_gshift = {
+        .info = {.profile_format = 5, .button_count = 5, .shift_flags = 0x02},
+        .data = invalid_gshift_data,
+        .data_length = sizeof(invalid_gshift_data),
+        .layout_supported = true,
+        .button_offset = 32,
+    };
+    for (size_t i = 0; i < 5; i++) {
+        memcpy(invalid_gshift_data + 96 + i * 4, gshift_specs[i], 4);
+    }
+    invalid_gshift_data[96 + 2 * 4] = 0x30;
+    invalid_gshift_data[96 + 3 * 4] = 0x30;
+    detect_gshift_button_layout(&invalid_gshift, NULL);
+    edge_coverage_ok = edge_coverage_ok && !invalid_gshift.gshift_layout_supported;
+
+    // Exercise the short final read and the fallback-sector failure without
+    // relying on a full profile load to reach these paths.
+    io_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    uint8_t tiny_sector[2] = {0};
+    ChannelRequestTestContext tiny_read_context = {
+        .replies = first_chunks, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &tiny_read_context;
+    edge_coverage_ok = edge_coverage_ok &&
+                       read_sector(&io_device, 0x0123, sizeof(tiny_sector), tiny_sector) &&
+                       tiny_sector[0] == first_sector[0] && tiny_sector[1] == first_sector[1];
+
+    Reply fallback_failure_replies[3] = {zero_chunks[0], zero_chunks[1],
+                                         (Reply){.status = REPLY_TIMEOUT}};
+    ChannelRequestTestContext fallback_failure_context = {
+        .replies = fallback_failure_replies, .reply_count = 3, .calls = 0};
+    g_channel_request_test_context = &fallback_failure_context;
+    uint16_t fallback_failure_sector = 99;
+    edge_coverage_ok =
+        edge_coverage_ok && !read_profile_control(&io_device, &io_info, &fallback_failure_sector,
+                                                  control_readback, sizeof(control_readback));
+
+    // Fill exactly MAX_HEADERS entries so parse_profile_headers also takes
+    // the header-count limit at the loop condition.
+    uint8_t maximum_headers_control[MAX_HEADERS * 4 + 4] = {0};
+    for (size_t i = 0; i < MAX_HEADERS; i++) {
+        maximum_headers_control[i * 4] = 0x01;
+        maximum_headers_control[i * 4 + 1] = (uint8_t)(i + 1);
+        maximum_headers_control[i * 4 + 2] = (uint8_t)(i & 1);
+    }
+    size_t maximum_header_count = 0;
+    edge_coverage_ok = edge_coverage_ok &&
+                       parse_profile_headers(&header_info, maximum_headers_control,
+                                             sizeof(maximum_headers_control), parsed_headers,
+                                             &maximum_header_count) &&
+                       maximum_header_count == MAX_HEADERS;
+
+    uint8_t button_bounds_data[40] = {0};
+    Profile button_bounds_profile = {
+        .info = {.profile_format = 5, .button_count = 3},
+        .data = button_bounds_data,
+        .data_length = sizeof(button_bounds_data),
+    };
+    detect_button_layout(&button_bounds_profile);
+
+    // Cover all four recognized legacy RGB modes in the mode classifier.
+    Profile rgb_mode_profile = {0};
+    uint8_t rgb_mode_data[255];
+    memset(rgb_mode_data, 0xFF, sizeof(rgb_mode_data));
+    rgb_mode_profile.info.profile_format = 5;
+    rgb_mode_profile.data = rgb_mode_data;
+    rgb_mode_profile.data_length = sizeof(rgb_mode_data);
+    const uint8_t rgb_modes[RGB_PROFILE_RECORD_COUNT] = {0x00, 0x01, 0x03, 0x0A};
+    for (size_t i = 0; i < RGB_PROFILE_RECORD_COUNT; i++) {
+        rgb_mode_data[RGB_PROFILE_BASE_OFFSET + i * RGB_PROFILE_RECORD_BYTES] = rgb_modes[i];
+    }
+    detect_rgb_layout(&rgb_mode_profile);
+    edge_coverage_ok = edge_coverage_ok && rgb_mode_profile.rgb_layout_supported;
+
+    // A live DPI write can fail transiently, then succeed after the retry
+    // delay. Also verify the bounded all-fail case and its loop exit.
+    const Reply live_retry_replies[] = {
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_OK},
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 3, .bytes = {0, 0x04, 0xB0}},
+    };
+    ChannelRequestTestContext live_retry_context = {
+        .replies = live_retry_replies, .reply_count = 4, .calls = 0};
+    g_channel_request_test_context = &live_retry_context;
+    edge_coverage_ok =
+        edge_coverage_ok && set_live_dpi_index_and_verify(&final_g502x_device, 1, 1200);
+
+    const Reply live_all_fail_replies[4] = {
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext live_all_fail_context = {
+        .replies = live_all_fail_replies, .reply_count = 4, .calls = 0};
+    g_channel_request_test_context = &live_all_fail_context;
+    edge_coverage_ok =
+        edge_coverage_ok && !set_live_dpi_index_and_verify(&final_g502x_device, 1, 1200);
+
+    // Exercise both callers' warning paths when all four live-DPI attempts
+    // fail after the profile has been identified as active.
+    const Reply sync_live_fail_replies[5] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0, 1}},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext sync_live_fail_context = {
+        .replies = sync_live_fail_replies, .reply_count = 5, .calls = 0};
+    g_channel_request_test_context = &sync_live_fail_context;
+    sync_active_profile_default_dpi(&final_g502x_device, 1, 2, 1200);
+
+    const Reply recover_live_fail_replies[5] = {
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0, 1}},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+        (Reply){.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext recover_live_fail_context = {
+        .replies = recover_live_fail_replies, .reply_count = 5, .calls = 0};
+    g_channel_request_test_context = &recover_live_fail_context;
+    edge_coverage_ok = edge_coverage_ok &&
+                       !recover_live_dpi_if_needed(&final_g502x_device, 1, final_stages, 3, 2, 999);
+
+    // Reach the zero-terminator and plain-value capacity checks directly,
+    // keeping these decoder cases independent of earlier assertions.
+    io_device.features[0] = (Feature){.id = FEATURE_ADJUSTABLE_DPI, .index = 5};
+    const Reply zero_terminator_dpi_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 5, .bytes = {0, 0, 0, 0x03, 0x20}},
+    };
+    ChannelRequestTestContext zero_terminator_dpi_context = {
+        .replies = zero_terminator_dpi_replies, .reply_count = 2, .calls = 0};
+    g_channel_request_test_context = &zero_terminator_dpi_context;
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 4, NULL, NULL);
+
+    const Reply plain_capacity_dpi_replies[] = {
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {1}},
+        (Reply){.status = REPLY_OK, .length = 5, .bytes = {0, 0x03, 0x20, 0x03, 0x21}},
+    };
+    ChannelRequestTestContext plain_capacity_dpi_context = {
+        .replies = plain_capacity_dpi_replies, .reply_count = 2, .calls = 0};
+    g_channel_request_test_context = &plain_capacity_dpi_context;
+    edge_coverage_ok = edge_coverage_ok && !adjustable_dpi_values(&io_device, edge_values,
+                                                                  &edge_value_count, 1, NULL, NULL);
+
+    ProfileHeader enabled_header = {.sector = 0x0123, .enabled = 1};
+    io_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
+    ChannelRequestTestContext summary_enabled_context = {
+        .replies = first_chunks, .reply_count = first_chunk_count, .calls = 0};
+    g_channel_request_test_context = &summary_enabled_context;
+    Profile enabled_summary = {0};
+    edge_coverage_ok =
+        edge_coverage_ok && load_profile_summary_with_headers(&io_device, &io_info, &enabled_header,
+                                                              1, 0, &enabled_summary);
+    free(enabled_summary.data);
+
+    if (!edge_coverage_ok) {
+        fprintf(stderr, "profile I/O edge-coverage self-test failed\n");
+        return 1;
+    }
+    if (!final_profile_io_ok) {
+        fprintf(stderr, "profile I/O targeted-path self-test failed\n");
+        return 1;
+    }
+
     return 0;
 }

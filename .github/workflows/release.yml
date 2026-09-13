@@ -12,9 +12,39 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  APP_ARCH: arm64
+  APP_BUNDLE_IDENTIFIER: com.cotyledonlabs.lope
+
 jobs:
+  verify:
+    name: Verify tagged source
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Verify Apple toolchain
+        run: |
+          set -euo pipefail
+          xcode-select --print-path
+          xcrun --find swift-format
+          xcrun --find codesign
+          xcrun swift --version
+
+      - name: Check formatting
+        run: make lint
+
+      - name: Run unit and self-tests
+        run: make test
+
+      - name: Enforce coverage minimums
+        run: make coverage-check
+
   release:
     name: Build, notarize, and publish macOS app
+    needs: verify
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -37,7 +67,8 @@ jobs:
           fi
           version="${GITHUB_REF_NAME#v}"
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
-          echo "APP_ARCHIVE=dist/LOPE-${version}-macos-arm64.zip" >> "$GITHUB_ENV"
+          echo "APP_BUILD=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "APP_ARCHIVE=dist/LOPE-${version}-macos-${APP_ARCH}.zip" >> "$GITHUB_ENV"
 
       - name: Import Developer ID certificate
         env:
@@ -82,9 +113,28 @@ jobs:
           make app \
             SIGNING_IDENTITY="$SIGNING_IDENTITY" \
             APP_VERSION="$APP_VERSION" \
-            APP_BUILD="$GITHUB_RUN_NUMBER" \
+            APP_BUILD="$APP_BUILD" \
+            APP_ARCH="$APP_ARCH" \
+            BUNDLE_IDENTIFIER="$APP_BUNDLE_IDENTIFIER" \
             CODESIGN_EXTRA_FLAGS='--timestamp'
           codesign --verify --deep --strict --verbose=2 outputs/LOPE.app
+
+      - name: Validate release metadata and signature
+        run: |
+          set -euo pipefail
+          plist='outputs/LOPE.app/Contents/Info.plist'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = "$APP_BUNDLE_IDENTIFIER"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")" = "$APP_VERSION"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" = "$APP_BUILD"
+
+          signature_info="$(codesign -dvvv --entitlements :- outputs/LOPE.app 2>&1)"
+          echo "$signature_info"
+          grep -q 'Authority=Developer ID Application:' <<<"$signature_info"
+          grep -q 'TeamIdentifier=' <<<"$signature_info"
+          if grep -q 'com.apple.security.get-task-allow' <<<"$signature_info"; then
+            echo 'Release signature unexpectedly contains get-task-allow.' >&2
+            exit 1
+          fi
 
       - name: Submit app for notarization
         env:
@@ -111,9 +161,12 @@ jobs:
       - name: Package release assets
         run: |
           set -euo pipefail
-          mkdir -p dist
-          ditto -c -k --keepParent outputs/LOPE.app "$APP_ARCHIVE"
-          shasum -a 256 "$APP_ARCHIVE" > "${APP_ARCHIVE}.sha256"
+          make package-release \
+            APP_VERSION="$APP_VERSION" \
+            APP_ARCH="$APP_ARCH" \
+            RELEASE_ARCHIVE="$APP_ARCHIVE"
+          test -s "$APP_ARCHIVE"
+          test -s "${APP_ARCHIVE}.sha256"
 
       - name: Create or update GitHub release
         env:

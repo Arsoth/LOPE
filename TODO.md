@@ -9,6 +9,11 @@
 
 # LOPE TODO Ingest:
 
+- the wake warning pops up in the status footer and it shouldn't, the warning is front and center already
+- if the app doesn't have access it needs to open a modal saying this and an option to open system settings. do NOT immediately pop up the system popup. it's also appearing every time the app refreshes when trying to wake mouse.
+- on first load it locks to only showing the first mouse it sees when there isn't permission, the dropdown cant see any other wireless mice. The wireless mice also don't need the permission as far as I am aware.
+- the app sometimes shows "Paired Logitech Mouse - Lightspeed" instead of the correct device (a G604 in this particular instance)
+
 # LOPE todo list
 
 ### 0: Remove references to highlighting all standard mouse buttons
@@ -59,11 +64,11 @@
 
 **Done when:** The expanded-key list is deterministic, alphabetized within the intended groups, and contains the supported media keys.
 
-### 8: Preserve recorded keypresses that overlap extended keystrokes
+### 8: Preserve recorded key presses that overlap extended keystrokes
 
 - [ ] Keep a key displayed as recorded when a captured keypress also matches an extended-keystroke option; do not replace the recorded value with the dropdown for keys that were actually captured.
 
-**Done when:** Captured overlapping keypresses remain visibly recorded, while extended-keystroke choices remain available for keys the user cannot directly access.
+**Done when:** Captured overlapping key presses remain visibly recorded, while extended-keystroke choices remain available for keys the user cannot directly access.
 
 ### 9: Correctly pad DPI stages when the count jumps
 

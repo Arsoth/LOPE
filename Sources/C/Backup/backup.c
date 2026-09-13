@@ -1,9 +1,14 @@
 #include "internal.h"
 
+BackupReadFn backup_read_impl = (BackupReadFn)read;
+BackupWriteFn backup_write_impl = (BackupWriteFn)write;
+BackupCloseFn backup_close_impl = close;
+BackupFstatFn backup_fstat_impl = fstat;
+
 static int write_all(int fd, const uint8_t *bytes, size_t length) {
     size_t written = 0;
     while (written < length) {
-        ssize_t n = write(fd, bytes + written, length - written);
+        ssize_t n = backup_write_impl(fd, bytes + written, length - written);
         if (n < 0 && errno == EINTR) {
             continue;
         }
@@ -18,7 +23,7 @@ static int write_all(int fd, const uint8_t *bytes, size_t length) {
 static int read_all(int fd, uint8_t *bytes, size_t length) {
     size_t read_bytes = 0;
     while (read_bytes < length) {
-        ssize_t n = read(fd, bytes + read_bytes, length - read_bytes);
+        ssize_t n = backup_read_impl(fd, bytes + read_bytes, length - read_bytes);
         if (n < 0 && errno == EINTR) {
             continue;
         }
@@ -92,7 +97,7 @@ int package_write_multi(const char *path, const Device *device, uint8_t profile_
     for (size_t i = 0; ok && i < sector_count; i++) {
         ok = write_all(fd, sectors[i].data, sectors[i].size);
     }
-    if (close(fd) != 0) {
+    if (backup_close_impl(fd) != 0) {
         ok = 0;
     }
     if (!ok) {
@@ -114,12 +119,12 @@ int package_read(const char *path, BackupPackage *package) {
     uint8_t header[BACKUP_HEADER_BYTES];
     if (!read_all(fd, header, sizeof(header))) {
         fprintf(stderr, "backup %s is shorter than its header\n", path);
-        close(fd);
+        backup_close_impl(fd);
         return 0;
     }
     if (memcmp(header, BACKUP_MAGIC, 8) != 0 || header[8] != 2) {
         fprintf(stderr, "backup %s is not a recognized Logitech onboard package\n", path);
-        close(fd);
+        backup_close_impl(fd);
         return 0;
     }
     package->vendor_id = get_be16(header + 10);
@@ -128,21 +133,21 @@ int package_read(const char *path, BackupPackage *package) {
     package->profile_format = header[15];
     if (package->vendor_id != LOGITECH_VID) {
         fprintf(stderr, "backup %s has invalid device or sector metadata\n", path);
-        close(fd);
+        backup_close_impl(fd);
         return 0;
     }
     struct stat st;
     size_t sector_count = get_be16(header + 16);
     if (sector_count == 0 || sector_count > MAX_BACKUP_SECTORS) {
         fprintf(stderr, "backup %s has an invalid sector count\n", path);
-        close(fd);
+        backup_close_impl(fd);
         return 0;
     }
     uint8_t table[MAX_BACKUP_SECTORS * 4];
     size_t table_length = sector_count * 4;
     if (!read_all(fd, table, table_length)) {
         fprintf(stderr, "backup %s is shorter than its sector table\n", path);
-        close(fd);
+        backup_close_impl(fd);
         return 0;
     }
     off_t expected_length = BACKUP_HEADER_BYTES + (off_t)table_length;
@@ -151,7 +156,7 @@ int package_read(const char *path, BackupPackage *package) {
         package->sectors[i].size = get_be16(table + i * 4 + 2);
         if (package->sectors[i].size < 32 || package->sectors[i].size > MAX_SECTOR_BYTES) {
             fprintf(stderr, "backup %s has invalid sector %zu metadata\n", path, i + 1);
-            close(fd);
+            backup_close_impl(fd);
             package_release(package);
             return 0;
         }
@@ -159,16 +164,16 @@ int package_read(const char *path, BackupPackage *package) {
             if (package->sectors[previous].sector == package->sectors[i].sector) {
                 fprintf(stderr, "backup %s contains duplicate sector 0x%04X\n", path,
                         package->sectors[i].sector);
-                close(fd);
+                backup_close_impl(fd);
                 package_release(package);
                 return 0;
             }
         }
         expected_length += package->sectors[i].size;
     }
-    if (fstat(fd, &st) != 0 || st.st_size != expected_length) {
+    if (backup_fstat_impl(fd, &st) != 0 || st.st_size != expected_length) {
         fprintf(stderr, "backup %s has an unexpected file length\n", path);
-        close(fd);
+        backup_close_impl(fd);
         package_release(package);
         return 0;
     }
@@ -178,19 +183,19 @@ int package_read(const char *path, BackupPackage *package) {
         if (package->sectors[i].data == NULL ||
             !read_all(fd, package->sectors[i].data, package->sectors[i].size)) {
             fprintf(stderr, "could not read sector %zu from backup %s\n", i + 1, path);
-            close(fd);
+            backup_close_impl(fd);
             package_release(package);
             return 0;
         }
         bool legacy_g600 = package->profile_format == 0xFF && package->product_id == 0xC24A;
         if (!legacy_g600 && !sector_crc_ok(package->sectors[i].data, package->sectors[i].size)) {
             fprintf(stderr, "backup %s has an invalid CRC in sector %zu\n", path, i + 1);
-            close(fd);
+            backup_close_impl(fd);
             package_release(package);
             return 0;
         }
     }
-    close(fd);
+    backup_close_impl(fd);
     return 1;
 }
 

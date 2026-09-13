@@ -280,9 +280,11 @@ parsing, backup-storage paths, RGB handling, and the write-validation guards
 in `AppModel`.
 
 `make install-hooks` installs a pre-commit hook (from
-`scripts/git-hooks/pre-commit`) that runs `make lint`, `make test`, and
-`make coverage-check` before every commit; run it once per clone. The
-coverage gate is deliberately strict (90% per file by default) — see
+`scripts/git-hooks/pre-commit`) that runs formatting plus the changed-file
+`make test-modified` test and coverage gate before every commit; run it once
+per clone. Pull requests targeting `main` and the nightly workflow run the
+full `make test` and `make coverage-check` gates. The coverage gate is
+deliberately strict (90% per file by default) — see
 [development-standards.md](development-standards.md#coverage).
 
 For descriptor additions, follow [Profiles/README.md](../Profiles/README.md)

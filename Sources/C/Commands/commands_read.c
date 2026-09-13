@@ -2,6 +2,11 @@
 
 void print_supported_dpi(const uint16_t *values, size_t count);
 
+// run_list has no Options object to pass through the normal discovery seam.
+// Keep its hardware discovery call injectable so list rendering can be tested
+// without enumerating live IOKit devices.
+DiscoverDevicesForListFn discover_devices_for_list_impl = discover_devices;
+
 int run_list(void) {
     HidContext context;
     if (!hid_context_create(&context)) {
@@ -12,7 +17,7 @@ int run_list(void) {
     // Listing only needs stable identities and pairing presence. Capability
     // discovery is deferred until the selected device is queried, avoiding
     // dozens of HID++ requests on every GUI refresh.
-    discover_devices(&context, -1, devices, &count, false);
+    discover_devices_for_list_impl(&context, -1, devices, &count, false);
     size_t vendor_interfaces = 0;
     for (size_t i = 0; i < context.count; i++) {
         if (context.items[i].is_vendor) {

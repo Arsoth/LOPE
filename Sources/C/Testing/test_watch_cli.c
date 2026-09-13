@@ -1,5 +1,103 @@
 #include "internal.h"
 
+static int watch_context_create_failure(HidContext *context) {
+    (void)context;
+    return 0;
+}
+
+static int watch_context_create_empty(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    return 1;
+}
+
+static int watch_context_create_with_mouse(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    context->items = (HidInterface *)calloc(1, sizeof(HidInterface));
+    if (context->items == NULL) {
+        return 0;
+    }
+    context->count = 1;
+    context->items[0].is_mouse = true;
+    snprintf(context->items[0].product, sizeof(context->items[0].product), "Coverage mouse");
+    return 1;
+}
+
+static int watch_context_create_with_nonmouse_and_mouse(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    context->items = (HidInterface *)calloc(2, sizeof(HidInterface));
+    if (context->items == NULL) {
+        return 0;
+    }
+    context->count = 2;
+    context->items[0].is_mouse = false;
+    context->items[1].is_mouse = true;
+    snprintf(context->items[1].product, sizeof(context->items[1].product), "Coverage mouse");
+    return 1;
+}
+
+static int watch_context_create_with_two_mice(HidContext *context) {
+    memset(context, 0, sizeof(*context));
+    context->items = (HidInterface *)calloc(2, sizeof(HidInterface));
+    if (context->items == NULL) {
+        return 0;
+    }
+    context->count = 2;
+    context->items[0].is_mouse = true;
+    context->items[1].is_mouse = true;
+    snprintf(context->items[0].product, sizeof(context->items[0].product), "First mouse");
+    return 1;
+}
+
+static IOReturn watch_device_open_failure(IOHIDDeviceRef device, IOOptionBits options) {
+    (void)device;
+    (void)options;
+    return kIOReturnError;
+}
+
+static IOReturn watch_device_open_success(IOHIDDeviceRef device, IOOptionBits options) {
+    (void)device;
+    (void)options;
+    return kIOReturnSuccess;
+}
+
+static IOReturn watch_device_close_noop(IOHIDDeviceRef device, IOOptionBits options) {
+    (void)device;
+    (void)options;
+    return kIOReturnSuccess;
+}
+
+static void watch_register_input_report_noop(IOHIDDeviceRef device, uint8_t *report,
+                                             CFIndex report_length, IOHIDReportCallback callback,
+                                             void *context) {
+    (void)device;
+    (void)report;
+    (void)report_length;
+    (void)callback;
+    (void)context;
+}
+
+static void watch_run_loop_schedule_noop(IOHIDDeviceRef device, CFRunLoopRef run_loop,
+                                         CFRunLoopMode mode) {
+    (void)device;
+    (void)run_loop;
+    (void)mode;
+}
+
+static CFRunLoopRunResult watch_run_loop_stop(CFRunLoopMode mode, CFTimeInterval seconds,
+                                              Boolean return_after_source_handled) {
+    (void)mode;
+    (void)seconds;
+    (void)return_after_source_handled;
+    g_stop_watch = 1;
+    return kCFRunLoopRunFinished;
+}
+
+static void *watch_buffer_allocate_failure(size_t count, size_t size) {
+    (void)count;
+    (void)size;
+    return NULL;
+}
+
 int test_watch_cli(void) {
     bool mouse_button_name_ok = strcmp(mouse_button_name(0), "Left") == 0 &&
                                 strcmp(mouse_button_name(1), "Right") == 0 &&
@@ -16,15 +114,74 @@ int test_watch_cli(void) {
         parse_decimal("42", &decimal_value) && decimal_value == 42 &&
         !parse_decimal(NULL, &decimal_value) && !parse_decimal("", &decimal_value) &&
         !parse_decimal("-1", &decimal_value) && !parse_decimal("100001", &decimal_value) &&
-        !parse_decimal("12x", &decimal_value) && parse_slot("ff", &slot_value) &&
-        slot_value == 0xFF && parse_slot("0xFF", &slot_value) && slot_value == 0xFF &&
-        parse_slot("3", &slot_value) && slot_value == 3 && !parse_slot("0", &slot_value) &&
-        !parse_slot("7", &slot_value) && !parse_slot("bad", &slot_value) &&
-        !parse_slot(NULL, &slot_value) && !parse_slot("3", NULL);
+        !parse_decimal("12x", &decimal_value) &&
+        !parse_decimal("999999999999999999999999999999", &decimal_value) &&
+        parse_slot("ff", &slot_value) && slot_value == 0xFF && parse_slot("FF", &slot_value) &&
+        slot_value == 0xFF && parse_slot("0xff", &slot_value) && slot_value == 0xFF &&
+        parse_slot("0xFF", &slot_value) && slot_value == 0xFF && parse_slot("3", &slot_value) &&
+        slot_value == 3 && !parse_slot("0", &slot_value) && !parse_slot("7", &slot_value) &&
+        !parse_slot("bad", &slot_value) && !parse_slot(NULL, &slot_value) && !parse_slot("3", NULL);
     if (!mouse_button_name_ok || !decimal_slot_ok) {
         fprintf(stderr, "mouse_button_name/parse_decimal/parse_slot self-test failed\n");
         return 1;
     }
+
+    Options watch_options = {.device_index = -1};
+    hid_context_create_impl = watch_context_create_failure;
+    if (run_watch(&watch_options) != 1) {
+        fprintf(stderr, "run_watch context-failure self-test failed\n");
+        return 1;
+    }
+    hid_context_create_impl = watch_context_create_empty;
+    if (run_watch(&watch_options) != 1) {
+        fprintf(stderr, "run_watch no-mouse self-test failed\n");
+        return 1;
+    }
+    hid_context_create_impl = watch_context_create_with_mouse;
+    watch_device_open_impl = watch_device_open_failure;
+    if (run_watch(&watch_options) != 1) {
+        fprintf(stderr, "run_watch open-failure self-test failed\n");
+        return 1;
+    }
+    watch_device_open_impl = watch_device_open_success;
+    watch_device_close_impl = watch_device_close_noop;
+    watch_buffer_allocate_impl = watch_buffer_allocate_failure;
+    if (run_watch(&watch_options) != 1) {
+        fprintf(stderr, "run_watch allocation-failure self-test failed\n");
+        return 1;
+    }
+    watch_buffer_allocate_impl = calloc;
+    watch_register_input_report_impl = watch_register_input_report_noop;
+    watch_schedule_with_run_loop_impl = watch_run_loop_schedule_noop;
+    watch_unschedule_from_run_loop_impl = watch_run_loop_schedule_noop;
+    watch_run_loop_impl = watch_run_loop_stop;
+    g_stop_watch = 0;
+    if (run_watch(&watch_options) != 0) {
+        fprintf(stderr, "run_watch success self-test failed\n");
+        return 1;
+    }
+
+    hid_context_create_impl = watch_context_create_with_nonmouse_and_mouse;
+    watch_options.device_index = -1;
+    if (run_watch(&watch_options) != 0) {
+        fprintf(stderr, "run_watch non-mouse-interface self-test failed\n");
+        return 1;
+    }
+
+    hid_context_create_impl = watch_context_create_with_two_mice;
+    watch_options.device_index = 1;
+    if (run_watch(&watch_options) != 0) {
+        fprintf(stderr, "run_watch indexed-mouse self-test failed\n");
+        return 1;
+    }
+    hid_context_create_impl = hid_context_create_hardware;
+    watch_device_open_impl = IOHIDDeviceOpen;
+    watch_device_close_impl = IOHIDDeviceClose;
+    watch_buffer_allocate_impl = calloc;
+    watch_register_input_report_impl = IOHIDDeviceRegisterInputReportCallback;
+    watch_schedule_with_run_loop_impl = IOHIDDeviceScheduleWithRunLoop;
+    watch_unschedule_from_run_loop_impl = IOHIDDeviceUnscheduleFromRunLoop;
+    watch_run_loop_impl = CFRunLoopRunInMode;
 
     typedef struct {
         uint8_t *callback_buffer;
@@ -47,12 +204,21 @@ int test_watch_cli(void) {
     }
     if (callback_ok) {
         watch_report_callback_for_test(NULL, 0, NULL, 0, 0, NULL, 0);
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, 0, NULL, 1);
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, 0, numbered_report, 0);
         watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, numbered_report,
                                        (CFIndex)sizeof(numbered_report));
         watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, numbered_press,
                                        (CFIndex)sizeof(numbered_press));
         watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, numbered_press,
                                        (CFIndex)sizeof(numbered_press));
+        uint8_t short_numbered_report[] = {0x07};
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT,
+                                       short_numbered_report,
+                                       (CFIndex)sizeof(short_numbered_report));
+        uint8_t mismatched_id_report[] = {0x00, 0x04};
+        watch_report_callback_for_test(&watch_state, 0, NULL, 0, REPORT_SHORT, mismatched_id_report,
+                                       (CFIndex)sizeof(mismatched_id_report));
         watch_report_callback_for_test(&watch_state, 0, NULL, 0, 0, unnumbered_press,
                                        (CFIndex)sizeof(unnumbered_press));
         fflush(stdout);
@@ -169,6 +335,13 @@ int test_watch_cli(void) {
         strcmp(parsed.dpi_values, "800,1600") == 0 && strcmp(parsed.report_rate, "1000") == 0 &&
         strcmp(parsed.backup_directory, "/tmp") == 0 && strcmp(parsed.operation_id, "op-1") == 0;
 
+    char *backup_and_state_argv[] = {
+        "lope", "apply", "--backup", "/tmp/backup.logiob", "--profile-state-change", "2:disable"};
+    parse_options_ok = parse_options_ok && parse_options(6, backup_and_state_argv, &parsed) &&
+                       strcmp(parsed.backup_path, "/tmp/backup.logiob") == 0 &&
+                       parsed.profile_state_change_count == 1 &&
+                       strcmp(parsed.profile_state_changes[0], "2:disable") == 0;
+
     char *too_many_button_changes_argv[(MAX_BATCH_BUTTON_CHANGES + 1) * 2 + 2];
     too_many_button_changes_argv[0] = "lope";
     too_many_button_changes_argv[1] = "apply";
@@ -210,6 +383,10 @@ int test_watch_cli(void) {
     char *dump_argv[] = {"lope", "dump", "/tmp/out.bin"};
     parse_options_ok = parse_options_ok && parse_options(3, dump_argv, &parsed) &&
                        strcmp(parsed.path, "/tmp/out.bin") == 0;
+
+    char *restore_argv[] = {"lope", "restore", "/tmp/in.logiob"};
+    parse_options_ok = parse_options_ok && parse_options(3, restore_argv, &parsed) &&
+                       strcmp(parsed.path, "/tmp/in.logiob") == 0;
 
     char *bind_rear_thumb_argv[] = {"lope", "bind", "rear-thumb", "alt-tab"};
     parse_options_ok = parse_options_ok && parse_options(4, bind_rear_thumb_argv, &parsed) &&

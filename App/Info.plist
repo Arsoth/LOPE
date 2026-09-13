@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>LOPE</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.codex.lope</string>
+	<string>com.cotyledonlabs.lope</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

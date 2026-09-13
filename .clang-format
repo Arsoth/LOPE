@@ -5,6 +5,4 @@ UseTab: Never
 ColumnLimit: 100
 PointerAlignment: Right
 AllowShortIfStatementsOnASingleLine: WithoutElse
-# The .inc chain in logitech_onboard.m is included in dependency order, not
-# alphabetical order; do not let the formatter reorder #include directives.
 SortIncludes: false

@@ -1,14 +1,31 @@
 #include "internal.h"
 
+HidDeviceOpenFn hid_device_open_impl = IOHIDDeviceOpen;
+HidDeviceCloseFn hid_device_close_impl = IOHIDDeviceClose;
+HidDeviceRegisterInputReportCallbackFn hid_device_register_input_report_callback_impl =
+    IOHIDDeviceRegisterInputReportCallback;
+HidDeviceScheduleWithRunLoopFn hid_device_schedule_with_run_loop_impl =
+    IOHIDDeviceScheduleWithRunLoop;
+HidDeviceUnscheduleFromRunLoopFn hid_device_unschedule_from_run_loop_impl =
+    IOHIDDeviceUnscheduleFromRunLoop;
+HidDeviceSetReportFn hid_device_set_report_impl = IOHIDDeviceSetReport;
+HidDeviceGetReportFn hid_device_get_report_impl = IOHIDDeviceGetReport;
+HidDeviceGetPropertyFn hid_device_get_property_impl = IOHIDDeviceGetProperty;
+HidDeviceGetServiceFn hid_device_get_service_impl = IOHIDDeviceGetService;
+HidRegistryEntryGetIDFn hid_registry_entry_get_id_impl = IORegistryEntryGetRegistryEntryID;
+HidDeviceCopyMatchingElementsFn hid_device_copy_matching_elements_impl =
+    IOHIDDeviceCopyMatchingElements;
+HidArrayGetCountFn hid_array_get_count_impl = CFArrayGetCount;
+HidArrayGetValueAtIndexFn hid_array_get_value_at_index_impl = CFArrayGetValueAtIndex;
+HidElementGetUsagePageFn hid_element_get_usage_page_impl = IOHIDElementGetUsagePage;
+HidElementGetReportIDFn hid_element_get_report_id_impl = IOHIDElementGetReportID;
+HidDebugFileOpenFn hid_debug_file_open_impl = fopen;
+
 volatile sig_atomic_t g_stop_watch = 0;
 
 bool hid_debug_enabled(void) {
-    static int enabled = -1;
-    if (enabled < 0) {
-        const char *value = getenv("LOGITECH_ONBOARD_DEBUG");
-        enabled = value != NULL && value[0] != '\0' && strcmp(value, "0") != 0;
-    }
-    return enabled != 0;
+    const char *value = getenv("LOGITECH_ONBOARD_DEBUG");
+    return value != NULL && value[0] != '\0' && strcmp(value, "0") != 0;
 }
 
 void hid_debug_log(const char *format, ...) {
@@ -20,7 +37,7 @@ void hid_debug_log(const char *format, ...) {
     vfprintf(stderr, format, arguments);
     va_end(arguments);
 
-    FILE *file = fopen("/tmp/lomps-hid-debug.log", "a");
+    FILE *file = hid_debug_file_open_impl("/tmp/lomps-hid-debug.log", "a");
     if (file == NULL) {
         return;
     }
@@ -37,7 +54,7 @@ void on_sigint(int signal_number) {
 }
 
 uint32_t number_property(IOHIDDeviceRef device, CFStringRef key) {
-    CFTypeRef value = IOHIDDeviceGetProperty(device, key);
+    CFTypeRef value = hid_device_get_property_impl(device, key);
     if (value == NULL || CFGetTypeID(value) != CFNumberGetTypeID()) {
         return 0;
     }
@@ -49,7 +66,7 @@ uint32_t number_property(IOHIDDeviceRef device, CFStringRef key) {
 }
 
 uint64_t location_property(IOHIDDeviceRef device) {
-    CFTypeRef value = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDLocationIDKey));
+    CFTypeRef value = hid_device_get_property_impl(device, CFSTR(kIOHIDLocationIDKey));
     if (value == NULL || CFGetTypeID(value) != CFNumberGetTypeID()) {
         return 0;
     }
@@ -61,12 +78,12 @@ uint64_t location_property(IOHIDDeviceRef device) {
 }
 
 uint64_t registry_id_property(IOHIDDeviceRef device) {
-    io_service_t service = IOHIDDeviceGetService(device);
+    io_service_t service = hid_device_get_service_impl(device);
     if (service == IO_OBJECT_NULL) {
         return 0;
     }
     uint64_t registry_id = 0;
-    if (IORegistryEntryGetRegistryEntryID(service, &registry_id) != KERN_SUCCESS) {
+    if (hid_registry_entry_get_id_impl(service, &registry_id) != KERN_SUCCESS) {
         return 0;
     }
     return registry_id;
@@ -74,7 +91,7 @@ uint64_t registry_id_property(IOHIDDeviceRef device) {
 
 void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t out_size) {
     out[0] = '\0';
-    CFTypeRef value = IOHIDDeviceGetProperty(device, key);
+    CFTypeRef value = hid_device_get_property_impl(device, key);
     if (value == NULL || CFGetTypeID(value) != CFStringGetTypeID()) {
         return;
     }
@@ -82,7 +99,8 @@ void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t o
 }
 
 bool device_has_hidpp_reports(IOHIDDeviceRef device) {
-    CFTypeRef descriptor_value = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDReportDescriptorKey));
+    CFTypeRef descriptor_value =
+        hid_device_get_property_impl(device, CFSTR(kIOHIDReportDescriptorKey));
     if (descriptor_value != NULL && CFGetTypeID(descriptor_value) == CFDataGetTypeID()) {
         const uint8_t *descriptor = CFDataGetBytePtr((CFDataRef)descriptor_value);
         CFIndex length = CFDataGetLength((CFDataRef)descriptor_value);
@@ -111,18 +129,19 @@ bool device_has_hidpp_reports(IOHIDDeviceRef device) {
 
     // Keep an element-based fallback for devices whose driver does not expose
     // the raw report descriptor as an IOHIDDevice property.
-    CFArrayRef elements = IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
+    CFArrayRef elements =
+        hid_device_copy_matching_elements_impl(device, NULL, kIOHIDOptionsTypeNone);
     if (elements == NULL) {
         return false;
     }
     bool found = false;
-    CFIndex count = CFArrayGetCount(elements);
+    CFIndex count = hid_array_get_count_impl(elements);
     for (CFIndex i = 0; i < count; i++) {
-        IOHIDElementRef element = (IOHIDElementRef)CFArrayGetValueAtIndex(elements, i);
-        if (element == NULL || IOHIDElementGetUsagePage(element) != HIDPP_USAGE_PAGE) {
+        IOHIDElementRef element = (IOHIDElementRef)hid_array_get_value_at_index_impl(elements, i);
+        if (element == NULL || hid_element_get_usage_page_impl(element) != HIDPP_USAGE_PAGE) {
             continue;
         }
-        uint32_t report_id = IOHIDElementGetReportID(element);
+        uint32_t report_id = hid_element_get_report_id_impl(element);
         if (report_id == REPORT_SHORT || report_id == REPORT_LONG) {
             found = true;
             break;
@@ -219,7 +238,7 @@ int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
     pthread_mutex_init(&channel->lock, NULL);
     IOReturn result = kIOReturnError;
     for (int attempt = 0; attempt < 3; attempt++) {
-        result = IOHIDDeviceOpen(device, kIOHIDOptionsTypeNone);
+        result = hid_device_open_impl(device, kIOHIDOptionsTypeNone);
         hid_debug_log("hid-debug open product=0x%04X location=0x%llX attempt=%d result=0x%08X",
                       number_property(device, CFSTR(kIOHIDProductIDKey)),
                       (unsigned long long)location_property(device), attempt + 1, result);
@@ -246,13 +265,13 @@ int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
     }
     channel->callback_buffer = (uint8_t *)calloc(MAX_REPORT_BYTES, 1);
     if (channel->callback_buffer == NULL) {
-        IOHIDDeviceClose(device, kIOHIDOptionsTypeNone);
+        hid_device_close_impl(device, kIOHIDOptionsTypeNone);
         pthread_mutex_destroy(&channel->lock);
         return 0;
     }
-    IOHIDDeviceRegisterInputReportCallback(device, channel->callback_buffer, MAX_REPORT_BYTES,
-                                           channel_report_callback, channel);
-    IOHIDDeviceScheduleWithRunLoop(device, channel->run_loop, kCFRunLoopDefaultMode);
+    hid_device_register_input_report_callback_impl(
+        device, channel->callback_buffer, MAX_REPORT_BYTES, channel_report_callback, channel);
+    hid_device_schedule_with_run_loop_impl(device, channel->run_loop, kCFRunLoopDefaultMode);
     channel->opened = true;
     return 1;
 }
@@ -288,8 +307,9 @@ void channel_close(HidChannel *channel) {
         return;
     }
     if (channel->opened) {
-        IOHIDDeviceUnscheduleFromRunLoop(channel->device, channel->run_loop, kCFRunLoopDefaultMode);
-        IOHIDDeviceClose(channel->device, kIOHIDOptionsTypeNone);
+        hid_device_unschedule_from_run_loop_impl(channel->device, channel->run_loop,
+                                                 kCFRunLoopDefaultMode);
+        hid_device_close_impl(channel->device, kIOHIDOptionsTypeNone);
     }
     channel_clear_queue(channel);
     free(channel->callback_buffer);
@@ -351,9 +371,9 @@ Reply channel_request_hardware(HidChannel *channel, uint8_t device_number, uint1
     // report buffer. This is the same convention used by macOS hidapi.
     size_t frame_length =
         build_hidpp_frame(use_long, device_number, request_id, params, params_length, frame);
-    IOReturn result =
-        IOHIDDeviceSetReport(channel->device, kIOHIDReportTypeOutput,
-                             use_long ? REPORT_LONG : REPORT_SHORT, frame, (CFIndex)frame_length);
+    IOReturn result = hid_device_set_report_impl(channel->device, kIOHIDReportTypeOutput,
+                                                 use_long ? REPORT_LONG : REPORT_SHORT, frame,
+                                                 (CFIndex)frame_length);
     hid_debug_log(
         "hid-debug tx report=0x%02X device=0x%02X request=0x%04X length=%zu result=0x%08X",
         use_long ? REPORT_LONG : REPORT_SHORT, device_number, request_id, frame_length, result);
@@ -538,8 +558,8 @@ bool channel_get_feature_report(HidChannel *channel, uint8_t report_id, uint8_t 
     memset(report, 0, capacity);
     report[0] = report_id;
     CFIndex actual_length = (CFIndex)capacity;
-    IOReturn result = IOHIDDeviceGetReport(channel->device, kIOHIDReportTypeFeature, report_id,
-                                           report, &actual_length);
+    IOReturn result = hid_device_get_report_impl(channel->device, kIOHIDReportTypeFeature,
+                                                 report_id, report, &actual_length);
     hid_debug_log("hid-debug feature-get report=0x%02X capacity=%zu length=%ld result=0x%08X",
                   report_id, capacity, (long)actual_length, result);
     if (result != kIOReturnSuccess || actual_length < 1) {
@@ -561,8 +581,8 @@ bool channel_set_feature_report(HidChannel *channel, uint8_t report_id, uint8_t 
         return false;
     }
     report[0] = report_id;
-    IOReturn result = IOHIDDeviceSetReport(channel->device, kIOHIDReportTypeFeature, report_id,
-                                           report, (CFIndex)length);
+    IOReturn result = hid_device_set_report_impl(channel->device, kIOHIDReportTypeFeature,
+                                                 report_id, report, (CFIndex)length);
     hid_debug_log("hid-debug feature-set report=0x%02X length=%zu result=0x%08X", report_id, length,
                   result);
     return result == kIOReturnSuccess;

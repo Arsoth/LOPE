@@ -25,8 +25,12 @@ setup, see
 - `make gui` and direct `swiftc` invocations are compile-only checks, useful
   for fast iteration but not a substitute for `./rebuild-signed.sh`.
 - `make test` runs `./lope self-test` (C core) and `swift test` (the
-  `LOPECoreTests` XCTest target defined in `Package.swift`). Run it after
-  touching parsing, model, or protocol code.
+  `LOPECoreTests` XCTest target defined in `Package.swift`). Run
+  `make test-modified` during normal branch work: it selects tests related to
+  changed files and checks coverage for changed production files. Run the full
+  `make test` after touching shared test/build infrastructure, and rely on the
+  full PR/nightly gate before landing. Passing test runs print only a concise
+  summary; failing runs print the captured diagnostics.
 - `swift test`/`swift build` are driven by `Package.swift`, which exists
   only to run the Swift unit tests; it does not build or replace the
   shipped app. The app is still built by the Makefile via direct `swiftc`
@@ -48,9 +52,11 @@ setup, see
 - `.clang-format` keeps include sorting disabled so module headers and
   platform headers remain in deliberate, readable groups.
 - `make install-hooks` copies `scripts/git-hooks/pre-commit` into
-  `.git/hooks/pre-commit`. That hook runs `make format-check`, `make test`,
-  and `make coverage-check` before every commit. Each clone needs to run
-  `make install-hooks` once; it is not automatic.
+  `.git/hooks/pre-commit`. That hook runs `make format-check` and the
+  staged-file `make test-modified` gate before every commit. Each clone needs
+  to run `make install-hooks` once; it is not automatic. The hook is a fast,
+  changed-files gate; pull requests targeting `main` and the nightly workflow
+  run the complete test and coverage gate.
 - Never bypass commit hooks.
 - Work TDD-first and keep solutions simple and non-duplicative: T.D.D. ·
   K.I.S.S. · D.R.Y.
@@ -122,6 +128,10 @@ setup, see
   the line minimum only for Swift (branch checking is skipped there since
   the toolchain cannot report it). Override thresholds ad hoc with
   `make coverage-check COVERAGE_MIN_LINE=80`.
+- `make coverage` colors each percentage cell when writing to a terminal:
+  red below 90%, yellow from 90% through 98.99%, and green from 99% through
+  100%. Use `COVERAGE_COLOR=always` or `COVERAGE_COLOR=never` to override
+  terminal detection.
 - `coverage-check-c` and `coverage-c` both exclude `Sources/C/Testing/`
   (`--ignore-filename-regex`/a negative-lookahead source pattern) from the
   report and the threshold check. That directory is test infrastructure —
@@ -155,8 +165,12 @@ setup, see
   `writeProfileEditorExport`/`applyImportedProfileEditorDraft` in
   `AppModel+ProfileEditor.swift` versus their callers in
   `AppModel+ProfileEditorShim.swift` for the pattern.
-- `make coverage-check` is wired into the pre-commit hook alongside
-  `make test` and `make lint`.
+- `make test-modified` is wired into the pre-commit hook alongside
+  `make format-check`. Its coverage invocation uses the same configured
+  per-file thresholds, but limits the report to changed production files.
+- Pull requests targeting `main` run `make test` and `make coverage-check` for
+  the complete repository. The scheduled nightly workflow repeats those full
+  checks so regressions are found even when no new pull request is open.
 - For each uncovered line or path you touch:
   1. Write a test for reachable behavior and relevant edge cases.
   2. There is no per-line exclusion comment (no `LCOV_EXCL_LINE` equivalent
@@ -166,9 +180,9 @@ setup, see
      comment at the site rather than relying on a suppression convention
      that does not exist for this tooling.
   3. Add any newly discovered edge case to the relevant test file.
-- Prefer running `make test` for ordinary work; run `make coverage-check`
-  before landing changes meant to close a coverage gap, and before release
-  candidates.
+- Prefer running `make test-modified` for ordinary branch work; run
+  `make coverage-check` before landing changes meant to close a coverage gap,
+  before release candidates, and whenever a full local verification is useful.
 
 ## Style
 

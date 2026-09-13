@@ -44,9 +44,10 @@ make install-hooks
 ```
 
 Installs `scripts/git-hooks/pre-commit` into `.git/hooks/pre-commit`. It
-runs `make format-check`, `make test`, and `make coverage-check` before
-every commit. This does not happen automatically per clone/worktree — run
-it again after a fresh clone.
+runs `make format-check` and the changed-files `make test-modified` gate
+before every commit. The full suite remains enforced by pull-request and
+nightly CI. This does not happen automatically per clone/worktree — run it
+again after a fresh clone.
 
 The coverage gate defaults to 90% per file (see `docs/development-standards.md`).
 
@@ -55,6 +56,7 @@ The coverage gate defaults to 90% per file (see `docs/development-standards.md`)
 ```sh
 make lint      # swift-format + clang-format, check only
 make test      # C self-test + swift test
+make test-modified  # related tests and coverage for current changes
 make coverage  # llvm-cov reports for both
 ./rebuild-signed.sh
 ```
@@ -68,6 +70,11 @@ back to alternate tools.
 The repository's release workflow is for direct distribution outside the Mac
 App Store. It requires a paid Apple Developer Program team and these GitHub
 Actions secrets:
+
+The release bundle identifier is currently `com.cotyledonlabs.lope` in both
+`App/Info.plist` and the release workflow. Register that exact identifier with
+the Apple Developer account used for Developer ID signing, or change both
+locations before publishing.
 
 - `DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64`: a base64-encoded `.p12`
   export containing the `Developer ID Application` certificate and private
@@ -102,4 +109,16 @@ git push origin v0.3.0
 ```
 
 The tag version becomes `CFBundleShortVersionString`; the GitHub Actions run
-number becomes `CFBundleVersion`.
+number becomes `CFBundleVersion`. The release job packages the stapled app as
+`dist/LOPE-VERSION-macos-arm64.zip` and publishes that file plus its SHA-256
+checksum. The `package-release` target is intentionally independent of `app`,
+so packaging a notarized bundle does not rebuild it and invalidate the stapled
+ticket:
+
+```sh
+make package-release APP_VERSION=0.3.0 APP_ARCH=arm64
+```
+
+The checked-in [`rebuild-signed.sh`](../rebuild-signed.sh) remains a local
+development/agent convenience script. It is not the release path and does not
+produce the GitHub release artifact.

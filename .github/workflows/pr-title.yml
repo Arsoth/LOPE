@@ -1,0 +1,30 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  conventional-commit-title:
+    name: Conventional Commit PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          title="$PR_TITLE"
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([[:alnum:]][[:alnum:]./_-]*\))?!?: [^[:space:]].*$'
+
+          if [[ ! "$title" =~ $pattern ]]; then
+            echo 'Invalid pull request title.' >&2
+            echo 'Expected: <type>[optional scope][!]: <description>' >&2
+            echo 'Allowed types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test.' >&2
+            exit 1
+          fi
+
+          echo "Valid Conventional Commit title: $title"

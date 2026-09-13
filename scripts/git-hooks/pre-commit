@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Installed via `make install-hooks`. Blocks commits that fail formatting,
-# linting, the self-test suite, or the per-file coverage minimums. The
-# coverage gate is intentionally strict (see docs/development-standards.md).
+# Installed via `make install-hooks`. Blocks commits that fail formatting or
+# the focused tests and coverage checks for staged source changes. Pull
+# requests and the nightly workflow run the full repository gate.
 
 set -euo pipefail
 
@@ -11,8 +11,5 @@ cd "$script_dir"
 echo "pre-commit: checking formatting and lint..."
 make format-check
 
-echo "pre-commit: running tests..."
-make test
-
-echo "pre-commit: checking coverage..."
-make coverage-check
+echo "pre-commit: running staged-file test and coverage gate..."
+MODIFIED_TESTS_STAGED_ONLY=1 make test-modified

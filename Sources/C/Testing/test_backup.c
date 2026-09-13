@@ -1,5 +1,95 @@
 #include "internal.h"
 
+static bool g_backup_read_eintr;
+static bool g_backup_read_partial;
+static int g_backup_read_fail_after;
+static bool g_backup_write_eintr;
+static bool g_backup_write_partial;
+static int g_backup_write_fail_after;
+static bool g_backup_close_fail;
+static int g_backup_fstat_mode;
+
+static ssize_t backup_read_double(int fd, void *bytes, size_t length) {
+    if (g_backup_read_eintr) {
+        g_backup_read_eintr = false;
+        errno = EINTR;
+        return -1;
+    }
+    if (g_backup_read_fail_after == 0) {
+        g_backup_read_fail_after = -1;
+        errno = EIO;
+        return -1;
+    }
+    if (g_backup_read_fail_after > 0) {
+        g_backup_read_fail_after--;
+    }
+    if (g_backup_read_partial && length > 1) {
+        g_backup_read_partial = false;
+        return read(fd, bytes, length / 2);
+    }
+    return read(fd, bytes, length);
+}
+
+static ssize_t backup_write_double(int fd, const void *bytes, size_t length) {
+    if (g_backup_write_eintr) {
+        g_backup_write_eintr = false;
+        errno = EINTR;
+        return -1;
+    }
+    if (g_backup_write_fail_after == 0) {
+        g_backup_write_fail_after = -1;
+        errno = EIO;
+        return -1;
+    }
+    if (g_backup_write_fail_after > 0) {
+        g_backup_write_fail_after--;
+    }
+    if (g_backup_write_partial && length > 1) {
+        g_backup_write_partial = false;
+        return write(fd, bytes, length / 2);
+    }
+    return write(fd, bytes, length);
+}
+
+static int backup_close_double(int fd) {
+    int result = close(fd);
+    if (g_backup_close_fail) {
+        g_backup_close_fail = false;
+        errno = EIO;
+        return -1;
+    }
+    return result;
+}
+
+static int backup_fstat_double(int fd, struct stat *status) {
+    if (g_backup_fstat_mode == 1) {
+        g_backup_fstat_mode = 0;
+        errno = EIO;
+        return -1;
+    }
+    int result = fstat(fd, status);
+    if (result == 0 && g_backup_fstat_mode == 2) {
+        status->st_size++;
+        g_backup_fstat_mode = 0;
+    }
+    return result;
+}
+
+static void reset_backup_seams(void) {
+    backup_read_impl = (BackupReadFn)read;
+    backup_write_impl = (BackupWriteFn)write;
+    backup_close_impl = close;
+    backup_fstat_impl = fstat;
+    g_backup_read_eintr = false;
+    g_backup_read_partial = false;
+    g_backup_read_fail_after = -1;
+    g_backup_write_eintr = false;
+    g_backup_write_partial = false;
+    g_backup_write_fail_after = -1;
+    g_backup_close_fail = false;
+    g_backup_fstat_mode = 0;
+}
+
 static bool write_test_file(const char *path, const uint8_t *bytes, size_t length) {
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
     if (fd < 0) {
@@ -98,9 +188,112 @@ int test_backup(void) {
         package_release(&package);
     }
     unlink(combined_path);
+
+    char seam_path[] = "/tmp/lomps-selftest-seams-XXXXXX";
+    int seam_fd = mkstemp(seam_path);
+    bool seam_ok = seam_fd >= 0;
+    if (seam_fd >= 0) {
+        close(seam_fd);
+        unlink(seam_path);
+    }
+    backup_read_impl = backup_read_double;
+    backup_write_impl = backup_write_double;
+    backup_close_impl = backup_close_double;
+    backup_fstat_impl = backup_fstat_double;
+    g_backup_read_fail_after = -1;
+    g_backup_write_eintr = true;
+    g_backup_write_partial = true;
+    g_backup_write_fail_after = -1;
+    seam_ok =
+        seam_ok && package_write_multi(seam_path, &dummy_device, 5, combined_sources, 2, true);
+    if (seam_ok) {
+        seam_ok = package_read(seam_path, &package) && package.sector_count == 2;
+        if (package.sector_count > 0) {
+            package_release(&package);
+        }
+    }
+    unlink(seam_path);
+
+    g_backup_write_eintr = false;
+    g_backup_write_partial = false;
+    g_backup_write_fail_after = 0;
+    seam_ok =
+        seam_ok && !package_write_multi(seam_path, &dummy_device, 5, combined_sources, 2, true);
+    unlink(seam_path);
+    g_backup_write_fail_after = -1;
+    g_backup_close_fail = true;
+    seam_ok =
+        seam_ok && !package_write_multi(seam_path, &dummy_device, 5, combined_sources, 2, true);
+    unlink(seam_path);
+    seam_ok = seam_ok && !package_write_multi("/tmp", &dummy_device, 5, combined_sources, 2, true);
+    reset_backup_seams();
+
+    char read_seam_path[] = "/tmp/lomps-selftest-read-seams-XXXXXX";
+    int read_seam_fd = mkstemp(read_seam_path);
+    bool read_seam_ok = read_seam_fd >= 0;
+    if (read_seam_fd >= 0) {
+        close(read_seam_fd);
+        unlink(read_seam_path);
+    }
+    read_seam_ok = read_seam_ok &&
+                   package_write_multi(read_seam_path, &dummy_device, 5, combined_sources, 2, true);
+    backup_read_impl = backup_read_double;
+    backup_fstat_impl = backup_fstat_double;
+    g_backup_read_eintr = true;
+    g_backup_read_partial = true;
+    g_backup_read_fail_after = -1;
+    if (read_seam_ok) {
+        read_seam_ok = package_read(read_seam_path, &package) && package.sector_count == 2;
+        if (package.sector_count > 0) {
+            package_release(&package);
+        }
+    }
+    g_backup_read_eintr = false;
+    g_backup_read_partial = false;
+    g_backup_read_fail_after = 2;
+    read_seam_ok = read_seam_ok && !package_read(read_seam_path, &package);
+    g_backup_read_fail_after = -1;
+    g_backup_fstat_mode = 1;
+    read_seam_ok = read_seam_ok && !package_read(read_seam_path, &package);
+    g_backup_fstat_mode = 2;
+    read_seam_ok = read_seam_ok && !package_read(read_seam_path, &package);
+    unlink(read_seam_path);
+    reset_backup_seams();
+
+    uint8_t legacy_package[BACKUP_HEADER_BYTES + 4 + 32] = {0};
+    make_backup_header(legacy_package, LOGITECH_VID, 1);
+    legacy_package[12] = (uint8_t)(G600_PRODUCT_ID >> 8);
+    legacy_package[13] = (uint8_t)G600_PRODUCT_ID;
+    legacy_package[15] = 0xFF;
+    legacy_package[BACKUP_HEADER_BYTES + 2] = 0;
+    legacy_package[BACKUP_HEADER_BYTES + 3] = 32;
+    char legacy_path[] = "/tmp/lomps-selftest-legacy-XXXXXX";
+    int legacy_fd = mkstemp(legacy_path);
+    bool legacy_ok = legacy_fd >= 0;
+    if (legacy_fd >= 0) {
+        close(legacy_fd);
+    }
+    if (legacy_ok) {
+        legacy_ok = write_test_file(legacy_path, legacy_package, sizeof(legacy_package)) &&
+                    package_read(legacy_path, &package) && package.sector_count == 1;
+        if (package.sector_count > 0) {
+            package_release(&package);
+        }
+    }
+    unlink(legacy_path);
+
+    BackupPackage boundary_package;
+    memset(&boundary_package, 0, sizeof(boundary_package));
+    boundary_package.sector_count = MAX_BACKUP_SECTORS + 1;
+    package_release(&boundary_package);
     if (!package_ok || !combined_package_ok) {
         free(profile.data);
         fprintf(stderr, "backup package self-test failed\n");
+        return 1;
+    }
+    if (!seam_ok || !read_seam_ok || !legacy_ok) {
+        free(profile.data);
+        fprintf(stderr, "backup I/O seam self-test failed\n");
         return 1;
     }
 

@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Runs `swift test`, forwarding all arguments, but drops its per-test-case
-# and per-suite "started"/"passed" chatter -- hundreds of lines that bury
-# the coverage tables printed after this script runs. Only real failure
-# output survives: the "error:" assertion diagnostic (with file:line) and
-# any "Test Case '...' failed"/"Test Suite '...' failed" line. On a fully
-# passing run this prints nothing at all, so the coverage table that
-# follows is the only output. Preserves swift test's real exit code even
-# though its output is piped through grep.
+# Runs `swift test`, forwarding all arguments, but captures its per-test-case
+# and per-suite chatter. A passing run is silent unless `--summary` is given;
+# a failing run prints the captured output so the failure is debuggable. This
+# keeps both ordinary test runs and coverage tables readable while preserving
+# swift test's real exit code.
 #
-# Usage: run-swift-test-quiet.sh [swift test arguments...]
+# Usage: run-swift-test-quiet.sh [--summary] [swift test arguments...]
 
 set -uo pipefail
+
+summary=0
+if [[ "${1:-}" == "--summary" ]]; then
+  summary=1
+  shift
+fi
 
 output="$(mktemp)"
 trap 'rm -f "$output"' EXIT
@@ -18,6 +21,15 @@ trap 'rm -f "$output"' EXIT
 status=0
 swift test "$@" >"$output" 2>&1 || status=$?
 
-grep -E "error:|' failed" "$output"
+if [[ "$status" -ne 0 ]]; then
+  cat "$output"
+elif [[ "$summary" -eq 1 ]]; then
+  summary_line="$(grep -E "Executed [0-9]+ tests, with 0 failures" "$output" | tail -1)"
+  if [[ -n "$summary_line" ]]; then
+    echo "Swift tests: passed (${summary_line#*$'\t'})"
+  else
+    echo "Swift tests: passed"
+  fi
+fi
 
 exit "$status"

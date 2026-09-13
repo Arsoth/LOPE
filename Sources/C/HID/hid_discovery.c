@@ -1,5 +1,14 @@
 #include "internal.h"
 
+HidCheckAccessFn hid_check_access_impl = IOHIDCheckAccess;
+HidManagerCreateFn hid_manager_create_impl = IOHIDManagerCreate;
+HidManagerSetDeviceMatchingFn hid_manager_set_device_matching_impl = IOHIDManagerSetDeviceMatching;
+HidManagerCopyDevicesFn hid_manager_copy_devices_impl = IOHIDManagerCopyDevices;
+HidSetGetCountFn hid_set_get_count_impl = CFSetGetCount;
+HidSetGetValuesFn hid_set_get_values_impl = CFSetGetValues;
+HidManagerCloseFn hid_manager_close_impl = IOHIDManagerClose;
+HidCFReleaseFn hid_cf_release_impl = CFRelease;
+
 static int ping_interface(HidInterface *iface, uint8_t device_number, double timeout,
                           double *protocol, uint8_t *resolved_device_number) {
     uint8_t params[3] = {0, 0, 0x5A};
@@ -270,13 +279,13 @@ void hid_context_release(HidContext *context) {
     }
     free(context->items);
     if (context->device_set != NULL) {
-        CFRelease(context->device_set);
+        hid_cf_release_impl(context->device_set);
     }
     if (context->manager != NULL && context->manager_open) {
-        IOHIDManagerClose(context->manager, kIOHIDOptionsTypeNone);
+        hid_manager_close_impl(context->manager, kIOHIDOptionsTypeNone);
     }
     if (context->manager != NULL) {
-        CFRelease(context->manager);
+        hid_cf_release_impl(context->manager);
     }
     memset(context, 0, sizeof(*context));
 }
@@ -311,33 +320,33 @@ int hid_context_create_hardware(HidContext *context) {
     // IOHIDDeviceOpen uses the HID-specific Input Monitoring permission. Do
     // not request it during enumeration: the GUI presents the wired-device
     // instructions and lets the user open System Settings deliberately.
-    IOHIDAccessType hid_access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent);
+    IOHIDAccessType hid_access = hid_check_access_impl(kIOHIDRequestTypeListenEvent);
     if (hid_debug_enabled()) {
         hid_debug_log("hid-debug access=%d", hid_access);
     }
-    context->manager = IOHIDManagerCreate(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
+    context->manager = hid_manager_create_impl(kCFAllocatorDefault, kIOHIDOptionsTypeNone);
     if (context->manager == NULL) {
         fprintf(stderr, "could not create macOS HID manager\n");
         return 0;
     }
-    IOHIDManagerSetDeviceMatching(context->manager, NULL);
+    hid_manager_set_device_matching_impl(context->manager, NULL);
     // CopyDevices is the enumeration primitive and does not require opening
     // the manager. Opening it first can fail under macOS HID privacy
     // restrictions, even though the individual device is enumerable/openable.
-    context->device_set = IOHIDManagerCopyDevices(context->manager);
+    context->device_set = hid_manager_copy_devices_impl(context->manager);
     if (context->device_set == NULL) {
         fprintf(stderr, "could not enumerate macOS HID devices\n");
         hid_context_release(context);
         return 0;
     }
-    CFIndex count = CFSetGetCount(context->device_set);
+    CFIndex count = hid_set_get_count_impl(context->device_set);
     if (count > 0) {
         IOHIDDeviceRef *devices = (IOHIDDeviceRef *)calloc((size_t)count, sizeof(*devices));
         if (devices == NULL) {
             hid_context_release(context);
             return 0;
         }
-        CFSetGetValues(context->device_set, (const void **)devices);
+        hid_set_get_values_impl(context->device_set, (const void **)devices);
         context->items = (HidInterface *)calloc((size_t)count, sizeof(*context->items));
         if (context->items == NULL) {
             free(devices);
@@ -841,4 +850,58 @@ const char *device_connection(const Device *device) {
         return "Wireless";
     }
     return "Wired";
+}
+
+int hid_discovery_compare_interfaces_for_test(const HidInterface *left, const HidInterface *right) {
+    return compare_hid_interfaces(left, right);
+}
+
+int hid_discovery_ping_interface_for_test(HidInterface *iface, uint8_t device_number,
+                                          double timeout, double *protocol,
+                                          uint8_t *resolved_device_number) {
+    return ping_interface(iface, device_number, timeout, protocol, resolved_device_number);
+}
+
+int hid_discovery_discover_features_for_test(Device *device) { return discover_features(device); }
+
+int hid_discovery_device_name_for_test(Device *device) { return device_name(device); }
+
+bool hid_discovery_receiver_device_name_for_test(Device *device, uint8_t slot) {
+    return receiver_device_name(device, slot);
+}
+
+uint8_t hid_discovery_receiver_slot_limit_for_test(const HidInterface *iface) {
+    return receiver_slot_limit(iface);
+}
+
+Reply hid_discovery_receiver_register_read_for_test(HidInterface *iface, uint16_t register_id,
+                                                    bool has_subregister, uint8_t subregister) {
+    return receiver_register_read(iface, register_id, has_subregister, subregister);
+}
+
+void hid_discovery_log_receiver_register_reply_for_test(const HidInterface *iface,
+                                                        uint16_t register_id, uint8_t subregister,
+                                                        Reply reply) {
+    log_receiver_register_reply(iface, register_id, subregister, reply);
+}
+
+void hid_discovery_receiver_slot_name_for_test(Device *device, uint8_t slot, Reply pairing_reply) {
+    receiver_slot_name(device, slot, pairing_reply);
+}
+
+bool hid_discovery_add_receiver_slot_device_for_test(Device *devices, size_t *count,
+                                                     HidInterface *iface, uint8_t slot,
+                                                     Reply pairing_reply, bool inspect_features) {
+    return add_receiver_slot_device(devices, count, iface, slot, pairing_reply, inspect_features);
+}
+
+int hid_discovery_add_device_for_test(Device *devices, size_t *count, HidInterface *iface,
+                                      uint8_t device_number, uint8_t request_device_number,
+                                      double protocol, bool inspect_features) {
+    return add_device(devices, count, iface, device_number, request_device_number, protocol,
+                      inspect_features);
+}
+
+const char *hid_discovery_receiver_connection_type_for_test(const HidInterface *iface) {
+    return receiver_connection_type(iface);
 }

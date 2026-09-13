@@ -6,6 +6,9 @@
 
 #include "internal.h"
 
+G600FeatureReportGetFn g600_get_feature_report_impl = channel_get_feature_report;
+G600FeatureReportSetFn g600_set_feature_report_impl = channel_set_feature_report;
+
 bool is_g600_device(const Device *device) {
     return device != NULL && device->iface != NULL &&
            (device->iface->product_id == G600_PRODUCT_ID ||
@@ -33,8 +36,8 @@ bool g600_read_profile(Device *device, int profile_number, uint8_t report[G600_R
         return false;
     }
     size_t length = 0;
-    if (!channel_get_feature_report(&device->iface->channel, report_id, report, G600_REPORT_BYTES,
-                                    &length) ||
+    if (!g600_get_feature_report_impl(&device->iface->channel, report_id, report, G600_REPORT_BYTES,
+                                      &length) ||
         length < G600_REPORT_BYTES || report[0] != report_id) {
         fprintf(stderr, "could not read G600 profile %d feature report 0x%02X\n", profile_number,
                 report_id);
@@ -49,8 +52,8 @@ bool g600_write_profile(Device *device, int profile_number, uint8_t report[G600_
         report[0] != report_id) {
         return false;
     }
-    return channel_set_feature_report(&device->iface->channel, report_id, report,
-                                      G600_REPORT_BYTES);
+    return g600_set_feature_report_impl(&device->iface->channel, report_id, report,
+                                        G600_REPORT_BYTES);
 }
 
 void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {

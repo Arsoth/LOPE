@@ -7,6 +7,11 @@ typedef struct {
     size_t calls;
 } BatchWriterTestContext;
 
+static int apply_context_create_failure(HidContext *context) {
+    (void)context;
+    return 0;
+}
+
 static bool batch_test_writer(void *context, const BatchSector *sector) {
     BatchWriterTestContext *test = (BatchWriterTestContext *)context;
     (void)sector;
@@ -23,6 +28,8 @@ int test_commands_apply(void) {
     bool batch_plan_ok =
         !batch_sector_changed(unchanged_before, unchanged_after, sizeof(unchanged_before)) &&
         batch_sector_changed(unchanged_before, changed_after, sizeof(unchanged_before)) &&
+        !batch_sector_changed(NULL, changed_after, sizeof(unchanged_before)) &&
+        !batch_sector_changed(unchanged_before, NULL, sizeof(unchanged_before)) &&
         batch_affected_sector_count(true, false) == 1 &&
         batch_affected_sector_count(false, true) == 1 &&
         batch_affected_sector_count(true, true) == 2 &&
@@ -72,6 +79,8 @@ int test_commands_apply(void) {
                          raw_record_spec[2] == 0x00 && raw_record_spec[3] == 0x04 &&
                          !parse_batch_raw_record("8001000", raw_record_spec) &&
                          !parse_batch_raw_record("8001000G", raw_record_spec) &&
+                         !parse_batch_raw_record("ZZ000000", raw_record_spec) &&
+                         !parse_batch_raw_record("-10010004", raw_record_spec) &&
                          !parse_batch_raw_record(NULL, raw_record_spec);
     if (!raw_record_ok) {
         fprintf(stderr, "parse_batch_raw_record self-test failed\n");
@@ -92,6 +101,8 @@ int test_commands_apply(void) {
         !parse_batch_profile_state("2:", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("12345678901234567:enable", &profile_state_number,
                                    &profile_state_enabled) &&
+        !parse_batch_profile_state("-1:enable", &profile_state_number, &profile_state_enabled) &&
+        !parse_batch_profile_state("ZZ:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("0:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("99:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("abc:enable", &profile_state_number, &profile_state_enabled);
@@ -101,8 +112,14 @@ int test_commands_apply(void) {
     }
 
     bool operation_id_ok = batch_operation_id_is_safe("lope-20260101-120000-42") &&
+                           batch_operation_id_is_safe("save_with.dot") &&
+                           batch_operation_id_is_safe("save.with-dot_2") &&
                            !batch_operation_id_is_safe(NULL) && !batch_operation_id_is_safe("") &&
                            !batch_operation_id_is_safe("bad id!");
+    char long_operation_id[97];
+    memset(long_operation_id, 'a', sizeof(long_operation_id) - 1);
+    long_operation_id[sizeof(long_operation_id) - 1] = '\0';
+    operation_id_ok = operation_id_ok && !batch_operation_id_is_safe(long_operation_id);
     if (!operation_id_ok) {
         fprintf(stderr, "batch_operation_id_is_safe self-test failed\n");
         return 1;
@@ -174,11 +191,13 @@ int test_commands_apply(void) {
         parsed_rgb_zone == 2 && parsed_rgb_color[0] == 0xA1 && parsed_rgb_color[1] == 0xB2 &&
         parsed_rgb_color[2] == 0xC3 &&
         !parse_batch_rgb_change("3:GG0000", &parsed_rgb_zone, parsed_rgb_color) &&
+        !parse_batch_rgb_change("1:ZZ0000", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change(NULL, &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change(":AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("1:", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("12345678901234567:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("0:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
+        !parse_batch_rgb_change("-1:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("abc:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("1:AABBC", &parsed_rgb_zone, parsed_rgb_color);
     if (!rgb_parser_ok) {
@@ -217,6 +236,8 @@ int test_commands_apply(void) {
         !parse_batch_button_change("normal:200000:80010004", &parsed_button, &parsed_gshift,
                                    parsed_button_spec) &&
         !parse_batch_button_change("normal:abc:80010004", &parsed_button, &parsed_gshift,
+                                   parsed_button_spec) &&
+        !parse_batch_button_change("normal:ZZ:80010004", &parsed_button, &parsed_gshift,
                                    parsed_button_spec) &&
         !parse_batch_button_change("normal:3:800100", &parsed_button, &parsed_gshift,
                                    parsed_button_spec);
@@ -257,6 +278,14 @@ int test_commands_apply(void) {
     apply_options.button_change_count = 2;
     apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
 
+    const char *duplicate_gshift_change_a = "gshift:1:80010001";
+    const char *duplicate_gshift_change_b = "gshift:1:80010002";
+    apply_options.button_changes[0] = duplicate_gshift_change_a;
+    apply_options.button_changes[1] = duplicate_gshift_change_b;
+    apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
+    apply_options.button_changes[0] = duplicate_button_change_a;
+    apply_options.button_changes[1] = duplicate_button_change_b;
+
     const char *structurally_invalid_button_change = "normal:1:30000000";
     apply_options.button_changes[0] = structurally_invalid_button_change;
     apply_options.button_change_count = 1;
@@ -296,6 +325,10 @@ int test_commands_apply(void) {
     apply_options.dpi_values = "1600,800";
     apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
     apply_options.dpi_values = NULL;
+
+    apply_options.dpi_shift = 0;
+    apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
+    apply_options.dpi_shift = -1;
 
     apply_options.operation_id = "bad id!";
     apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
@@ -478,6 +511,26 @@ int test_commands_apply(void) {
     }
     size_t apply2_headers_prefix_count = apply2_headers_reply_count;
 
+    Reply apply2_profile_load_fail_replies[40];
+    memcpy(apply2_profile_load_fail_replies, apply2_headers_replies,
+           apply2_headers_prefix_count * sizeof(Reply));
+    ChannelRequestTestContext apply2_profile_load_fail_channel = {
+        .replies = apply2_profile_load_fail_replies,
+        .reply_count = apply2_headers_prefix_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_profile_load_fail_channel;
+    Options apply2_profile_load_fail = {0};
+    apply2_profile_load_fail.profile = 1;
+    apply2_profile_load_fail.device_index = -1;
+    apply2_profile_load_fail.dpi_default = -1;
+    apply2_profile_load_fail.dpi_shift = -1;
+    apply2_profile_load_fail.button_changes[0] = apply2_valid_button_change;
+    apply2_profile_load_fail.button_change_count = 1;
+    if (run_apply(&apply2_profile_load_fail) != 1) {
+        fprintf(stderr, "run_apply profile-load-failure self-test failed\n");
+        return 1;
+    }
+
     Reply apply2_out_of_range_replies[40];
     memcpy(apply2_out_of_range_replies, apply2_headers_replies,
            apply2_headers_prefix_count * sizeof(Reply));
@@ -532,6 +585,150 @@ int test_commands_apply(void) {
         apply2_loaded_replies[apply2_loaded_reply_count++] = data_chunks[i];
     }
     size_t apply2_loaded_prefix_count = apply2_loaded_reply_count;
+
+    // A profile can have a valid normal button layout while its advertised
+    // G-Shift bank is not validated. The command must reject only the
+    // G-Shift edit, after reaching that specific layout check.
+    uint8_t apply2_gshift_bad_sector[255];
+    memcpy(apply2_gshift_bad_sector, mock_sector, sizeof(apply2_gshift_bad_sector));
+    memset(apply2_gshift_bad_sector + 96, 0, 5 * 4);
+    sector_put_crc(apply2_gshift_bad_sector, sizeof(apply2_gshift_bad_sector));
+    Reply apply2_gshift_bad_chunks[32];
+    size_t apply2_gshift_bad_chunk_count = build_sector_read_replies(
+        apply2_gshift_bad_sector, sizeof(apply2_gshift_bad_sector), apply2_gshift_bad_chunks, 32);
+    Reply apply2_gshift_replies[80];
+    size_t apply2_gshift_reply_count = 0;
+    Reply apply2_gshift_info = k_mock_get_info_reply;
+    apply2_gshift_info.bytes[9] = 0x02;
+    apply2_gshift_replies[apply2_gshift_reply_count++] = apply2_gshift_info;
+    for (size_t i = 0; i < control_chunk_count; i++) {
+        apply2_gshift_replies[apply2_gshift_reply_count++] = control_chunks[i];
+    }
+    for (size_t i = 0; i < apply2_gshift_bad_chunk_count; i++) {
+        apply2_gshift_replies[apply2_gshift_reply_count++] = apply2_gshift_bad_chunks[i];
+    }
+    ChannelRequestTestContext apply2_gshift_channel = {
+        .replies = apply2_gshift_replies, .reply_count = apply2_gshift_reply_count, .calls = 0};
+    g_channel_request_test_context = &apply2_gshift_channel;
+    Options apply2_gshift = {0};
+    apply2_gshift.profile = 1;
+    apply2_gshift.device_index = -1;
+    apply2_gshift.dpi_default = -1;
+    apply2_gshift.dpi_shift = -1;
+    apply2_gshift.button_changes[0] = "gshift:1:80010002";
+    apply2_gshift.button_change_count = 1;
+    if (run_apply(&apply2_gshift) != 1) {
+        fprintf(stderr, "run_apply unsupported-G-Shift-layout self-test failed\n");
+        return 1;
+    }
+
+    // RGB records are independently validated. An unknown populated mode
+    // should reach run_apply's RGB-layout rejection without invalidating the
+    // otherwise writable button layout.
+    uint8_t apply2_rgb_bad_sector[255];
+    memcpy(apply2_rgb_bad_sector, mock_sector, sizeof(apply2_rgb_bad_sector));
+    apply2_rgb_bad_sector[RGB_PROFILE_BASE_OFFSET] = 0x02;
+    sector_put_crc(apply2_rgb_bad_sector, sizeof(apply2_rgb_bad_sector));
+    Reply apply2_rgb_bad_chunks[32];
+    size_t apply2_rgb_bad_chunk_count = build_sector_read_replies(
+        apply2_rgb_bad_sector, sizeof(apply2_rgb_bad_sector), apply2_rgb_bad_chunks, 32);
+    Reply apply2_rgb_bad_replies[80];
+    size_t apply2_rgb_bad_reply_count = 0;
+    for (size_t i = 0; i < apply2_headers_prefix_count; i++) {
+        apply2_rgb_bad_replies[apply2_rgb_bad_reply_count++] = apply2_headers_replies[i];
+    }
+    for (size_t i = 0; i < apply2_rgb_bad_chunk_count; i++) {
+        apply2_rgb_bad_replies[apply2_rgb_bad_reply_count++] = apply2_rgb_bad_chunks[i];
+    }
+    ChannelRequestTestContext apply2_rgb_bad_channel = {
+        .replies = apply2_rgb_bad_replies, .reply_count = apply2_rgb_bad_reply_count, .calls = 0};
+    g_channel_request_test_context = &apply2_rgb_bad_channel;
+    Options apply2_rgb_bad = {0};
+    apply2_rgb_bad.profile = 1;
+    apply2_rgb_bad.device_index = -1;
+    apply2_rgb_bad.dpi_default = -1;
+    apply2_rgb_bad.dpi_shift = -1;
+    apply2_rgb_bad.rgb_changes[0] = "1:AABBCC";
+    apply2_rgb_bad.rgb_change_count = 1;
+    if (run_apply(&apply2_rgb_bad) != 1) {
+        fprintf(stderr, "run_apply unsupported-RGB-layout self-test failed\n");
+        return 1;
+    }
+
+    // Exercise both sides of the DPI layout/CRC guard. These cases stop in
+    // preflight, before capability reads or any write is attempted.
+    uint8_t apply2_dpi_bad_layout_sector[255];
+    memcpy(apply2_dpi_bad_layout_sector, mock_sector, sizeof(apply2_dpi_bad_layout_sector));
+    write_le16(apply2_dpi_bad_layout_sector + 3, 0);
+    sector_put_crc(apply2_dpi_bad_layout_sector, sizeof(apply2_dpi_bad_layout_sector));
+    Reply apply2_dpi_bad_layout_chunks[32];
+    size_t apply2_dpi_bad_layout_count = build_sector_read_replies(
+        apply2_dpi_bad_layout_sector, sizeof(apply2_dpi_bad_layout_sector),
+        apply2_dpi_bad_layout_chunks, 32);
+    Reply apply2_dpi_bad_layout_replies[80];
+    size_t apply2_dpi_bad_layout_reply_count = 0;
+    for (size_t i = 0; i < apply2_headers_prefix_count; i++) {
+        apply2_dpi_bad_layout_replies[apply2_dpi_bad_layout_reply_count++] =
+            apply2_headers_replies[i];
+    }
+    for (size_t i = 0; i < apply2_dpi_bad_layout_count; i++) {
+        apply2_dpi_bad_layout_replies[apply2_dpi_bad_layout_reply_count++] =
+            apply2_dpi_bad_layout_chunks[i];
+    }
+    ChannelRequestTestContext apply2_dpi_bad_layout_channel = {
+        .replies = apply2_dpi_bad_layout_replies,
+        .reply_count = apply2_dpi_bad_layout_reply_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_dpi_bad_layout_channel;
+    Options apply2_dpi_bad_layout = {0};
+    apply2_dpi_bad_layout.profile = 1;
+    apply2_dpi_bad_layout.device_index = -1;
+    apply2_dpi_bad_layout.dpi_values = "800,1600";
+    apply2_dpi_bad_layout.dpi_default = -1;
+    apply2_dpi_bad_layout.dpi_shift = -1;
+    if (run_apply(&apply2_dpi_bad_layout) != 1) {
+        fprintf(stderr, "run_apply unsupported-DPI-layout self-test failed\n");
+        return 1;
+    }
+
+    ChannelRequestTestContext apply2_dpi_bad_crc_channel = {
+        .replies = apply2_bad_crc_replies, .reply_count = apply2_bad_crc_reply_count, .calls = 0};
+    g_channel_request_test_context = &apply2_dpi_bad_crc_channel;
+    Options apply2_dpi_bad_crc = {0};
+    apply2_dpi_bad_crc.profile = 1;
+    apply2_dpi_bad_crc.device_index = -1;
+    apply2_dpi_bad_crc.dpi_values = "800,1600";
+    apply2_dpi_bad_crc.dpi_default = -1;
+    apply2_dpi_bad_crc.dpi_shift = -1;
+    if (run_apply(&apply2_dpi_bad_crc) != 1) {
+        fprintf(stderr, "run_apply invalid-DPI-profile-CRC self-test failed\n");
+        return 1;
+    }
+
+    // Leaving both indexes unspecified uses the profile's validated default
+    // and shift indexes. Preview mode reaches that fallback without requiring
+    // a write transaction.
+    Reply apply2_dpi_fallback_replies[96];
+    size_t apply2_dpi_fallback_reply_count = apply2_loaded_prefix_count;
+    memcpy(apply2_dpi_fallback_replies, apply2_loaded_replies,
+           apply2_loaded_prefix_count * sizeof(Reply));
+    apply2_dpi_fallback_replies[apply2_dpi_fallback_reply_count++] = set_dpi_sensor_count_1;
+    apply2_dpi_fallback_replies[apply2_dpi_fallback_reply_count++] = set_dpi_sensor_list;
+    ChannelRequestTestContext apply2_dpi_fallback_channel = {.replies = apply2_dpi_fallback_replies,
+                                                             .reply_count =
+                                                                 apply2_dpi_fallback_reply_count,
+                                                             .calls = 0};
+    g_channel_request_test_context = &apply2_dpi_fallback_channel;
+    Options apply2_dpi_fallback = {0};
+    apply2_dpi_fallback.profile = 1;
+    apply2_dpi_fallback.device_index = -1;
+    apply2_dpi_fallback.dpi_values = "800,1200,1600,2400,3200";
+    apply2_dpi_fallback.dpi_default = -1;
+    apply2_dpi_fallback.dpi_shift = -1;
+    if (run_apply(&apply2_dpi_fallback) != 0) {
+        fprintf(stderr, "run_apply DPI-index-fallback preview self-test failed\n");
+        return 1;
+    }
 
     Reply apply2_button_range_replies[80];
     memcpy(apply2_button_range_replies, apply2_loaded_replies,
@@ -871,6 +1068,10 @@ int test_commands_apply(void) {
     apply2_happy_after[33] = 0x01;
     apply2_happy_after[34] = 0x00;
     apply2_happy_after[35] = 0x02;
+    apply2_happy_after[96] = 0x80;
+    apply2_happy_after[97] = 0x01;
+    apply2_happy_after[98] = 0x00;
+    apply2_happy_after[99] = 0x10;
     sector_put_crc(apply2_happy_after, sizeof(apply2_happy_after));
     Reply apply2_happy_after_chunks[32];
     size_t apply2_happy_after_chunk_count = build_sector_read_replies(
@@ -908,7 +1109,8 @@ int test_commands_apply(void) {
     apply2_happy.dpi_default = -1;
     apply2_happy.dpi_shift = -1;
     apply2_happy.button_changes[0] = "normal:1:80010002";
-    apply2_happy.button_change_count = 1;
+    apply2_happy.button_changes[1] = "gshift:1:80010010";
+    apply2_happy.button_change_count = 2;
     apply2_happy.yes = true;
     apply2_happy.backup_directory = apply2_happy_directory;
     apply2_happy.operation_id = "lope-apply-happy-test";
@@ -1012,6 +1214,66 @@ int test_commands_apply(void) {
         fprintf(stderr, "run_apply report-rate-unavailable self-test failed\n");
         return 1;
     }
+
+    // A readable extended report-rate feature exercises the representable
+    // profile-interval path and keeps polling-rate edits covered separately
+    // from the failure case above.
+    Device apply2_report_device = set_dpi_device;
+    apply2_report_device.feature_count = 3;
+    apply2_report_device.features[2] = (Feature){.id = FEATURE_EXTENDED_REPORT_RATE, .index = 6};
+    DiscoverDevicesTestContext apply2_report_discovery = {
+        .devices = &apply2_report_device, .count = 1, .result = 1};
+    g_discover_devices_test_context = &apply2_report_discovery;
+    uint8_t apply2_report_after[255];
+    memcpy(apply2_report_after, mock_sector, sizeof(apply2_report_after));
+    apply2_report_after[0] = 1;
+    sector_put_crc(apply2_report_after, sizeof(apply2_report_after));
+    Reply apply2_report_after_chunks[32];
+    size_t apply2_report_after_chunk_count = build_sector_read_replies(
+        apply2_report_after, sizeof(apply2_report_after), apply2_report_after_chunks, 32);
+    Reply apply2_report_success_replies[128];
+    size_t apply2_report_success_count = 0;
+    for (size_t i = 0; i < apply2_loaded_prefix_count; i++) {
+        apply2_report_success_replies[apply2_report_success_count++] = apply2_loaded_replies[i];
+    }
+    apply2_report_success_replies[apply2_report_success_count++] =
+        (Reply){.status = REPLY_OK, .length = 2, .bytes = {0x00, 0x0F}};
+    apply2_report_success_replies[apply2_report_success_count++] =
+        (Reply){.status = REPLY_OK, .length = 1, .bytes = {3}};
+    apply2_report_success_replies[apply2_report_success_count++] = k_mock_onboard_mode_reply;
+    apply2_report_success_replies[apply2_report_success_count++] = k_mock_generic_ok_reply;
+    for (size_t i = 0; i < 16; i++) {
+        apply2_report_success_replies[apply2_report_success_count++] = k_mock_generic_ok_reply;
+    }
+    apply2_report_success_replies[apply2_report_success_count++] = k_mock_generic_ok_reply;
+    for (size_t i = 0; i < apply2_report_after_chunk_count; i++) {
+        apply2_report_success_replies[apply2_report_success_count++] =
+            apply2_report_after_chunks[i];
+    }
+    ChannelRequestTestContext apply2_report_success_channel = {
+        .replies = apply2_report_success_replies,
+        .reply_count = apply2_report_success_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_report_success_channel;
+    Options apply2_report_success = {0};
+    apply2_report_success.profile = 1;
+    apply2_report_success.device_index = -1;
+    apply2_report_success.dpi_default = -1;
+    apply2_report_success.dpi_shift = -1;
+    apply2_report_success.report_rate = "1000";
+    apply2_report_success.yes = true;
+    apply2_report_success.backup_directory = "/tmp";
+    apply2_report_success.operation_id = "lope-apply-report-rate-test";
+    char apply2_report_success_backup_path[512];
+    make_batch_backup_path("/tmp", apply2_report_success.operation_id,
+                           apply2_report_success_backup_path);
+    unlink(apply2_report_success_backup_path);
+    if (run_apply(&apply2_report_success) != 0) {
+        fprintf(stderr, "run_apply report-rate success self-test failed\n");
+        return 1;
+    }
+    unlink(apply2_report_success_backup_path);
+    g_discover_devices_test_context = &apply2_discovery;
 
     // execute_batch_sector_plan's own verify-readback failure: the write
     // itself succeeds, but nothing answers the follow-up readSector calls.
@@ -1174,6 +1436,302 @@ int test_commands_apply(void) {
             apply2_combo_result);
         return 1;
     }
+
+    // A control-only update also needs to exercise the plan's profile=false
+    // branch and the disabled-state assignment. Start with both slots enabled
+    // so disabling profile 2 remains a valid effective change.
+    uint8_t apply2_both_enabled_control[255];
+    memcpy(apply2_both_enabled_control, profile_state_control, sizeof(apply2_both_enabled_control));
+    apply2_both_enabled_control[6] = 1;
+    sector_put_crc(apply2_both_enabled_control, sizeof(apply2_both_enabled_control));
+    Reply apply2_both_enabled_chunks[32];
+    size_t apply2_both_enabled_chunk_count =
+        build_sector_read_replies(apply2_both_enabled_control, sizeof(apply2_both_enabled_control),
+                                  apply2_both_enabled_chunks, 32);
+    uint8_t apply2_disable_profile2_control[255];
+    memcpy(apply2_disable_profile2_control, apply2_both_enabled_control,
+           sizeof(apply2_disable_profile2_control));
+    apply2_disable_profile2_control[6] = 0;
+    sector_put_crc(apply2_disable_profile2_control, sizeof(apply2_disable_profile2_control));
+    Reply apply2_disable_profile2_chunks[32];
+    size_t apply2_disable_profile2_chunk_count = build_sector_read_replies(
+        apply2_disable_profile2_control, sizeof(apply2_disable_profile2_control),
+        apply2_disable_profile2_chunks, 32);
+    Reply apply2_control_only_replies[96];
+    size_t apply2_control_only_reply_count = 0;
+    apply2_control_only_replies[apply2_control_only_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < apply2_both_enabled_chunk_count; i++) {
+        apply2_control_only_replies[apply2_control_only_reply_count++] =
+            apply2_both_enabled_chunks[i];
+    }
+    apply2_control_only_replies[apply2_control_only_reply_count++] = k_mock_onboard_mode_reply;
+    apply2_control_only_replies[apply2_control_only_reply_count++] = k_mock_generic_ok_reply;
+    for (size_t i = 0; i < 16; i++) {
+        apply2_control_only_replies[apply2_control_only_reply_count++] = k_mock_generic_ok_reply;
+    }
+    apply2_control_only_replies[apply2_control_only_reply_count++] = k_mock_generic_ok_reply;
+    for (size_t i = 0; i < apply2_disable_profile2_chunk_count; i++) {
+        apply2_control_only_replies[apply2_control_only_reply_count++] =
+            apply2_disable_profile2_chunks[i];
+    }
+    ChannelRequestTestContext apply2_control_only_channel = {.replies = apply2_control_only_replies,
+                                                             .reply_count =
+                                                                 apply2_control_only_reply_count,
+                                                             .calls = 0};
+    g_channel_request_test_context = &apply2_control_only_channel;
+    Options apply2_control_only = {0};
+    apply2_control_only.profile = 1;
+    apply2_control_only.device_index = -1;
+    apply2_control_only.dpi_default = -1;
+    apply2_control_only.dpi_shift = -1;
+    apply2_control_only.profile_state_changes[0] = "2:disable";
+    apply2_control_only.profile_state_change_count = 1;
+    apply2_control_only.yes = true;
+    apply2_control_only.backup_directory = "/tmp";
+    apply2_control_only.operation_id = "lope-apply-control-only-test";
+    char apply2_control_only_backup_path[512];
+    make_batch_backup_path(apply2_control_only.backup_directory, apply2_control_only.operation_id,
+                           apply2_control_only_backup_path);
+    unlink(apply2_control_only_backup_path);
+    int apply2_control_only_result = run_apply(&apply2_control_only);
+    unlink(apply2_control_only_backup_path);
+    if (apply2_control_only_result != 0) {
+        fprintf(stderr, "run_apply control-only disable self-test failed\n");
+        return 1;
+    }
+
+    // Exercise the two short-circuit failures in the profile-state control
+    // read: an unavailable sector and a readable sector with no headers.
+    g_discover_devices_test_context = &apply2_discovery;
+    Reply apply2_control_read_failure_replies[1] = {k_mock_get_info_reply};
+    ChannelRequestTestContext apply2_control_read_failure_channel = {
+        .replies = apply2_control_read_failure_replies, .reply_count = 1, .calls = 0};
+    g_channel_request_test_context = &apply2_control_read_failure_channel;
+    Options apply2_control_read_failure = {0};
+    apply2_control_read_failure.profile = 1;
+    apply2_control_read_failure.device_index = -1;
+    apply2_control_read_failure.dpi_default = -1;
+    apply2_control_read_failure.dpi_shift = -1;
+    apply2_control_read_failure.profile_state_changes[0] = "1:enable";
+    apply2_control_read_failure.profile_state_change_count = 1;
+    if (run_apply(&apply2_control_read_failure) != 1) {
+        fprintf(stderr, "run_apply control-read-failure self-test failed\n");
+        return 1;
+    }
+
+    uint8_t apply2_empty_control[255] = {0};
+    sector_put_crc(apply2_empty_control, sizeof(apply2_empty_control));
+    Reply apply2_empty_control_chunks[32];
+    size_t apply2_empty_control_chunk_count = build_sector_read_replies(
+        apply2_empty_control, sizeof(apply2_empty_control), apply2_empty_control_chunks, 32);
+    Reply apply2_empty_control_replies[40];
+    size_t apply2_empty_control_reply_count = 0;
+    apply2_empty_control_replies[apply2_empty_control_reply_count++] = k_mock_get_info_reply;
+    for (size_t i = 0; i < apply2_empty_control_chunk_count; i++) {
+        apply2_empty_control_replies[apply2_empty_control_reply_count++] =
+            apply2_empty_control_chunks[i];
+    }
+    ChannelRequestTestContext apply2_empty_control_channel = {
+        .replies = apply2_empty_control_replies,
+        .reply_count = apply2_empty_control_reply_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_empty_control_channel;
+    if (run_apply(&apply2_control_read_failure) != 1) {
+        fprintf(stderr, "run_apply empty-control-headers self-test failed\n");
+        return 1;
+    }
+
+    // A valid normal-button layout with an invalid second bank must reject a
+    // G-Shift edit after profile loading, rather than treating the bank as
+    // writable merely because the device advertises the shift flag.
+    uint8_t apply2_bad_gshift_sector[255];
+    memcpy(apply2_bad_gshift_sector, mock_sector, sizeof(apply2_bad_gshift_sector));
+    memset(apply2_bad_gshift_sector + 96, 0, 20);
+    sector_put_crc(apply2_bad_gshift_sector, sizeof(apply2_bad_gshift_sector));
+    Reply apply2_bad_gshift_chunks[32];
+    size_t apply2_bad_gshift_chunk_count = build_sector_read_replies(
+        apply2_bad_gshift_sector, sizeof(apply2_bad_gshift_sector), apply2_bad_gshift_chunks, 32);
+    Reply apply2_bad_gshift_replies[80];
+    size_t apply2_bad_gshift_reply_count = 0;
+    for (size_t i = 0; i < apply2_headers_prefix_count; i++) {
+        apply2_bad_gshift_replies[apply2_bad_gshift_reply_count++] = apply2_headers_replies[i];
+    }
+    for (size_t i = 0; i < apply2_bad_gshift_chunk_count; i++) {
+        apply2_bad_gshift_replies[apply2_bad_gshift_reply_count++] = apply2_bad_gshift_chunks[i];
+    }
+    ChannelRequestTestContext apply2_bad_gshift_channel = {.replies = apply2_bad_gshift_replies,
+                                                           .reply_count =
+                                                               apply2_bad_gshift_reply_count,
+                                                           .calls = 0};
+    g_channel_request_test_context = &apply2_bad_gshift_channel;
+    Options apply2_bad_gshift = {0};
+    apply2_bad_gshift.profile = 1;
+    apply2_bad_gshift.device_index = -1;
+    apply2_bad_gshift.dpi_default = -1;
+    apply2_bad_gshift.dpi_shift = -1;
+    apply2_bad_gshift.button_changes[0] = "gshift:1:80010002";
+    apply2_bad_gshift.button_change_count = 1;
+    if (run_apply(&apply2_bad_gshift) != 1) {
+        fprintf(stderr, "run_apply invalid-G-Shift-layout self-test failed\n");
+        return 1;
+    }
+
+    // An otherwise writable profile can still have an unrecognized DPI
+    // layout. This reaches run_apply's layout validation before any sensor
+    // capability requests are attempted.
+    uint8_t apply2_bad_dpi_sector[255];
+    memcpy(apply2_bad_dpi_sector, mock_sector, sizeof(apply2_bad_dpi_sector));
+    write_le16(apply2_bad_dpi_sector + 5, 0);
+    sector_put_crc(apply2_bad_dpi_sector, sizeof(apply2_bad_dpi_sector));
+    Reply apply2_bad_dpi_chunks[32];
+    size_t apply2_bad_dpi_chunk_count = build_sector_read_replies(
+        apply2_bad_dpi_sector, sizeof(apply2_bad_dpi_sector), apply2_bad_dpi_chunks, 32);
+    Reply apply2_bad_dpi_replies[80];
+    size_t apply2_bad_dpi_reply_count = 0;
+    for (size_t i = 0; i < apply2_headers_prefix_count; i++) {
+        apply2_bad_dpi_replies[apply2_bad_dpi_reply_count++] = apply2_headers_replies[i];
+    }
+    for (size_t i = 0; i < apply2_bad_dpi_chunk_count; i++) {
+        apply2_bad_dpi_replies[apply2_bad_dpi_reply_count++] = apply2_bad_dpi_chunks[i];
+    }
+    ChannelRequestTestContext apply2_bad_dpi_channel = {
+        .replies = apply2_bad_dpi_replies, .reply_count = apply2_bad_dpi_reply_count, .calls = 0};
+    g_channel_request_test_context = &apply2_bad_dpi_channel;
+    Options apply2_bad_dpi = {0};
+    apply2_bad_dpi.profile = 1;
+    apply2_bad_dpi.device_index = -1;
+    apply2_bad_dpi.dpi_values = "800,1200";
+    apply2_bad_dpi.dpi_default = -1;
+    apply2_bad_dpi.dpi_shift = -1;
+    if (run_apply(&apply2_bad_dpi) != 1) {
+        fprintf(stderr, "run_apply invalid-DPI-layout self-test failed\n");
+        return 1;
+    }
+
+    // Defaults omitted: run_apply inherits the indexes already stored in the
+    // profile. Preview mode makes this a no-write test while still traversing
+    // the complete DPI preparation path.
+    Reply apply2_inherited_dpi_replies[100];
+    size_t apply2_inherited_dpi_reply_count = 0;
+    for (size_t i = 0; i < apply2_loaded_prefix_count; i++) {
+        apply2_inherited_dpi_replies[apply2_inherited_dpi_reply_count++] = apply2_loaded_replies[i];
+    }
+    apply2_inherited_dpi_replies[apply2_inherited_dpi_reply_count++] = set_dpi_sensor_count_1;
+    apply2_inherited_dpi_replies[apply2_inherited_dpi_reply_count++] = set_dpi_sensor_list;
+    ChannelRequestTestContext apply2_inherited_dpi_channel = {
+        .replies = apply2_inherited_dpi_replies,
+        .reply_count = apply2_inherited_dpi_reply_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_inherited_dpi_channel;
+    Options apply2_inherited_dpi = {0};
+    apply2_inherited_dpi.profile = 1;
+    apply2_inherited_dpi.device_index = -1;
+    apply2_inherited_dpi.dpi_values = "800,1200,1600";
+    apply2_inherited_dpi.dpi_default = -1;
+    apply2_inherited_dpi.dpi_shift = -1;
+    if (run_apply(&apply2_inherited_dpi) != 0) {
+        fprintf(stderr, "run_apply inherited-DPI-index preview self-test failed\n");
+        return 1;
+    }
+
+    Reply apply2_shift_range_replies[100];
+    size_t apply2_shift_range_reply_count = 0;
+    for (size_t i = 0; i < apply2_loaded_prefix_count; i++) {
+        apply2_shift_range_replies[apply2_shift_range_reply_count++] = apply2_loaded_replies[i];
+    }
+    apply2_shift_range_replies[apply2_shift_range_reply_count++] = set_dpi_sensor_count_1;
+    apply2_shift_range_replies[apply2_shift_range_reply_count++] = set_dpi_sensor_list;
+    ChannelRequestTestContext apply2_shift_range_channel = {.replies = apply2_shift_range_replies,
+                                                            .reply_count =
+                                                                apply2_shift_range_reply_count,
+                                                            .calls = 0};
+    g_channel_request_test_context = &apply2_shift_range_channel;
+    Options apply2_shift_range = apply2_inherited_dpi;
+    apply2_shift_range.dpi_default = 1;
+    apply2_shift_range.dpi_shift = 6;
+    if (run_apply(&apply2_shift_range) != 1) {
+        fprintf(stderr, "run_apply shift-index-out-of-range self-test failed\n");
+        return 1;
+    }
+
+    // A requested disable that is already in effect still exercises the false
+    // arm of the control-state write ternary without requiring a hardware write.
+    ChannelRequestTestContext apply2_disable_preview_channel = {
+        .replies = apply2_control_loaded_replies,
+        .reply_count = apply2_control_loaded_prefix_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_disable_preview_channel;
+    Options apply2_disable_preview = {0};
+    apply2_disable_preview.profile = 1;
+    apply2_disable_preview.device_index = -1;
+    apply2_disable_preview.dpi_default = -1;
+    apply2_disable_preview.dpi_shift = -1;
+    apply2_disable_preview.profile_state_changes[0] = "2:disable";
+    apply2_disable_preview.profile_state_change_count = 1;
+    if (run_apply(&apply2_disable_preview) != 0) {
+        fprintf(stderr, "run_apply disable-preview self-test failed\n");
+        return 1;
+    }
+
+    // Control-only success covers the batch plan's no-profile branch and the
+    // post-write DPI-sync condition's false arm.
+    Reply apply2_control_only_enable_replies[100];
+    size_t apply2_control_only_enable_reply_count = 0;
+    for (size_t i = 0; i < apply2_control_loaded_prefix_count; i++) {
+        apply2_control_only_enable_replies[apply2_control_only_enable_reply_count++] =
+            apply2_control_loaded_replies[i];
+    }
+    apply2_control_only_enable_replies[apply2_control_only_enable_reply_count++] =
+        k_mock_onboard_mode_reply;
+    apply2_control_only_enable_replies[apply2_control_only_enable_reply_count++] =
+        k_mock_generic_ok_reply;
+    for (size_t i = 0; i < 16; i++) {
+        apply2_control_only_enable_replies[apply2_control_only_enable_reply_count++] =
+            k_mock_generic_ok_reply;
+    }
+    apply2_control_only_enable_replies[apply2_control_only_enable_reply_count++] =
+        k_mock_generic_ok_reply;
+    for (size_t i = 0; i < profile_state_after_chunk_count; i++) {
+        apply2_control_only_enable_replies[apply2_control_only_enable_reply_count++] =
+            profile_state_after_chunks[i];
+    }
+    ChannelRequestTestContext apply2_control_only_enable_channel = {
+        .replies = apply2_control_only_enable_replies,
+        .reply_count = apply2_control_only_enable_reply_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_control_only_enable_channel;
+    Options apply2_control_only_enable = {0};
+    apply2_control_only_enable.profile = 1;
+    apply2_control_only_enable.device_index = -1;
+    apply2_control_only_enable.dpi_default = -1;
+    apply2_control_only_enable.dpi_shift = -1;
+    apply2_control_only_enable.profile_state_changes[0] = "2:enable";
+    apply2_control_only_enable.profile_state_change_count = 1;
+    apply2_control_only_enable.yes = true;
+    apply2_control_only_enable.backup_directory = "/tmp";
+    apply2_control_only_enable.operation_id = "lope-apply-control-only-test";
+    char apply2_control_only_enable_backup_path[512];
+    make_batch_backup_path("/tmp", apply2_control_only_enable.operation_id,
+                           apply2_control_only_enable_backup_path);
+    unlink(apply2_control_only_enable_backup_path);
+    if (run_apply(&apply2_control_only_enable) != 0) {
+        fprintf(stderr, "run_apply control-only success self-test failed\n");
+        return 1;
+    }
+    unlink(apply2_control_only_enable_backup_path);
+
+    // The command should stop before discovery when HID context setup fails.
+    hid_context_create_impl = apply_context_create_failure;
+    Options apply_context_failure = {0};
+    apply_context_failure.profile = 1;
+    apply_context_failure.device_index = -1;
+    apply_context_failure.button_changes[0] = apply2_valid_button_change;
+    apply_context_failure.button_change_count = 1;
+    if (run_apply(&apply_context_failure) != 1) {
+        fprintf(stderr, "run_apply context-creation-failure self-test failed\n");
+        return 1;
+    }
+    hid_context_create_impl = hid_context_create_hardware;
 
     return 0;
 }

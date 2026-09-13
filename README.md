@@ -99,8 +99,8 @@ Run `make test` for the C self-test binary and the Swift XCTest suite (via
 for an `llvm-cov` report, or `make coverage-check` to enforce the per-file
 minimums (see [docs/development-standards.md](docs/development-standards.md)
 for what's actually enforced and why Swift has no branch-coverage numbers).
-`make install-hooks` installs a pre-commit hook that runs the format, test,
-and coverage checks (see
+`make install-hooks` installs a pre-commit hook that runs the format and
+changed-files test/coverage checks (see
 [docs/development-standards.md](docs/development-standards.md)). See
 [docs/development-setup.md](docs/development-setup.md) for
 required tooling, [the development reference](docs/REFERENCE.md) for the
@@ -111,16 +111,20 @@ maintenance is covered by [Profiles/README.md](Profiles/README.md).
 ## Continuous integration and releases
 
 Pull requests targeting `main`, and pushes to `main`, run
-[the CI workflow](.github/workflows/ci.yml). It checks formatting, runs the C
-and Swift test suites, and runs `make coverage-check`, which enforces the
-repository's configured per-file coverage minimums.
+[the CI workflow](.github/workflows/ci.yml). It checks formatting, runs the
+complete C and Swift test suites, and runs `make coverage-check`, which
+enforces the repository's configured per-file coverage minimums. The scheduled
+[nightly workflow](.github/workflows/nightly.yml) repeats the same full gate.
 
 To make that check merge-blocking, add `LOPE CI / Format, test, and coverage
 gate` under the required status checks in the branch ruleset for `main`.
 
 Releases are cut by pushing a `vX.Y.Z` tag from `main`. The release workflow
-builds the native arm64 app, signs it with a Developer ID Application
-certificate, submits it to Apple's notary service, staples the ticket, and
-publishes a ZIP plus SHA-256 checksum to the GitHub release. See
-[development setup](docs/development-setup.md) for the required GitHub
-secrets.
+verifies the tagged source, builds the native arm64 app, signs it with a
+Developer ID Application certificate, submits it to Apple's notary service,
+staples the ticket, and publishes a versioned ZIP plus SHA-256 checksum to the
+GitHub release. The archive is named
+`LOPE-VERSION-macos-arm64.zip`; the tag version becomes
+`CFBundleShortVersionString` and the workflow run number becomes
+`CFBundleVersion`. See [development setup](docs/development-setup.md) for the
+required GitHub secrets.

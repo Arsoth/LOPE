@@ -3,6 +3,11 @@
 
 #include "types.h"
 
+typedef int (*DiscoverDevicesForListFn)(HidContext *context, int requested_slot, Device *devices,
+                                        size_t *count, bool inspect_features);
+
+extern DiscoverDevicesForListFn discover_devices_for_list_impl;
+
 int run_list(void);
 int select_device(Device *devices, size_t count, const Options *options, Device **selected);
 int run_info(const Options *options);
