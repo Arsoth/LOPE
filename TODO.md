@@ -35,12 +35,6 @@
 
 **Done when:** Device, profile, DPI, and write-operation data used by the GUI crosses a documented structured boundary, malformed or unsupported responses produce clear errors, and the existing diagnostic CLI remains readable.
 
-### 4: Evaluate an in-process engine API after the C boundaries are clean
-
-- [ ] Measure the cost and complexity of the separate `lope` process after the structured boundary and C layering work are complete, then decide whether the GUI should continue using the process boundary or use a typed in-process C library API.
-
-**Done when:** The decision is documented with evidence covering startup cost, error handling, cancellation, HID-resource ownership, testability, and packaging; no process-boundary rewrite is started without a demonstrated benefit.
-
 ### 5: Simplify app window and tab ownership
 
 - [ ] Remove unnecessary support for multiple Swift-created app windows and in-app tabs so files cannot have conflicting ownership and the app has a simpler single-instance workflow.
@@ -109,3 +103,9 @@
 **Done when:** Interactive editor surfaces have intentional hover, pressed, focused, selected, and disabled states; links and direct-manipulation targets use context-appropriate system cursors; ordinary buttons retain the default arrow cursor; hover feedback does not change layout or obscure other states; and the treatment is consistent across the app.
 
 # Ignore below item(s):
+
+### 4: Evaluate an in-process engine API after the C boundaries are clean
+
+- [ ] Measure the cost and complexity of the separate `lope` process after the structured boundary and C layering work are complete, then decide whether the GUI should continue using the process boundary or use a typed in-process C library API.
+
+**Done when:** The decision is documented with evidence covering startup cost, error handling, cancellation, HID-resource ownership, testability, and packaging; no process-boundary rewrite is started without a demonstrated benefit.
