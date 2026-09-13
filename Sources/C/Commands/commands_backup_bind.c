@@ -1,4 +1,6 @@
-static int run_dump(const Options *options) {
+#include "internal.h"
+
+int run_dump(const Options *options) {
     if (options->path == NULL) {
         fprintf(stderr, "dump requires an output path\n");
         return 1;
@@ -39,7 +41,7 @@ static int run_dump(const Options *options) {
     return ok ? 0 : 1;
 }
 
-static int parse_hex_byte(const char *text, uint8_t *value) {
+int parse_hex_byte(const char *text, uint8_t *value) {
     if (text == NULL || *text == '\0') {
         return 0;
     }
@@ -53,7 +55,7 @@ static int parse_hex_byte(const char *text, uint8_t *value) {
     return 1;
 }
 
-static int parse_hex_word(const char *text, uint16_t *value) {
+int parse_hex_word(const char *text, uint16_t *value) {
     if (text == NULL || *text == '\0') {
         return 0;
     }
@@ -67,7 +69,7 @@ static int parse_hex_word(const char *text, uint16_t *value) {
     return 1;
 }
 
-static int parse_target(const char *target, uint8_t spec[4]) {
+bool parse_target(const char *target, uint8_t spec[4]) {
     if (target == NULL) {
         return 0;
     }
@@ -234,7 +236,7 @@ static int parse_target(const char *target, uint8_t spec[4]) {
     return 0;
 }
 
-static int run_bind(const Options *options) {
+int run_bind(const Options *options) {
     if (options->target == NULL) {
         fprintf(stderr, "bind requires a target such as alt-tab or key:04:2B\n");
         return 1;
@@ -381,7 +383,7 @@ static int run_bind(const Options *options) {
     return 0;
 }
 
-static int run_restore(const Options *options) {
+int run_restore(const Options *options) {
     if (options->path == NULL) {
         fprintf(stderr, "restore requires a backup package path\n");
         return 1;

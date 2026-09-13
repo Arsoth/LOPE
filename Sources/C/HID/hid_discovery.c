@@ -1,3 +1,5 @@
+#include "internal.h"
+
 static int ping_interface(HidInterface *iface, uint8_t device_number, double timeout,
                           double *protocol, uint8_t *resolved_device_number) {
     uint8_t params[3] = {0, 0, 0x5A};
@@ -135,7 +137,7 @@ static bool receiver_device_name(Device *device, uint8_t slot) {
     return false;
 }
 
-static const char *receiver_pairing_model_name(Reply pairing_reply) {
+const char *receiver_pairing_model_name(Reply pairing_reply) {
     // Lightspeed pairing information carries the mouse WPID at bytes 3..4.
     // G603 is WPID 0x406C. This lets the list retain the model identity when
     // the mouse is asleep and the receiver's codename register is transiently
@@ -257,7 +259,7 @@ static int device_name(Device *device) {
     return copied > 0;
 }
 
-static void hid_context_release(HidContext *context) {
+void hid_context_release(HidContext *context) {
     if (context == NULL) {
         return;
     }
@@ -304,7 +306,7 @@ static int compare_hid_interfaces(const void *left_pointer, const void *right_po
     return strcmp(left->transport, right->transport);
 }
 
-static int hid_context_create(HidContext *context) {
+int hid_context_create(HidContext *context) {
     memset(context, 0, sizeof(*context));
     // IOHIDDeviceOpen uses the HID-specific Input Monitoring permission. Do
     // not request it during enumeration: the GUI presents the wired-device
@@ -406,7 +408,7 @@ static int hid_context_create(HidContext *context) {
     return 1;
 }
 
-static int open_vendor_channels(HidContext *context) {
+int open_vendor_channels(HidContext *context) {
     for (size_t i = 0; i < context->count; i++) {
         HidInterface *iface = &context->items[i];
         if (!iface->is_vendor || iface->channel_open) {
@@ -475,18 +477,18 @@ static uint8_t receiver_slot_limit(const HidInterface *iface) {
     }
 }
 
-static bool is_receiver_endpoint(const Device *device);
-static bool is_mouse_device(const Device *device);
-static bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
-                                               size_t count);
+bool is_receiver_endpoint(const Device *device);
+bool is_mouse_device(const Device *device);
+bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
+                                        size_t count);
 
-static void format_device_key(const Device *device, char *out, size_t out_size) {
+void format_device_key(const Device *device, char *out, size_t out_size) {
     snprintf(out, out_size, "%" PRIx64 "-%" PRIx64 "-%02X", device->iface->location_id,
              device->iface->registry_id, device->request_device_number);
 }
 
-static bool parse_device_key(const char *text, uint64_t *location_id, uint64_t *registry_id,
-                             uint8_t *device_number) {
+bool parse_device_key(const char *text, uint64_t *location_id, uint64_t *registry_id,
+                      uint8_t *device_number) {
     unsigned long long parsed_location = 0;
     unsigned long long parsed_registry = 0;
     unsigned int parsed_device = 0;
@@ -503,8 +505,8 @@ static bool parse_device_key(const char *text, uint64_t *location_id, uint64_t *
     return true;
 }
 
-static int discover_devices(HidContext *context, int requested_slot, Device *devices, size_t *count,
-                            bool inspect_features) {
+int discover_devices(HidContext *context, int requested_slot, Device *devices, size_t *count,
+                     bool inspect_features) {
     *count = 0;
     open_vendor_channels(context);
     for (size_t i = 0; i < context->count; i++) {
@@ -604,8 +606,7 @@ static int discover_devices(HidContext *context, int requested_slot, Device *dev
     return 1;
 }
 
-static int discover_device_by_key(HidContext *context, const char *key, Device *devices,
-                                  size_t *count) {
+int discover_device_by_key(HidContext *context, const char *key, Device *devices, size_t *count) {
     *count = 0;
     uint64_t location_id = 0;
     uint64_t registry_id = 0;
@@ -672,8 +673,8 @@ static int discover_device_by_key(HidContext *context, const char *key, Device *
     return 1;
 }
 
-static int discover_devices_for_options_hardware(HidContext *context, const Options *options,
-                                                 Device *devices, size_t *count) {
+int discover_devices_for_options_hardware(HidContext *context, const Options *options,
+                                          Device *devices, size_t *count) {
     if (options->device_key != NULL) {
         return discover_device_by_key(context, options->device_key, devices, count);
     }
@@ -683,20 +684,17 @@ static int discover_devices_for_options_hardware(HidContext *context, const Opti
 // discover_devices_for_options_impl is a test seam: self-test overrides it to
 // hand back a canned Device list so command-layer logic (run_info, run_dpi,
 // run_bind, ...) can be exercised without real IOKit hardware. It complements
-// channel_request_impl (see logitech_onboard_hid_transport.inc), which mocks
+// channel_request_impl (see the HID transport module), which mocks
 // the HID++ calls those commands make once a device is selected.
-typedef int (*DiscoverDevicesForOptionsFn)(HidContext *context, const Options *options,
-                                           Device *devices, size_t *count);
-
-static DiscoverDevicesForOptionsFn discover_devices_for_options_impl =
+DiscoverDevicesForOptionsFn discover_devices_for_options_impl =
     discover_devices_for_options_hardware;
 
-static int discover_devices_for_options(HidContext *context, const Options *options,
-                                        Device *devices, size_t *count) {
+int discover_devices_for_options(HidContext *context, const Options *options, Device *devices,
+                                 size_t *count) {
     return discover_devices_for_options_impl(context, options, devices, count);
 }
 
-static const char *device_label(const Device *device) {
+const char *device_label(const Device *device) {
     if (device->name[0] != '\0') {
         return device->name;
     }
@@ -712,7 +710,7 @@ static const char *device_label(const Device *device) {
     return "Logitech HID++ device";
 }
 
-static bool is_receiver_endpoint(const Device *device) {
+bool is_receiver_endpoint(const Device *device) {
     if (device == NULL || device->device_number != 0xFF) {
         return false;
     }
@@ -723,7 +721,7 @@ static bool is_receiver_endpoint(const Device *device) {
            text_contains_case_insensitive(device_label(device), "bolt");
 }
 
-static bool is_mouse_device(const Device *device) {
+bool is_mouse_device(const Device *device) {
     if (device == NULL || is_receiver_endpoint(device)) {
         return false;
     }
@@ -749,8 +747,8 @@ static bool is_mouse_device(const Device *device) {
     return true;
 }
 
-static bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
-                                               size_t count) {
+bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
+                                        size_t count) {
     if (candidate == NULL || devices == NULL || is_receiver_interface(candidate->iface) ||
         !is_wireless_device_product(candidate->iface->product_id)) {
         return false;
@@ -822,7 +820,7 @@ static const char *receiver_connection_type(const HidInterface *iface) {
     return is_receiver_interface(iface) ? "Receiver" : NULL;
 }
 
-static const char *device_connection(const Device *device) {
+const char *device_connection(const Device *device) {
     const char *receiver_type = receiver_connection_type(device->iface);
     if (receiver_type != NULL &&
         (device->device_number != 0xFF || is_receiver_interface(device->iface))) {

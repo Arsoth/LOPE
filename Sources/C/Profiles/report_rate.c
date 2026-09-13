@@ -5,7 +5,9 @@
 // query is therefore preferred over the device-wide 0x8060 list whenever the
 // feature is present; it is the only list this module exposes to callers.
 
-static uint32_t report_rate_hertz_from_interval(uint8_t milliseconds) {
+#include "internal.h"
+
+uint32_t report_rate_hertz_from_interval(uint8_t milliseconds) {
     if (milliseconds == 0) {
         return 0;
     }
@@ -15,8 +17,8 @@ static uint32_t report_rate_hertz_from_interval(uint8_t milliseconds) {
     return (1000u + milliseconds / 2u) / milliseconds;
 }
 
-static size_t report_rate_entries_from_mask(uint16_t feature_id, uint16_t mask,
-                                            ReportRateEntry *entries, size_t capacity) {
+size_t report_rate_entries_from_mask(uint16_t feature_id, uint16_t mask, ReportRateEntry *entries,
+                                     size_t capacity) {
     if (entries == NULL || capacity == 0) {
         return 0;
     }
@@ -47,7 +49,7 @@ static size_t report_rate_entries_from_mask(uint16_t feature_id, uint16_t mask,
     return count;
 }
 
-static uint8_t report_rate_connection_type(const Device *device) {
+uint8_t report_rate_connection_type(const Device *device) {
     // HID++ 0x8061 defines 0 as wired USB and 1 as gaming wireless. The
     // discovery layer's connection names are the existing source of truth;
     // Bluetooth/Bolt/Unifying devices are treated as wired for this feature,
@@ -59,7 +61,7 @@ static uint8_t report_rate_connection_type(const Device *device) {
                : 0;
 }
 
-static bool read_report_rate_capabilities(Device *device, ReportRateCapabilities *capabilities) {
+bool read_report_rate_capabilities(Device *device, ReportRateCapabilities *capabilities) {
     if (device == NULL || capabilities == NULL) {
         return false;
     }
@@ -133,7 +135,7 @@ static bool read_report_rate_capabilities(Device *device, ReportRateCapabilities
     return false;
 }
 
-static void print_report_rate_capabilities(const ReportRateCapabilities *capabilities) {
+void print_report_rate_capabilities(const ReportRateCapabilities *capabilities) {
     printf("Report rate feature: 0x%04X\n", capabilities->feature_id);
     printf("Supported polling rates: ");
     for (size_t i = 0; i < capabilities->rate_count; i++) {
@@ -150,7 +152,7 @@ static void print_report_rate_capabilities(const ReportRateCapabilities *capabil
     }
 }
 
-static bool parse_report_rate_hertz(const char *text, uint32_t *hertz) {
+bool parse_report_rate_hertz(const char *text, uint32_t *hertz) {
     if (text == NULL || hertz == NULL || *text == '\0') {
         return false;
     }
@@ -168,8 +170,7 @@ static bool parse_report_rate_hertz(const char *text, uint32_t *hertz) {
 // byte zero. The first four 0x8061 values are the same 8/4/2/1 ms intervals;
 // the 2000/4000/8000 Hz values are connection-level only and cannot be saved
 // in this profile field without changing the profile format.
-static bool report_rate_profile_interval(Device *device, uint32_t requested_hertz,
-                                         uint8_t *milliseconds) {
+bool report_rate_profile_interval(Device *device, uint32_t requested_hertz, uint8_t *milliseconds) {
     if (device == NULL || milliseconds == NULL) {
         return false;
     }
@@ -207,9 +208,7 @@ static bool report_rate_profile_interval(Device *device, uint32_t requested_hert
     return false;
 }
 
-static int select_device(Device *devices, size_t count, const Options *options, Device **selected);
-
-static int run_set_report_rate(const Options *options) {
+int run_set_report_rate(const Options *options) {
     uint32_t requested_hertz = 0;
     if (!parse_report_rate_hertz(options->positionals[0], &requested_hertz)) {
         fprintf(stderr, "set-report-rate requires a positive integer rate in Hz\n");

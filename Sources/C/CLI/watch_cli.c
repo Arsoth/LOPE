@@ -1,3 +1,5 @@
+#include "internal.h"
+
 typedef struct {
     uint8_t *callback_buffer;
     uint8_t previous_buttons;
@@ -5,7 +7,7 @@ typedef struct {
     char label[256];
 } WatchState;
 
-static const char *mouse_button_name(uint8_t bit) {
+const char *mouse_button_name(uint8_t bit) {
     switch (bit) {
     case 0:
         return "Left";
@@ -59,7 +61,7 @@ static void watch_report_callback(void *context, IOReturn result, void *sender,
     }
 }
 
-static int run_watch(const Options *options) {
+int run_watch(const Options *options) {
     HidContext context;
     if (!hid_context_create(&context)) {
         return 1;
@@ -115,7 +117,7 @@ static int run_watch(const Options *options) {
     return 0;
 }
 
-static void print_usage(const char *program) {
+void print_usage(const char *program) {
     printf("Usage: %s [global options] command [arguments]\n\n", program);
     printf("Read-only commands:\n");
     printf("  list                                  enumerate Logitech HID++ devices\n");
@@ -162,7 +164,7 @@ static void print_usage(const char *program) {
     printf("  --help                               show this help\n");
 }
 
-static int parse_decimal(const char *text, int *value) {
+int parse_decimal(const char *text, int *value) {
     if (text == NULL || *text == '\0') {
         return 0;
     }
@@ -176,7 +178,7 @@ static int parse_decimal(const char *text, int *value) {
     return 1;
 }
 
-static int parse_slot(const char *text, int *slot) {
+int parse_slot(const char *text, int *slot) {
     if (strcmp(text, "ff") == 0 || strcmp(text, "FF") == 0 || strcmp(text, "0xff") == 0 ||
         strcmp(text, "0xFF") == 0) {
         *slot = 0xFF;
@@ -190,7 +192,7 @@ static int parse_slot(const char *text, int *slot) {
     return 1;
 }
 
-static int parse_options(int argc, char **argv, Options *options) {
+int parse_options(int argc, char **argv, Options *options) {
     memset(options, 0, sizeof(*options));
     options->device_index = -1;
     options->slot = -1;

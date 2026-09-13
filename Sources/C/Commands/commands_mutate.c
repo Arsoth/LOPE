@@ -1,4 +1,6 @@
-static bool dpi_value_in_list(const uint16_t *values, size_t count, uint16_t wanted) {
+#include "internal.h"
+
+bool dpi_value_in_list(const uint16_t *values, size_t count, uint16_t wanted) {
     for (size_t i = 0; i < count; i++) {
         if (values[i] == wanted) {
             return true;
@@ -7,7 +9,7 @@ static bool dpi_value_in_list(const uint16_t *values, size_t count, uint16_t wan
     return false;
 }
 
-static int run_set_dpi(const Options *options) {
+int run_set_dpi(const Options *options) {
     if (options->positional_count != 1) {
         fprintf(stderr, "set-dpi requires one to five comma-separated values, e.g. 800,1600\n");
         return 1;
@@ -169,7 +171,7 @@ static int run_set_dpi(const Options *options) {
     return 0;
 }
 
-static int run_set_profile_state(const Options *options) {
+int run_set_profile_state(const Options *options) {
     if (options->positional_count != 2) {
         fprintf(stderr, "set-profile-state syntax: set-profile-state N enable|disable\n");
         return 1;
@@ -335,7 +337,7 @@ static int run_set_profile_state(const Options *options) {
     return 0;
 }
 
-static bool parse_batch_raw_record(const char *text, uint8_t spec[4]) {
+bool parse_batch_raw_record(const char *text, uint8_t spec[4]) {
     if (text == NULL || strlen(text) != 8) {
         return false;
     }
@@ -352,8 +354,7 @@ static bool parse_batch_raw_record(const char *text, uint8_t spec[4]) {
     return true;
 }
 
-static bool parse_batch_button_change(const char *text, int *button, bool *gshift,
-                                      uint8_t spec[4]) {
+bool parse_batch_button_change(const char *text, int *button, bool *gshift, uint8_t spec[4]) {
     if (text == NULL) {
         return false;
     }
@@ -391,7 +392,7 @@ static bool parse_batch_button_change(const char *text, int *button, bool *gshif
     return true;
 }
 
-static bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]) {
+bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]) {
     if (text == NULL) {
         return false;
     }
@@ -431,7 +432,7 @@ static bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]
     return true;
 }
 
-static bool parse_batch_profile_state(const char *text, int *profile, bool *enabled) {
+bool parse_batch_profile_state(const char *text, int *profile, bool *enabled) {
     if (text == NULL) {
         return false;
     }
@@ -463,7 +464,7 @@ static bool parse_batch_profile_state(const char *text, int *profile, bool *enab
     return true;
 }
 
-static bool batch_operation_id_is_safe(const char *operation_id) {
+bool batch_operation_id_is_safe(const char *operation_id) {
     if (operation_id == NULL || *operation_id == '\0' || strlen(operation_id) >= 96) {
         return false;
     }
@@ -476,33 +477,22 @@ static bool batch_operation_id_is_safe(const char *operation_id) {
     return true;
 }
 
-static bool make_batch_backup_path(const char *directory, const char *operation_id,
-                                   char path[512]) {
+bool make_batch_backup_path(const char *directory, const char *operation_id, char path[512]) {
     const char *base = directory == NULL || *directory == '\0' ? "." : directory;
     int length = snprintf(path, 512, "%s/%s.logiob", base, operation_id);
     return length > 0 && length < 512;
 }
 
-static bool batch_sector_changed(const uint8_t *before, const uint8_t *after, size_t length) {
+bool batch_sector_changed(const uint8_t *before, const uint8_t *after, size_t length) {
     return before != NULL && after != NULL && memcmp(before, after, length) != 0;
 }
 
-static size_t batch_affected_sector_count(bool profile_changed, bool control_changed) {
+size_t batch_affected_sector_count(bool profile_changed, bool control_changed) {
     return (profile_changed ? 1U : 0U) + (control_changed ? 1U : 0U);
 }
 
-typedef struct {
-    uint16_t sector;
-    const uint8_t *data;
-    size_t length;
-    const char *kind;
-} BatchSector;
-
-typedef bool (*BatchSectorWriter)(void *context, const BatchSector *sector);
-
-static bool execute_batch_sector_plan(const BatchSector *plan, size_t plan_count,
-                                      BatchSectorWriter writer, void *context,
-                                      size_t *verified_count, size_t *failed_index) {
+bool execute_batch_sector_plan(const BatchSector *plan, size_t plan_count, BatchSectorWriter writer,
+                               void *context, size_t *verified_count, size_t *failed_index) {
     *verified_count = 0;
     for (size_t i = 0; i < plan_count; i++) {
         if (!writer(context, &plan[i])) {
@@ -514,9 +504,8 @@ static bool execute_batch_sector_plan(const BatchSector *plan, size_t plan_count
     return true;
 }
 
-static void print_batch_recovery(const char *operation_id, size_t verified_count,
-                                 const char *failed_kind, uint16_t failed_sector,
-                                 const char *backup_path, bool has_backup) {
+void print_batch_recovery(const char *operation_id, size_t verified_count, const char *failed_kind,
+                          uint16_t failed_sector, const char *backup_path, bool has_backup) {
     fprintf(stderr,
             "Save operation %s failed after %zu sector(s) were verified. "
             "%s sector 0x%04X was not verified. Restore from the exact backups "
@@ -547,7 +536,7 @@ static bool write_batch_sector_with_device(void *context, const BatchSector *sec
                                          sector->length, sector->kind);
 }
 
-static int run_apply(const Options *options) {
+int run_apply(const Options *options) {
     if (options->profile < 1) {
         fprintf(stderr, "apply requires an explicit --profile N selection\n");
         return 1;

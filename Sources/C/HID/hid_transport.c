@@ -1,6 +1,8 @@
-static volatile sig_atomic_t g_stop_watch = 0;
+#include "internal.h"
 
-static bool hid_debug_enabled(void) {
+volatile sig_atomic_t g_stop_watch = 0;
+
+bool hid_debug_enabled(void) {
     static int enabled = -1;
     if (enabled < 0) {
         const char *value = getenv("LOGITECH_ONBOARD_DEBUG");
@@ -9,7 +11,7 @@ static bool hid_debug_enabled(void) {
     return enabled != 0;
 }
 
-static void hid_debug_log(const char *format, ...) {
+void hid_debug_log(const char *format, ...) {
     if (!hid_debug_enabled()) {
         return;
     }
@@ -29,12 +31,12 @@ static void hid_debug_log(const char *format, ...) {
     fclose(file);
 }
 
-static void on_sigint(int signal_number) {
+void on_sigint(int signal_number) {
     (void)signal_number;
     g_stop_watch = 1;
 }
 
-static uint32_t number_property(IOHIDDeviceRef device, CFStringRef key) {
+uint32_t number_property(IOHIDDeviceRef device, CFStringRef key) {
     CFTypeRef value = IOHIDDeviceGetProperty(device, key);
     if (value == NULL || CFGetTypeID(value) != CFNumberGetTypeID()) {
         return 0;
@@ -46,7 +48,7 @@ static uint32_t number_property(IOHIDDeviceRef device, CFStringRef key) {
     return (uint32_t)number;
 }
 
-static uint64_t location_property(IOHIDDeviceRef device) {
+uint64_t location_property(IOHIDDeviceRef device) {
     CFTypeRef value = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDLocationIDKey));
     if (value == NULL || CFGetTypeID(value) != CFNumberGetTypeID()) {
         return 0;
@@ -58,7 +60,7 @@ static uint64_t location_property(IOHIDDeviceRef device) {
     return (uint64_t)(uint32_t)number;
 }
 
-static uint64_t registry_id_property(IOHIDDeviceRef device) {
+uint64_t registry_id_property(IOHIDDeviceRef device) {
     io_service_t service = IOHIDDeviceGetService(device);
     if (service == IO_OBJECT_NULL) {
         return 0;
@@ -70,7 +72,7 @@ static uint64_t registry_id_property(IOHIDDeviceRef device) {
     return registry_id;
 }
 
-static void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t out_size) {
+void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t out_size) {
     out[0] = '\0';
     CFTypeRef value = IOHIDDeviceGetProperty(device, key);
     if (value == NULL || CFGetTypeID(value) != CFStringGetTypeID()) {
@@ -79,7 +81,7 @@ static void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, s
     CFStringGetCString((CFStringRef)value, out, (CFIndex)out_size, kCFStringEncodingUTF8);
 }
 
-static bool device_has_hidpp_reports(IOHIDDeviceRef device) {
+bool device_has_hidpp_reports(IOHIDDeviceRef device) {
     CFTypeRef descriptor_value = IOHIDDeviceGetProperty(device, CFSTR(kIOHIDReportDescriptorKey));
     if (descriptor_value != NULL && CFGetTypeID(descriptor_value) == CFDataGetTypeID()) {
         const uint8_t *descriptor = CFDataGetBytePtr((CFDataRef)descriptor_value);
@@ -130,7 +132,7 @@ static bool device_has_hidpp_reports(IOHIDDeviceRef device) {
     return found;
 }
 
-static bool is_wireless_device_product(uint32_t product_id) {
+bool is_wireless_device_product(uint32_t product_id) {
     // Logitech wireless HID++ product IDs are in the 0x4000 range. Some
     // macOS HID stacks do not expose the vendor report descriptor for these
     // interfaces, so the product ID is the reliable fallback (notably for
@@ -139,22 +141,22 @@ static bool is_wireless_device_product(uint32_t product_id) {
            product_id == 0x4102;
 }
 
-static bool is_receiver_product(uint32_t product_id) {
+bool is_receiver_product(uint32_t product_id) {
     return product_id >= 0xC500 && product_id <= 0xC5FF;
 }
 
-static bool is_bluetooth_device_product(uint32_t product_id) {
+bool is_bluetooth_device_product(uint32_t product_id) {
     // Bluetooth HID++ model IDs are in the B0xx/B3xx ranges (for example,
     // the MX Master 3S uses B034).
     return (product_id >= 0xB000 && product_id <= 0xB3FF);
 }
 
-static bool is_known_hidpp_product(uint32_t product_id) {
+bool is_known_hidpp_product(uint32_t product_id) {
     return is_wireless_device_product(product_id) || is_receiver_product(product_id) ||
            is_bluetooth_device_product(product_id);
 }
 
-static bool text_contains_case_insensitive(const char *text, const char *needle) {
+bool text_contains_case_insensitive(const char *text, const char *needle) {
     if (text == NULL || needle == NULL || *needle == '\0') {
         return false;
     }
@@ -204,7 +206,7 @@ static void channel_report_callback(void *context, IOReturn result, void *sender
     pthread_mutex_unlock(&channel->lock);
 }
 
-static int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
+int channel_open(HidChannel *channel, IOHIDDeviceRef device) {
     memset(channel, 0, sizeof(*channel));
     channel->device = device;
     channel->run_loop = CFRunLoopGetCurrent();
@@ -275,7 +277,7 @@ static HidReportNode *channel_take_report(HidChannel *channel) {
     return node;
 }
 
-static void channel_close(HidChannel *channel) {
+void channel_close(HidChannel *channel) {
     if (channel == NULL) {
         return;
     }
@@ -306,9 +308,9 @@ static HidReportNode *wait_for_report(HidChannel *channel, double timeout_second
     }
 }
 
-static size_t build_hidpp_frame(bool use_long, uint8_t device_number, uint16_t request_id,
-                                const uint8_t *params, size_t params_length,
-                                uint8_t frame[LONG_REPORT_BYTES]) {
+size_t build_hidpp_frame(bool use_long, uint8_t device_number, uint16_t request_id,
+                         const uint8_t *params, size_t params_length,
+                         uint8_t frame[LONG_REPORT_BYTES]) {
     size_t frame_length = use_long ? LONG_REPORT_BYTES : SHORT_REPORT_BYTES;
     memset(frame, 0, LONG_REPORT_BYTES);
     frame[0] = use_long ? REPORT_LONG : REPORT_SHORT;
@@ -325,10 +327,9 @@ static size_t build_hidpp_frame(bool use_long, uint8_t device_number, uint16_t r
 // canned Reply values so device_call/raw_request's feature-resolution and
 // retry logic can be exercised without real IOKit hardware. Production code
 // always runs through channel_request_hardware.
-static Reply channel_request_hardware(HidChannel *channel, uint8_t device_number,
-                                      uint16_t request_id, const uint8_t *params,
-                                      size_t params_length, bool prefer_long,
-                                      double timeout_seconds) {
+Reply channel_request_hardware(HidChannel *channel, uint8_t device_number, uint16_t request_id,
+                               const uint8_t *params, size_t params_length, bool prefer_long,
+                               double timeout_seconds) {
     Reply reply;
     memset(&reply, 0, sizeof(reply));
     if (params_length > 16) {
@@ -432,25 +433,21 @@ static Reply channel_request_hardware(HidChannel *channel, uint8_t device_number
     }
 }
 
-typedef Reply (*ChannelRequestFn)(HidChannel *channel, uint8_t device_number, uint16_t request_id,
-                                  const uint8_t *params, size_t params_length, bool prefer_long,
-                                  double timeout_seconds);
+ChannelRequestFn channel_request_impl = channel_request_hardware;
 
-static ChannelRequestFn channel_request_impl = channel_request_hardware;
-
-static Reply channel_request(HidChannel *channel, uint8_t device_number, uint16_t request_id,
-                             const uint8_t *params, size_t params_length, bool prefer_long,
-                             double timeout_seconds) {
+Reply channel_request(HidChannel *channel, uint8_t device_number, uint16_t request_id,
+                      const uint8_t *params, size_t params_length, bool prefer_long,
+                      double timeout_seconds) {
     return channel_request_impl(channel, device_number, request_id, params, params_length,
                                 prefer_long, timeout_seconds);
 }
 
-static bool is_receiver_routed_device(const Device *device) {
+bool is_receiver_routed_device(const Device *device) {
     return device != NULL && device->request_device_number != 0xFF && device->iface != NULL &&
            is_receiver_product(device->iface->product_id);
 }
 
-static bool should_retry_short_report(Reply reply) {
+bool should_retry_short_report(Reply reply) {
     // A few Lightspeed mouse firmware revisions accept the receiver's
     // long-report probe but only answer a routed feature request on the
     // short HID++ path. The receiver can report this as a timeout, I/O error,
@@ -460,7 +457,7 @@ static bool should_retry_short_report(Reply reply) {
            reply.status == REPLY_HIDPP10_ERROR || reply.status == REPLY_HIDPP20_ERROR;
 }
 
-static const char *reply_status_name(ReplyStatus status) {
+const char *reply_status_name(ReplyStatus status) {
     switch (status) {
     case REPLY_TIMEOUT:
         return "timeout";
@@ -478,7 +475,7 @@ static const char *reply_status_name(ReplyStatus status) {
     return "unknown";
 }
 
-static void print_reply_error(const char *operation, Reply reply) {
+void print_reply_error(const char *operation, Reply reply) {
     if (reply.status == REPLY_OK) {
         return;
     }
@@ -490,7 +487,7 @@ static void print_reply_error(const char *operation, Reply reply) {
     }
 }
 
-static int device_feature_index(const Device *device, uint16_t feature_id, uint8_t *index) {
+int device_feature_index(const Device *device, uint16_t feature_id, uint8_t *index) {
     for (size_t i = 0; i < device->feature_count; i++) {
         if (device->features[i].id == feature_id) {
             *index = device->features[i].index;
@@ -526,8 +523,8 @@ static Reply device_call_with_report(Device *device, uint16_t feature_id, uint8_
     return reply;
 }
 
-static bool channel_get_feature_report(HidChannel *channel, uint8_t report_id, uint8_t *report,
-                                       size_t capacity, size_t *length) {
+bool channel_get_feature_report(HidChannel *channel, uint8_t report_id, uint8_t *report,
+                                size_t capacity, size_t *length) {
     if (channel == NULL || !channel->opened || report == NULL || capacity == 0 ||
         capacity > MAX_FEATURE_REPORT_BYTES) {
         return false;
@@ -551,8 +548,8 @@ static bool channel_get_feature_report(HidChannel *channel, uint8_t report_id, u
     return true;
 }
 
-static bool channel_set_feature_report(HidChannel *channel, uint8_t report_id, uint8_t *report,
-                                       size_t length) {
+bool channel_set_feature_report(HidChannel *channel, uint8_t report_id, uint8_t *report,
+                                size_t length) {
     if (channel == NULL || !channel->opened || report == NULL || length < 1 ||
         length > MAX_FEATURE_REPORT_BYTES) {
         return false;
@@ -565,20 +562,20 @@ static bool channel_set_feature_report(HidChannel *channel, uint8_t report_id, u
     return result == kIOReturnSuccess;
 }
 
-static Reply device_call(Device *device, uint16_t feature_id, uint8_t function,
-                         const uint8_t *params, size_t params_length, double timeout_seconds) {
+Reply device_call(Device *device, uint16_t feature_id, uint8_t function, const uint8_t *params,
+                  size_t params_length, double timeout_seconds) {
     return device_call_with_report(device, feature_id, function, params, params_length, false,
                                    timeout_seconds);
 }
 
-static Reply device_call_long(Device *device, uint16_t feature_id, uint8_t function,
-                              const uint8_t *params, size_t params_length, double timeout_seconds) {
+Reply device_call_long(Device *device, uint16_t feature_id, uint8_t function, const uint8_t *params,
+                       size_t params_length, double timeout_seconds) {
     return device_call_with_report(device, feature_id, function, params, params_length, true,
                                    timeout_seconds);
 }
 
-static Reply raw_request(Device *device, uint16_t request_id, const uint8_t *params,
-                         size_t params_length, bool prefer_long, double timeout_seconds) {
+Reply raw_request(Device *device, uint16_t request_id, const uint8_t *params, size_t params_length,
+                  bool prefer_long, double timeout_seconds) {
     bool use_long = prefer_long || device->prefer_long_reports;
     Reply reply = channel_request(&device->iface->channel, device->request_device_number,
                                   request_id, params, params_length, use_long, timeout_seconds);

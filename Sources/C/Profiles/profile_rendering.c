@@ -1,4 +1,6 @@
-static const char *function_name(uint8_t value) {
+#include "internal.h"
+
+const char *function_name(uint8_t value) {
     static const char *names[] = {
         "no action",     "tilt left",   "tilt right",     "next DPI",       "previous DPI",
         "cycle DPI",     "default DPI", "shift DPI",      "next profile",   "previous profile",
@@ -8,7 +10,7 @@ static const char *function_name(uint8_t value) {
     return value <= 0x11 ? names[value] : "unknown function";
 }
 
-static const char *key_name(uint8_t code) {
+const char *key_name(uint8_t code) {
     switch (code) {
     case 0x04:
         return "A";
@@ -123,7 +125,7 @@ static const char *key_name(uint8_t code) {
     }
 }
 
-static void describe_spec(const uint8_t spec[4], char *out, size_t out_size) {
+void describe_spec(const uint8_t spec[4], char *out, size_t out_size) {
     if (spec_is_disabled(spec)) {
         snprintf(out, out_size, "disabled");
         return;
@@ -197,15 +199,15 @@ static void describe_spec(const uint8_t spec[4], char *out, size_t out_size) {
     snprintf(out, out_size, "unrecognized raw spec");
 }
 
-static bool spec_is_back(const uint8_t spec[4]) {
+bool spec_is_back(const uint8_t spec[4]) {
     return spec[0] == 0x80 && spec[1] == 0x01 && spec[2] == 0x00 && spec[3] == 0x08;
 }
 
-static void print_hex4(const uint8_t bytes[4]) {
+void print_hex4(const uint8_t bytes[4]) {
     printf("%02X %02X %02X %02X", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-static void print_profile_summary(const Profile *profile, bool show_buttons) {
+void print_profile_summary(const Profile *profile, bool show_buttons) {
     printf("Profile %zu (sector 0x%04X, enabled=%s)\n", profile->selected_header + 1,
            profile->headers[profile->selected_header].sector,
            profile->headers[profile->selected_header].enabled ? "yes" : "no");
@@ -305,7 +307,7 @@ static void print_profile_summary(const Profile *profile, bool show_buttons) {
     }
 }
 
-static int find_rear_thumb_button(const Profile *profile) {
+int find_rear_thumb_button(const Profile *profile) {
     if (!profile->layout_supported || !profile->crc_ok) {
         return 0;
     }
@@ -321,7 +323,7 @@ static int find_rear_thumb_button(const Profile *profile) {
     return found;
 }
 
-static void print_feature_list(const Device *device) {
+void print_feature_list(const Device *device) {
     printf("  features: %zu\n", device->feature_count);
     for (size_t i = 0; i < device->feature_count; i++) {
         printf("    index %3u: 0x%04X v%u\n", device->features[i].index, device->features[i].id,
@@ -329,7 +331,7 @@ static void print_feature_list(const Device *device) {
     }
 }
 
-static void print_device_line(const Device *device, size_t index) {
+void print_device_line(const Device *device, size_t index) {
     char key[64];
     format_device_key(device, key, sizeof(key));
     printf("[%zu] %s  %s  (HID++ %.1f, product 0x%04X, key %s)\n", index, device_connection(device),

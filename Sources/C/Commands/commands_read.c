@@ -1,6 +1,8 @@
-static void print_supported_dpi(const uint16_t *values, size_t count);
+#include "internal.h"
 
-static int run_list(void) {
+void print_supported_dpi(const uint16_t *values, size_t count);
+
+int run_list(void) {
     HidContext context;
     if (!hid_context_create(&context)) {
         return 1;
@@ -34,7 +36,7 @@ static int run_list(void) {
     return 0;
 }
 
-static int select_device(Device *devices, size_t count, const Options *options, Device **selected) {
+int select_device(Device *devices, size_t count, const Options *options, Device **selected) {
     if (count == 0) {
         fprintf(stderr, "no reachable Logitech HID++ device found\n");
         return 0;
@@ -71,7 +73,7 @@ static int select_device(Device *devices, size_t count, const Options *options, 
     return 1;
 }
 
-static int run_info(const Options *options) {
+int run_info(const Options *options) {
     HidContext context;
     if (!hid_context_create(&context)) {
         return 1;
@@ -135,7 +137,7 @@ static int run_info(const Options *options) {
     return 0;
 }
 
-static int run_profiles(const Options *options) {
+int run_profiles(const Options *options) {
     HidContext context;
     if (!hid_context_create(&context)) {
         return 1;
@@ -300,7 +302,7 @@ static int run_profiles(const Options *options) {
     return 0;
 }
 
-static void print_supported_dpi(const uint16_t *values, size_t count) {
+void print_supported_dpi(const uint16_t *values, size_t count) {
     printf("Supported DPI: ");
     if (count >= 2) {
         uint16_t step = (uint16_t)(values[1] - values[0]);
@@ -322,7 +324,7 @@ static void print_supported_dpi(const uint16_t *values, size_t count) {
     printf("\n");
 }
 
-static int run_dpi(const Options *options) {
+int run_dpi(const Options *options) {
     HidContext context;
     if (!hid_context_create(&context)) {
         return 1;
@@ -376,7 +378,7 @@ static int run_dpi(const Options *options) {
     return 0;
 }
 
-static int run_current_dpi(const Options *options) {
+int run_current_dpi(const Options *options) {
     HidContext context;
     if (!hid_context_create(&context)) {
         return 1;
@@ -405,7 +407,7 @@ static int run_current_dpi(const Options *options) {
     return 0;
 }
 
-static int parse_dpi_values(const char *text, uint16_t values[5], size_t *count_out) {
+int parse_dpi_values(const char *text, uint16_t values[5], size_t *count_out) {
     if (text == NULL) {
         return 0;
     }

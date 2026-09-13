@@ -4,28 +4,15 @@
 // other writable mice in this project. Its three profile reports are fixed
 // 154-byte feature reports with 20 three-byte button records in two banks.
 
-#define G600_PRODUCT_ID 0xC24A
-#define G600_PROFILE_COUNT 3
-#define G600_BUTTON_COUNT 20
-#define G600_REPORT_BYTES 154
-#define G600_NORMAL_BUTTON_OFFSET 31
-#define G600_GSHIFT_BUTTON_OFFSET 94
-#define G600_FIRST_PROFILE_REPORT 0xF3
-#define G600_BACKUP_PROFILE_FORMAT 0xFF
+#include "internal.h"
 
-static int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
-                               const BackupSectorSource *sectors, size_t sector_count,
-                               bool refuse_overwrite);
-static void package_release(BackupPackage *package);
-static int ensure_write_confirmation(const char *operation);
-
-static bool is_g600_device(const Device *device) {
+bool is_g600_device(const Device *device) {
     return device != NULL && device->iface != NULL &&
            (device->iface->product_id == G600_PRODUCT_ID ||
             text_contains_case_insensitive(device->iface->product, "G600"));
 }
 
-static bool g600_profile_report_id(int profile_number, uint8_t *report_id) {
+bool g600_profile_report_id(int profile_number, uint8_t *report_id) {
     if (profile_number < 1 || profile_number > G600_PROFILE_COUNT) {
         return false;
     }
@@ -35,13 +22,12 @@ static bool g600_profile_report_id(int profile_number, uint8_t *report_id) {
     return true;
 }
 
-static uint16_t g600_profile_sector(int profile_number) {
+uint16_t g600_profile_sector(int profile_number) {
     uint8_t report_id = 0;
     return g600_profile_report_id(profile_number, &report_id) ? report_id : 0;
 }
 
-static bool g600_read_profile(Device *device, int profile_number,
-                              uint8_t report[G600_REPORT_BYTES]) {
+bool g600_read_profile(Device *device, int profile_number, uint8_t report[G600_REPORT_BYTES]) {
     uint8_t report_id = 0;
     if (!is_g600_device(device) || !g600_profile_report_id(profile_number, &report_id)) {
         return false;
@@ -57,8 +43,7 @@ static bool g600_read_profile(Device *device, int profile_number,
     return true;
 }
 
-static bool g600_write_profile(Device *device, int profile_number,
-                               uint8_t report[G600_REPORT_BYTES]) {
+bool g600_write_profile(Device *device, int profile_number, uint8_t report[G600_REPORT_BYTES]) {
     uint8_t report_id = 0;
     if (!is_g600_device(device) || !g600_profile_report_id(profile_number, &report_id) ||
         report[0] != report_id) {
@@ -68,7 +53,7 @@ static bool g600_write_profile(Device *device, int profile_number,
                                       G600_REPORT_BYTES);
 }
 
-static void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {
+void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {
     uint8_t code = native[0];
     if (code == 0 && native[1] == 0 && native[2] == 0) {
         memset(spec, 0xFF, 4);
@@ -137,7 +122,7 @@ static void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {
     }
 }
 
-static bool g600_spec_to_native(const uint8_t spec[4], uint8_t native[3]) {
+bool g600_spec_to_native(const uint8_t spec[4], uint8_t native[3]) {
     if (spec_is_disabled(spec)) {
         memset(native, 0, 3);
         return true;
@@ -218,7 +203,7 @@ static bool g600_spec_to_native(const uint8_t spec[4], uint8_t native[3]) {
     return false;
 }
 
-static void g600_describe_native(const uint8_t native[3], char *out, size_t out_size) {
+void g600_describe_native(const uint8_t native[3], char *out, size_t out_size) {
     if (native[0] == 0 && native[1] == 0 && native[2] == 0) {
         snprintf(out, out_size, "disabled");
         return;
@@ -267,12 +252,12 @@ static void g600_describe_native(const uint8_t native[3], char *out, size_t out_
     }
 }
 
-static void g600_print_hex4(const uint8_t bytes[4]) {
+void g600_print_hex4(const uint8_t bytes[4]) {
     printf("%02X %02X %02X %02X", bytes[0], bytes[1], bytes[2], bytes[3]);
 }
 
-static void g600_print_profile_summary(int profile_number, const uint8_t report[G600_REPORT_BYTES],
-                                       bool show_buttons) {
+void g600_print_profile_summary(int profile_number, const uint8_t report[G600_REPORT_BYTES],
+                                bool show_buttons) {
     uint8_t report_id = report[0];
     printf("Profile %d (sector 0x%04X, enabled=yes)\n", profile_number,
            g600_profile_sector(profile_number));
@@ -309,7 +294,7 @@ static void g600_print_profile_summary(int profile_number, const uint8_t report[
     }
 }
 
-static int run_g600_info(const Options *options, Device *device) {
+int run_g600_info(const Options *options, Device *device) {
     int profile_number = options->profile > 0 ? options->profile : 1;
     if (!g600_profile_report_id(profile_number, NULL)) {
         fprintf(stderr, "G600 profile %d is out of range 1..%d\n", profile_number,
@@ -327,7 +312,7 @@ static int run_g600_info(const Options *options, Device *device) {
     return 0;
 }
 
-static int run_g600_profiles(const Options *options, Device *device) {
+int run_g600_profiles(const Options *options, Device *device) {
     if (options->profile > G600_PROFILE_COUNT) {
         fprintf(stderr, "profile %d is out of range 1..%d\n", options->profile, G600_PROFILE_COUNT);
         return 1;
@@ -365,8 +350,7 @@ static int run_g600_profiles(const Options *options, Device *device) {
     return 0;
 }
 
-static bool g600_make_backup_path(const Options *options, const char *operation_id,
-                                  char path[512]) {
+bool g600_make_backup_path(const Options *options, const char *operation_id, char path[512]) {
     const char *base = options->backup_directory == NULL || *options->backup_directory == '\0'
                            ? "."
                            : options->backup_directory;
@@ -375,9 +359,9 @@ static bool g600_make_backup_path(const Options *options, const char *operation_
     return length > 0 && length < 512;
 }
 
-static int run_g600_apply(const Options *options, Device *device, const int *requested_buttons,
-                          const bool *requested_gshift, const uint8_t requested_specs[][4],
-                          size_t requested_count, const char *operation_id) {
+int run_g600_apply(const Options *options, Device *device, const int *requested_buttons,
+                   const bool *requested_gshift, const uint8_t requested_specs[][4],
+                   size_t requested_count, const char *operation_id) {
     if (options->rgb_change_count > 0 || options->dpi_values != NULL ||
         options->profile_state_change_count > 0) {
         fprintf(stderr,
@@ -462,7 +446,7 @@ static int run_g600_apply(const Options *options, Device *device, const int *req
     return 0;
 }
 
-static int run_g600_dump(const Options *options, Device *device) {
+int run_g600_dump(const Options *options, Device *device) {
     int profile_number = options->profile > 0 ? options->profile : 1;
     uint8_t report[G600_REPORT_BYTES];
     if (!g600_read_profile(device, profile_number, report)) {
@@ -479,7 +463,7 @@ static int run_g600_dump(const Options *options, Device *device) {
     return ok ? 0 : 1;
 }
 
-static int run_g600_restore(const Options *options, Device *device, const BackupPackage *package) {
+int run_g600_restore(const Options *options, Device *device, const BackupPackage *package) {
     if (package->profile_format != G600_BACKUP_PROFILE_FORMAT || package->sector_count != 1 ||
         package->sectors[0].size != G600_REPORT_BYTES) {
         fprintf(stderr, "refusing G600 restore: expected one 154-byte legacy profile report\n");

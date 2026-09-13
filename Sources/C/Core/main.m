@@ -1,23 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
-// The implementation remains one translation unit so the low-level helpers
-// can keep static linkage. The included chunks are ordered by dependency and
-// grouped by responsibility for focused maintenance.
-
-#include "logitech_onboard_types.inc"
-#include "logitech_onboard_hid_transport.inc"
-#include "logitech_onboard_hid_discovery.inc"
-#include "logitech_onboard_report_rate.inc"
-#include "logitech_onboard_profile_io.inc"
-#include "logitech_onboard_profile_rendering.inc"
-#include "logitech_onboard_g600.inc"
-#include "logitech_onboard_backup.inc"
-#include "logitech_onboard_commands_read.inc"
-#include "logitech_onboard_commands_mutate.inc"
-#include "logitech_onboard_commands_backup_bind.inc"
-#include "logitech_onboard_watch_cli.inc"
-#include "logitech_onboard_selftest.inc"
+#include "internal.h"
 
 int main(int argc, char **argv) {
     Options options;

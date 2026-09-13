@@ -1,12 +1,12 @@
 # Development and formatting standards
 
 This repo is a single macOS app: a C command-line/HID core
-(`Sources/logitech_onboard.m` plus the `Sources/logitech_onboard_*.inc`
-modules, built as one translation unit) and a SwiftUI/AppKit GUI
-(`Sources/*.swift`), packaged together into `outputs/LOPE.app` by the
-Makefile. These are project defaults; the Makefile, existing source
-conventions, and other project docs override them when they are more
-specific. For required tooling and one-time setup, see
+(`Sources/C/Core/main.m` plus the independently compiled
+modules under `Sources/C`) and a SwiftUI/AppKit GUI under `Sources/Swift`,
+packaged together into `outputs/LOPE.app` by the Makefile. These are project
+defaults; the Makefile, existing source conventions, and other project docs
+override them when they are more specific. For required tooling and one-time
+setup, see
 [development-setup.md](development-setup.md).
 
 ## Working tools
@@ -30,10 +30,10 @@ specific. For required tooling and one-time setup, see
 - `swift test`/`swift build` are driven by `Package.swift`, which exists
   only to run the Swift unit tests; it does not build or replace the
   shipped app. The app is still built by the Makefile via direct `swiftc`
-  invocations, and `Package.swift`'s `LOPECore` target excludes
-  `AppMain.swift` and `ContentView.swift` (the same split the Makefile
-  used for its old model-only test binaries) plus all of the C/`.inc`
-  sources.
+  invocations, and `Package.swift`'s `LOPECore` target excludes the app
+  entry point and SwiftUI view files (the same split the Makefile used for
+  its old model-only test binaries); all C sources live outside the Swift
+  package target under `Sources/C`.
 - Building and testing only invoke local tools (`clang`, `swiftc`, `swift`,
   `codesign`); none of it needs elevated sandbox permissions or network
   access.
@@ -45,9 +45,8 @@ specific. For required tooling and one-time setup, see
   `clang-format`, configured in `.clang-format`. Run `make format` to apply
   both, or `make lint` (alias for `make format-check`) to check without
   writing changes.
-- `.clang-format` sets `SortIncludes: false` because `Sources/logitech_onboard.m`
-  includes its `.inc` modules in dependency order, not alphabetical order;
-  do not re-enable include sorting.
+- `.clang-format` keeps include sorting disabled so module headers and
+  platform headers remain in deliberate, readable groups.
 - `make install-hooks` copies `scripts/git-hooks/pre-commit` into
   `.git/hooks/pre-commit`. That hook runs `make format-check`, `make test`,
   and `make coverage-check` before every commit. Each clone needs to run
@@ -66,9 +65,9 @@ specific. For required tooling and one-time setup, see
   needed.
 - C tests remain plain functions that `fprintf(stderr, ...)` and return a
   nonzero status, run via `./lope self-test` (see
-  `Sources/logitech_onboard_selftest.inc`). Add new cases there for new C
-  core logic; there is no XCTest/GoogleTest equivalent wired up for the C
-  side.
+  `Sources/C/Testing/selftest.c`). Add new cases there for
+  new C core logic; there is no XCTest/GoogleTest equivalent wired up for the
+  C side.
 - A type named identically to an Apple system type (e.g. `RGBColor`, which
   collides with the legacy QuickDraw `RGBColor` in `ApplicationServices`)
   can become ambiguous in test code once any file in the same target
@@ -121,6 +120,6 @@ specific. For required tooling and one-time setup, see
 - Swift: SwiftUI/AppKit, following the file-splitting convention already in
   use (e.g. `AppModel+Editing.swift`, `AppModel+Writes.swift` extensions on
   a shared model type).
-- C: C11 with `-Wall -Wextra -Wpedantic`. Keep the single-translation-unit
-  `.inc` module structure intact; do not turn `.inc` files into
-  independently compiled units.
+- C: C11 with `-Wall -Wextra -Wpedantic`. Keep each module independently
+  compilable, put shared declarations in headers, and keep implementation-
+  private helpers `static`.

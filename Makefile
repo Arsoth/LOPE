@@ -1,17 +1,17 @@
 APP := lope
-SRC := Sources/logitech_onboard.m
-# The C implementation is intentionally one translation unit, assembled from
-# focused .inc modules so static helper linkage and original call ordering stay intact.
-C_MODULES := $(wildcard Sources/logitech_onboard_*.inc)
+SRC := Sources/C/Core/main.m
+C_MODULES := $(shell find Sources/C -type f -name '*.c' -print | sort)
+C_HEADERS := $(shell find Sources/C -type f -name '*.h' -print | sort)
+C_INCLUDE_FLAGS := -I Sources/C/Core -I Sources/C/HID -I Sources/C/Profiles \
+	-I Sources/C/Backup -I Sources/C/Commands -I Sources/C/CLI -I Sources/C/Testing
 GUI_APP := LOPE.app
 GUI_BIN := bin/LOPEGUI
-GUI_SRC := $(wildcard Sources/*.swift)
+GUI_SRC := $(shell find Sources/Swift -type f -name '*.swift' -print | sort)
 PROFILE_FILES := $(wildcard Profiles/*.json)
 GUI_TARGET := arm64-apple-macos13.0
 GUI_BUNDLE := outputs/$(GUI_APP)
 SWIFT_MODULE_CACHE := .build/module-cache
-GUI_MODEL_SRC := $(filter-out Sources/AppMain.swift Sources/ContentView.swift,$(GUI_SRC))
-C_SRC := $(SRC) $(C_MODULES)
+C_SRC := $(SRC) $(C_MODULES) $(C_HEADERS)
 # A stable signing identity lets macOS recognize rebuilt versions of the app
 # as the same app for Input Monitoring. Override this when several identities
 # are installed, for example:
@@ -31,9 +31,9 @@ all: app
 
 build: $(APP)
 
-$(APP): $(SRC) $(C_MODULES)
+$(APP): $(SRC) $(C_MODULES) $(C_HEADERS)
 	@mkdir -p bin
-	clang $(CFLAGS) $(FRAMEWORKS) $(SRC) -o bin/$(APP)
+	clang $(CFLAGS) $(C_INCLUDE_FLAGS) $(FRAMEWORKS) $(SRC) $(C_MODULES) -o bin/$(APP)
 	@ln -sf bin/$(APP) $(APP)
 
 gui: $(GUI_BIN)
@@ -89,7 +89,7 @@ SWIFT_TEST_BINARY = $(SWIFT_BIN_PATH)/LOPEPackageTests.xctest/Contents/MacOS/LOP
 
 $(C_COVERAGE_PROFDATA): $(SRC) $(C_MODULES)
 	@mkdir -p $(COVERAGE_DIR)
-	clang -std=c11 -Wall -Wextra -Wpedantic -fprofile-instr-generate -fcoverage-mapping $(FRAMEWORKS) $(SRC) -o $(C_COVERAGE_BIN)
+	clang -std=c11 -Wall -Wextra -Wpedantic -fprofile-instr-generate -fcoverage-mapping $(C_INCLUDE_FLAGS) $(FRAMEWORKS) $(SRC) $(C_MODULES) -o $(C_COVERAGE_BIN)
 	LLVM_PROFILE_FILE=$(C_COVERAGE_PROFRAW) $(C_COVERAGE_BIN) self-test >/dev/null
 	xcrun llvm-profdata merge -sparse $(C_COVERAGE_PROFRAW) -o $(C_COVERAGE_PROFDATA)
 

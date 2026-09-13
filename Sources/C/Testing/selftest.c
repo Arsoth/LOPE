@@ -1,3 +1,5 @@
+#include "internal.h"
+
 typedef struct {
     const bool *outcomes;
     size_t outcome_count;
@@ -21,7 +23,7 @@ typedef struct {
 
 static ChannelRequestTestContext *g_channel_request_test_context = NULL;
 
-// Test seam for channel_request_impl (see logitech_onboard_hid_transport.inc):
+// Test seam for channel_request_impl (see the HID transport module):
 // replays canned replies in order so device_call/raw_request logic can be
 // exercised without real IOKit hardware.
 static Reply channel_request_test_double(HidChannel *channel, uint8_t device_number,
@@ -54,7 +56,7 @@ typedef struct {
 static DiscoverDevicesTestContext *g_discover_devices_test_context = NULL;
 
 // Test seam for discover_devices_for_options_impl (see
-// logitech_onboard_hid_discovery.inc): hands back a canned Device list so
+// HID discovery module): hands back a canned Device list so
 // command-layer entry points (run_info, run_dpi, run_bind, ...) can be
 // exercised without real IOKit hardware. Pairs with channel_request_impl,
 // which mocks the HID++ traffic those commands make afterward.
@@ -73,7 +75,7 @@ static int discover_devices_for_options_test_double(HidContext *context, const O
     return g_discover_devices_test_context->result;
 }
 
-// Mirrors read_sector's chunking exactly (see logitech_onboard_profile_io.inc)
+// Mirrors read_sector's chunking exactly (see the profile I/O module)
 // so a full sector buffer can be turned into the sequence of 16-byte
 // ONBOARD_READ_SECTOR replies that function expects, without needing real
 // hardware. Returns the number of replies written, or 0 if capacity is too
@@ -106,7 +108,7 @@ static size_t build_sector_read_replies(const uint8_t *sector, size_t size, Repl
     return count;
 }
 
-static int run_self_test(void) {
+int run_self_test(void) {
     const uint8_t sample[] = "123456789";
     if (crc16_ccitt_false(sample, 9) != 0x29B1) {
         fprintf(stderr, "CRC self-test failed\n");

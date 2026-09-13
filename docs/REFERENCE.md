@@ -8,18 +8,20 @@ README.
 
 The app has three layers:
 
-- `Sources/AppMain.swift`, `Sources/ContentView.swift`, and the focused
-  `Sources/*Pane.swift` / `Sources/ContentView*.swift` components provide the SwiftUI
+- `Sources/Swift/App/AppMain.swift`, `Sources/Swift/UI/ContentView.swift`, and the
+  focused `Sources/Swift/UI` components provide the SwiftUI
   window, tabs, editor, settings, and status messages. The footer message fades
   after 30 seconds; its info button replaces the footer with a full-width,
   scrollable history drawer whose header is the same footer bar and shows the
   ten most recent status events. Opening the drawer reduces the editor's
   available height rather than covering it.
-- `Sources/LogitechOnboardProfileManagerApp.swift` plus the `AppModel+*.swift`
-  extensions own device selection, refresh state, parsing, backup management,
-  editing, and writes.
-- `Sources/logitech_onboard.m` assembles the C HID++ engine from the focused
-  `.inc` modules. The GUI invokes the bundled engine as a separate process.
+- `Sources/Swift/Model/AppModel.swift` plus the
+  `Sources/Swift/Model/AppModel+*.swift` extensions own device selection,
+  refresh state, parsing, backup management, editing, and writes.
+- `Sources/C/Core/main.m` is the C HID++ engine entry point.
+  The engine is organized into independently compiled modules under `Sources/C`
+  (HID, Profiles, Backup, Commands, CLI, and Testing). The GUI invokes the
+  bundled engine as a separate process.
 
 Mouse-specific physical layouts and capability metadata are JSON descriptors in
 `Profiles/`. `MouseProfileCatalog` loads them from the app bundle and, during

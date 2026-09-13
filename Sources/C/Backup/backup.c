@@ -1,3 +1,5 @@
+#include "internal.h"
+
 static int write_all(int fd, const uint8_t *bytes, size_t length) {
     size_t written = 0;
     while (written < length) {
@@ -37,12 +39,12 @@ static uint16_t get_be16(const uint8_t *bytes) {
     return (uint16_t)(((uint16_t)bytes[0] << 8) | bytes[1]);
 }
 
-static int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
-                               const BackupSectorSource *sectors, size_t sector_count,
-                               bool refuse_overwrite);
+int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
+                        const BackupSectorSource *sectors, size_t sector_count,
+                        bool refuse_overwrite);
 
-static int package_write(const char *path, const Device *device, const Profile *profile,
-                         const uint8_t *data, bool refuse_overwrite) {
+int package_write(const char *path, const Device *device, const Profile *profile,
+                  const uint8_t *data, bool refuse_overwrite) {
     BackupSectorSource sector = {.sector = profile->headers[profile->selected_header].sector,
                                  .size = profile->data_length,
                                  .data = data};
@@ -50,9 +52,9 @@ static int package_write(const char *path, const Device *device, const Profile *
                                refuse_overwrite);
 }
 
-static int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
-                               const BackupSectorSource *sectors, size_t sector_count,
-                               bool refuse_overwrite) {
+int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
+                        const BackupSectorSource *sectors, size_t sector_count,
+                        bool refuse_overwrite) {
     if (sector_count == 0 || sector_count > MAX_BACKUP_SECTORS) {
         fprintf(stderr, "cannot create a backup package with %zu sectors\n", sector_count);
         return 0;
@@ -100,9 +102,9 @@ static int package_write_multi(const char *path, const Device *device, uint8_t p
     return 1;
 }
 
-static void package_release(BackupPackage *package);
+void package_release(BackupPackage *package);
 
-static int package_read(const char *path, BackupPackage *package) {
+int package_read(const char *path, BackupPackage *package) {
     memset(package, 0, sizeof(*package));
     int fd = open(path, O_RDONLY);
     if (fd < 0) {
@@ -192,7 +194,7 @@ static int package_read(const char *path, BackupPackage *package) {
     return 1;
 }
 
-static void package_release(BackupPackage *package) {
+void package_release(BackupPackage *package) {
     if (package != NULL) {
         for (size_t i = 0; i < package->sector_count && i < MAX_BACKUP_SECTORS; i++) {
             free(package->sectors[i].data);
@@ -201,7 +203,7 @@ static void package_release(BackupPackage *package) {
     }
 }
 
-static void default_backup_path(char *path, size_t path_size, const char *prefix) {
+void default_backup_path(char *path, size_t path_size, const char *prefix) {
     time_t now = time(NULL);
     struct tm local_time;
     localtime_r(&now, &local_time);
@@ -210,7 +212,7 @@ static void default_backup_path(char *path, size_t path_size, const char *prefix
     snprintf(path, path_size, "%s-%s-%ld.bin", prefix, stamp, (long)getpid());
 }
 
-static int ensure_write_confirmation(const char *operation) {
+int ensure_write_confirmation(const char *operation) {
     fprintf(stderr,
             "%s is preview-only by default. Add --yes after reviewing the output to permit the "
             "mouse write.\n",
@@ -218,7 +220,7 @@ static int ensure_write_confirmation(const char *operation) {
     return 0;
 }
 
-static int validate_profile_for_write(const Profile *profile) {
+int validate_profile_for_write(const Profile *profile) {
     if (!profile->crc_ok) {
         fprintf(stderr, "refusing to write: the current profile sector CRC is invalid\n");
         return 0;

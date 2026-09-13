@@ -5,6 +5,9 @@
 // macOS. Protocol constants and layout knowledge are based on public Solaar,
 // libratbag, lowtech, and omm.py research; see docs/PROTOCOL.md.
 
+#ifndef LOPE_LOGITECH_ONBOARD_TYPES_H
+#define LOPE_LOGITECH_ONBOARD_TYPES_H
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/hid/IOHIDElement.h>
 #include <IOKit/hid/IOHIDKeys.h>
@@ -289,3 +292,5 @@ typedef struct {
     size_t sector_count;
     BackupSector sectors[MAX_BACKUP_SECTORS];
 } BackupPackage;
+
+#endif // LOPE_LOGITECH_ONBOARD_TYPES_H
