@@ -116,7 +116,24 @@ void build_mock_control_sector(uint8_t control[132]) {
     control[3] = 0x00;
 }
 
+void build_mock_control_sector_two_profiles(uint8_t control[255]) {
+    memset(control, 0, 255);
+    control[0] = 0x01;
+    control[1] = 0x23;
+    control[2] = 0x01;
+    control[4] = 0x02;
+    control[5] = 0x00;
+    control[6] = 0x00;
+    sector_put_crc(control, 255);
+}
+
 const Reply k_mock_get_info_reply = {
     .status = REPLY_OK,
     .length = 10,
     .bytes = {0x00, 0x05, 0x00, 0x01, 0x00, 0x05, 0x01, 0x00, 0xFF, 0x02}};
+
+const Reply k_mock_generic_ok_reply = {.status = REPLY_OK};
+const Reply k_mock_onboard_mode_reply = {
+    .status = REPLY_OK, .length = 1, .bytes = {ONBOARD_MODE_ONBOARD}};
+const Reply k_mock_host_mode_reply = {
+    .status = REPLY_OK, .length = 1, .bytes = {ONBOARD_MODE_HOST}};

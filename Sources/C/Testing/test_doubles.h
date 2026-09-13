@@ -45,15 +45,31 @@ void reset_hid_test_seams(void);
 // Builds a 255-byte profile-format-5 onboard sector with a fully populated
 // button layout (offset 32 normal / 96 G-Shift), 5 DPI stages, and 2 RGB
 // zones, with a valid CRC. Several self-tests (profile_io, profile_rendering,
-// commands_mutate, commands_backup_bind) exercise their own module against
-// this same canned sector.
+// commands_set_dpi, commands_apply, commands_backup_bind) exercise their own
+// module against this same canned sector.
 void build_mock_onboard_sector(uint8_t sector[255]);
 
 // Builds a 132-byte control sector selecting sector 0x0123 as profile 1.
 void build_mock_control_sector(uint8_t control[132]);
 
+// Builds a 255-byte control sector (matching k_mock_get_info_reply's
+// reported sector size) with two profile headers: profile 1 in sector
+// 0x0123 (enabled) and profile 2 in sector 0x0200 (disabled), with a valid
+// CRC. Used by the commands_set_profile_state and commands_apply self-tests,
+// which both need a control sector sized to the full sector rather than the
+// smaller header-only read commands_set_dpi's tests exercise.
+void build_mock_control_sector_two_profiles(uint8_t control[255]);
+
 // Canned FEATURE_ONBOARD_PROFILES getInfo reply (5-profile capacity,
 // sector 0x0100 base) used to satisfy load_selected_profile's info read.
 extern const Reply k_mock_get_info_reply;
+
+// Canned single-byte-status replies reused across several self-tests: a
+// generic acknowledgement (startWrite/writeData/endWrite), an
+// already-onboard mode query, and a host-mode query that requires switching
+// to onboard mode before a write can proceed.
+extern const Reply k_mock_generic_ok_reply;
+extern const Reply k_mock_onboard_mode_reply;
+extern const Reply k_mock_host_mode_reply;
 
 #endif // LOPE_LOGITECH_ONBOARD_TEST_DOUBLES_H

@@ -27,7 +27,13 @@ int run_self_test(void) {
     if (test_commands_read() != 0) {
         return 1;
     }
-    if (test_commands_mutate() != 0) {
+    if (test_commands_set_dpi() != 0) {
+        return 1;
+    }
+    if (test_commands_set_profile_state() != 0) {
+        return 1;
+    }
+    if (test_commands_apply() != 0) {
         return 1;
     }
     if (test_commands_backup_bind() != 0) {

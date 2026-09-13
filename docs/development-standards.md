@@ -119,6 +119,18 @@ setup, see
   the line minimum only for Swift (branch checking is skipped there since
   the toolchain cannot report it). Override thresholds ad hoc with
   `make coverage-check COVERAGE_MIN_LINE=80`.
+- `coverage-check-c` and `coverage-c` both exclude `Sources/C/Testing/`
+  (`--ignore-filename-regex`/a negative-lookahead source pattern) from the
+  report and the threshold check. That directory is test infrastructure —
+  the `test_<module>.c` files, `selftest.c`'s dispatcher, and
+  `test_doubles.c`'s mocking seams — not production code, so it is scored
+  the same way `Tests/` is already excluded from the Swift side. Self-test
+  files built from `&&`-chained assertions (`ok = a() && b() && !c(); if
+  (!ok) { ...; return 1; }`) structurally cap their own branch coverage
+  well under 90%: once every chained condition passes, the early-bail
+  branch for each `&&` never executes, and that is a property of the
+  assertion style, not a gap in what is tested. Excluding the directory
+  avoids grading test code against a metric it can't meaningfully satisfy.
 - `make coverage-check` is wired into the pre-commit hook alongside
   `make test` and `make lint`.
 - For each uncovered line or path you touch:

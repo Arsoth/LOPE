@@ -15,7 +15,9 @@ int test_report_rate(void);
 int test_g600(void);
 int test_backup(void);
 int test_commands_read(void);
-int test_commands_mutate(void);
+int test_commands_set_dpi(void);
+int test_commands_set_profile_state(void);
+int test_commands_apply(void);
 int test_commands_backup_bind(void);
 int test_watch_cli(void);
 

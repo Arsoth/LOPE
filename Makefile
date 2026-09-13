@@ -94,7 +94,7 @@ $(C_COVERAGE_PROFDATA): $(SRC) $(C_MODULES)
 	xcrun llvm-profdata merge -sparse $(C_COVERAGE_PROFRAW) -o $(C_COVERAGE_PROFDATA)
 
 coverage-c: $(C_COVERAGE_PROFDATA)
-	xcrun llvm-cov report $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA) --show-branch-summary
+	xcrun llvm-cov report $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA) --show-branch-summary --ignore-filename-regex='/Sources/C/Testing/'
 
 coverage-swift:
 	swift test --enable-code-coverage
@@ -103,7 +103,7 @@ coverage-swift:
 coverage: coverage-c coverage-swift
 
 coverage-check-c: $(C_COVERAGE_PROFDATA)
-	scripts/check-coverage.sh "C core" "Sources/" $(COVERAGE_MIN_LINE) $(COVERAGE_MIN_BRANCH) -- $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA)
+	scripts/check-coverage.sh "C core" "Sources/(?!C/Testing/)" $(COVERAGE_MIN_LINE) $(COVERAGE_MIN_BRANCH) -- $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA)
 
 coverage-check-swift:
 	swift test --enable-code-coverage

@@ -1,5 +1,5 @@
-#ifndef LOPE_LOGITECH_ONBOARD_COMMANDS_MUTATE_H
-#define LOPE_LOGITECH_ONBOARD_COMMANDS_MUTATE_H
+#ifndef LOPE_LOGITECH_ONBOARD_COMMANDS_APPLY_H
+#define LOPE_LOGITECH_ONBOARD_COMMANDS_APPLY_H
 
 #include "types.h"
 
@@ -12,9 +12,6 @@ typedef struct {
 
 typedef bool (*BatchSectorWriter)(void *context, const BatchSector *sector);
 
-bool dpi_value_in_list(const uint16_t *values, size_t count, uint16_t wanted);
-int run_set_dpi(const Options *options);
-int run_set_profile_state(const Options *options);
 bool parse_batch_raw_record(const char *text, uint8_t spec[4]);
 bool parse_batch_button_change(const char *text, int *button, bool *gshift, uint8_t spec[4]);
 bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]);
@@ -29,4 +26,4 @@ void print_batch_recovery(const char *operation_id, size_t verified_count, const
                           uint16_t failed_sector, const char *backup_path, bool has_backup);
 int run_apply(const Options *options);
 
-#endif // LOPE_LOGITECH_ONBOARD_COMMANDS_MUTATE_H
+#endif // LOPE_LOGITECH_ONBOARD_COMMANDS_APPLY_H
