@@ -9,16 +9,61 @@
 
 # LOPE TODO Ingest:
 
-- FEAT: check if it's possible to detect a wired mouse the app don't have permission to pull data from (ideally if it's a logitech specifically), and pop up a (not yet created) permission request modal with a "open system preferences" button if so. this should completely replace the no mouse detected logic that does that in the device picker
-- FEAT: when refreshing a sleeping mouse, just keep the refresh button disabled, don't periodically re-enable it when timing lands on returned query and delay till next.
-- FIX: the bottom footer shadows are still a bit wonky, need to fix those
-- FIX: sometimes refresh sticks on a sleeping mouse and the app only shows that mouse with no way to move out without exiting the app completely
-- FEAT: multiple open window instance and tabs inside the app from swift are not needed, that can cause cross ownership of files and adds to complexity.
-- FEAT: expand the wireless mice sleep shake awake notification to _any_ non-wired mice
-- FEAT: alphabetize the expanded keyboard keys, but also keep them grouped, so do [all the keyboard bits on a 100%, home, end, arrows etc], [all the F13+ keys], [media keys (I notice play/next/etc aren't there?)], [all the other weird keys]
-- FEAT: if you record a keypress that happens to also match what is in the extended keystrokes, leave it showing as recorded, don't override visually to the dropdown. That's for keys you don't have easy access to, not ones you do (but there's no way to know which keys the current keyboard exposes as far as I'm aware?)
-
 # LOPE todo list
+
+### 1: Detect connected mice blocked by missing permissions
+
+- [ ] Detect a connected wired mouse that the app cannot query, preferably identifying Logitech devices, and show a permission request modal with an “Open System Settings” button, replacing the device picker’s generic no-mouse-detected state.
+
+**Done when:** An inaccessible supported mouse produces the permission flow, the button opens the relevant System Settings location, and the generic no-mouse-detected flow is no longer in existence.
+
+### 2: Keep refresh disabled while a mouse is sleeping
+
+- [ ] Keep the refresh button disabled throughout refresh polling for a sleeping mouse instead of periodically re-enabling it when a returned query lands during the delay interval.
+
+**Done when:** The refresh button remains disabled until the refresh operation times out after the 60s or the mouse becomes available.
+
+### 3: Fix the header shadows
+
+- [ ] Correct the rendering and layout of the header shadows.
+
+**Done when:** Header shadows appear over main content.
+
+### 4: Recover from a refresh stuck on a sleeping mouse
+
+- [ ] Fix the refresh flow so a sleeping mouse cannot leave the app showing only that mouse with no way to recover without quitting.
+
+**Done when:** A refresh against a sleeping mouse either recovers or returns to a usable device-selection state without requiring the app to exit.
+
+### 5: Simplify app window and tab ownership
+
+- [ ] Remove unnecessary support for multiple Swift-created app windows and in-app tabs so files cannot have conflicting ownership and the app has a simpler single-instance workflow.
+
+**Done when:** The app exposes one clear window/workflow, and opening or activating the app does not create competing windows or tabs that can own the same files.
+
+### 6: Show the sleep shake-awake notification for all non-wired mice
+
+- [ ] Expand the wireless-mouse sleep shake-awake notification to cover every non-wired mouse type.
+
+**Done when:** Any supported non-wired mouse that enters the relevant sleeping state receives the notification, while wired mice do not.
+
+### 7: Group and alphabetize expanded keyboard keys
+
+- [ ] Alphabetize expanded keyboard keys while keeping them grouped into standard full-size keyboard keys, F13-and-later keys, media keys, and other unusual keys; include available media keys such as play and next.
+
+**Done when:** The expanded-key list is deterministic, alphabetized within the intended groups, and contains the supported media keys.
+
+### 8: Preserve recorded keypresses that overlap extended keystrokes
+
+- [ ] Keep a key displayed as recorded when a captured keypress also matches an extended-keystroke option; do not replace the recorded value with the dropdown for keys that were actually captured.
+
+**Done when:** Captured overlapping keypresses remain visibly recorded, while extended-keystroke choices remain available for keys the user cannot directly access.
+
+### 9: Correctly pad DPI stages when the count jumps
+
+- [ ] Fix `setDPIStageCount` in `AppModel+EditingDPI.swift` so `dpiStages` is padded to the requested count even when the count increases by more than one at a time, such as 1→5.
+
+**Done when:** Increasing the stage count always produces exactly the requested number of stages with valid default values, including multi-stage jumps.
 
 # Ignore below item(s):
 
