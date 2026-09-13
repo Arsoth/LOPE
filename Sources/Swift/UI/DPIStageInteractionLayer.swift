@@ -72,6 +72,7 @@ struct DPIStageOutsideClickMonitor: NSViewRepresentable {
 struct DPIStageHitTarget: Equatable {
   let index: Int
   let x: CGFloat
+  let role: DPILegendRole
 }
 
 /// Owns pointer interaction for the entire stage bar. Keeping click arbitration,
@@ -122,8 +123,11 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
     var onDragEnded: ((CGFloat) -> Void)?
 
     private let dragThreshold: CGFloat = 5
-    private let handleSize = CGSize(width: 84, height: 62)
-    private let handleCenterY: CGFloat = 58
+    // Matches the visible badge (the circle/rounded-rect/pentagon icon drawn
+    // in `stageHandle`), not the button's full frame, which also spans the
+    // DPI value label below the badge. The label is not a drag/click target.
+    private let badgeSize: CGFloat = 34
+    private let badgeCenterY: CGFloat = 43
     private let trackRange: ClosedRange<CGFloat> = 24...65
     private var mouseDownPoint: CGPoint?
     private var pendingStage: Int?
@@ -244,19 +248,35 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
     }
 
     private func target(at point: CGPoint) -> DPIStageHitTarget? {
-      targets.last { handleRect(for: $0.x).contains(point) }
+      targets.last { contains(point, target: $0) }
     }
 
     private func nearestTarget(to x: CGFloat) -> DPIStageHitTarget? {
       targets.min { abs($0.x - x) < abs($1.x - x) }
     }
 
-    private func handleRect(for x: CGFloat) -> CGRect {
+    private func contains(_ point: CGPoint, target: DPIStageHitTarget) -> Bool {
+      let rect = badgeRect(for: target.x)
+      guard rect.contains(point) else { return false }
+      switch target.role {
+      case .other:
+        let radius = rect.width / 2
+        return hypot(point.x - rect.midX, point.y - rect.midY) <= radius
+      case .shift:
+        return DPIStagePentagon().path(in: rect).cgPath.contains(point)
+      case .defaultStage:
+        // A 4pt corner radius on a 34pt square clips a sliver few pointers
+        // will ever land on; the bounding square is a fine approximation.
+        return true
+      }
+    }
+
+    private func badgeRect(for x: CGFloat) -> CGRect {
       CGRect(
-        x: x - handleSize.width / 2,
-        y: handleCenterY - handleSize.height / 2,
-        width: handleSize.width,
-        height: handleSize.height
+        x: x - badgeSize / 2,
+        y: badgeCenterY - badgeSize / 2,
+        width: badgeSize,
+        height: badgeSize
       )
     }
 

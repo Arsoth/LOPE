@@ -11,7 +11,9 @@ extension DPIStageBar {
         draggingStage == index
         ? (activeDragX ?? position(for: value, width: width))
         : position(for: value, width: width)
-      return DPIStageHitTarget(index: index, x: x)
+      let role: DPILegendRole =
+        defaultStage == index + 1 ? .defaultStage : (shiftStage == index + 1 ? .shift : .other)
+      return DPIStageHitTarget(index: index, x: x, role: role)
     }
   }
 
