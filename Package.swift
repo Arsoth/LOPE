@@ -18,6 +18,9 @@ let package = Package(
       exclude: [
         "AppMain.swift",
         "ContentView.swift",
+        "ContentViewControls.swift",
+        "ContentViewSections.swift",
+        "ProfileEditorPane.swift",
         "logitech_onboard.m",
         "logitech_onboard_backup.inc",
         "logitech_onboard_commands_backup_bind.inc",

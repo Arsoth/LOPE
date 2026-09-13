@@ -8,7 +8,8 @@ README.
 
 The app has three layers:
 
-- `Sources/AppMain.swift` and `Sources/ContentView.swift` provide the SwiftUI
+- `Sources/AppMain.swift`, `Sources/ContentView.swift`, and the focused
+  `Sources/*Pane.swift` / `Sources/ContentView*.swift` components provide the SwiftUI
   window, tabs, editor, settings, and status messages. The footer message fades
   after 30 seconds; its info button replaces the footer with a full-width,
   scrollable history drawer whose header is the same footer bar and shows the
@@ -277,8 +278,10 @@ parsing, backup-storage paths, RGB handling, and the write-validation guards
 in `AppModel`.
 
 `make install-hooks` installs a pre-commit hook (from
-`scripts/git-hooks/pre-commit`) that runs `make lint` and `make test`
-before every commit; run it once per clone.
+`scripts/git-hooks/pre-commit`) that runs `make lint`, `make test`, and
+`make coverage-check` before every commit; run it once per clone. The
+coverage gate is deliberately strict (90% per file by default) — see
+[development-standards.md](development-standards.md#coverage).
 
 For descriptor additions, follow [Profiles/README.md](../Profiles/README.md)
 and add a focused test before enabling a new write path.

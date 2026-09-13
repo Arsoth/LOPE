@@ -14,16 +14,11 @@
 - FIX: the bottom footer shadows are still a bit wonky, need to fix those
 - FIX: sometimes refresh sticks on a sleeping mouse and the app only shows that mouse with no way to move out without exiting the app completely
 - FEAT: multiple open window instance and tabs inside the app from swift are not needed, that can cause cross ownership of files and adds to complexity.
+- FEAT: expand the wireless mice sleep shake awake notification to _any_ non-wired mice
+- FEAT: alphabetize the expanded keyboard keys, but also keep them grouped, so do [all the keyboard bits on a 100%, home, end, arrows etc], [all the F13+ keys], [media keys (I notice play/next/etc aren't there?)], [all the other weird keys]
+- FEAT: if you record a keypress that happens to also match what is in the extended keystrokes, leave it showing as recorded, don't override visually to the dropdown. That's for keys you don't have easy access to, not ones you do (but there's no way to know which keys the current keyboard exposes as far as I'm aware?)
 
 # LOPE todo list
-
-### 1: Refactor the UI into smaller reusable components
-
-- [ ] Split the large ContentView sections into focused components.
-- [ ] Extract repeated controls and layouts into reusable views.
-- [ ] Preserve the current behavior and appearance while reducing ContentView's size.
-
-**Done when:** The UI is organized into smaller reusable components without behavior or visual regressions.
 
 # Ignore below item(s):
 

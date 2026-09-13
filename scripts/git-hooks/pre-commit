@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installed via `make install-hooks`. Blocks commits that fail formatting,
-# linting, or the self-test suite.
+# linting, the self-test suite, or the per-file coverage minimums. The
+# coverage gate is intentionally strict (see docs/development-standards.md).
 
 set -euo pipefail
 
@@ -12,3 +13,6 @@ make format-check
 
 echo "pre-commit: running tests..."
 make test
+
+echo "pre-commit: checking coverage..."
+make coverage-check

@@ -35,7 +35,7 @@ chord, highlights while recording, and provides an X to cancel without
 changing the existing output. The optional extended-key override is available
 only when enabled in Settings.
 Enable **Show non-standard keyboard keys** in Settings to add hidden keys such
-as Insert, F13–F24, and Sleep. The editor displays the
+as Insert, F13–F24, Sleep, and so many more. The editor displays the
 current keyboard-output usage as `X/Y`; the current HID++ keyboard record stores
 one key.
 
@@ -99,8 +99,10 @@ Run `make test` for the C self-test binary and the Swift XCTest suite (via
 for an `llvm-cov` report, or `make coverage-check` to enforce the per-file
 minimums (see [docs/development-standards.md](docs/development-standards.md)
 for what's actually enforced and why Swift has no branch-coverage numbers).
-`make install-hooks` installs a pre-commit hook that runs the format and
-test checks. See [docs/development-setup.md](docs/development-setup.md) for
+`make install-hooks` installs a pre-commit hook that runs the format, test,
+and coverage checks (see
+[docs/development-standards.md](docs/development-standards.md)). See
+[docs/development-setup.md](docs/development-setup.md) for
 required tooling, [the development reference](docs/REFERENCE.md) for the
 source layout, device behavior, troubleshooting, and command-line details.
 Protocol notes are in [docs/PROTOCOL.md](docs/PROTOCOL.md), and descriptor

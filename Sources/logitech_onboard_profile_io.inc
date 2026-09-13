@@ -945,3 +945,16 @@ static int load_profile_summary_with_headers(Device *device, const ProfileInfo *
 }
 
 static int load_selected_profile(Device *device, int requested_profile, Profile *profile) {
+    ProfileInfo info;
+    if (!get_profile_info(device, &info)) {
+        return 0;
+    }
+    ProfileHeader headers[MAX_HEADERS];
+    size_t header_count = 0;
+    if (!read_profile_headers(device, &info, headers, &header_count)) {
+        fprintf(stderr, "could not find any onboard profile headers\n");
+        return 0;
+    }
+    return load_profile_with_headers(device, &info, headers, header_count, requested_profile,
+                                     profile);
+}

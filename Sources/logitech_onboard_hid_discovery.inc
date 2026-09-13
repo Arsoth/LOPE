@@ -672,12 +672,28 @@ static int discover_device_by_key(HidContext *context, const char *key, Device *
     return 1;
 }
 
-static int discover_devices_for_options(HidContext *context, const Options *options,
-                                        Device *devices, size_t *count) {
+static int discover_devices_for_options_hardware(HidContext *context, const Options *options,
+                                                 Device *devices, size_t *count) {
     if (options->device_key != NULL) {
         return discover_device_by_key(context, options->device_key, devices, count);
     }
     return discover_devices(context, options->slot, devices, count, true);
+}
+
+// discover_devices_for_options_impl is a test seam: self-test overrides it to
+// hand back a canned Device list so command-layer logic (run_info, run_dpi,
+// run_bind, ...) can be exercised without real IOKit hardware. It complements
+// channel_request_impl (see logitech_onboard_hid_transport.inc), which mocks
+// the HID++ calls those commands make once a device is selected.
+typedef int (*DiscoverDevicesForOptionsFn)(HidContext *context, const Options *options,
+                                           Device *devices, size_t *count);
+
+static DiscoverDevicesForOptionsFn discover_devices_for_options_impl =
+    discover_devices_for_options_hardware;
+
+static int discover_devices_for_options(HidContext *context, const Options *options,
+                                        Device *devices, size_t *count) {
+    return discover_devices_for_options_impl(context, options, devices, count);
 }
 
 static const char *device_label(const Device *device) {

@@ -1,16 +1,3 @@
-ProfileInfo info;
-if (!get_profile_info(device, &info)) {
-    return 0;
-}
-ProfileHeader headers[MAX_HEADERS];
-size_t header_count = 0;
-if (!read_profile_headers(device, &info, headers, &header_count)) {
-    fprintf(stderr, "could not find any onboard profile headers\n");
-    return 0;
-}
-return load_profile_with_headers(device, &info, headers, header_count, requested_profile, profile);
-}
-
 static const char *function_name(uint8_t value) {
     static const char *names[] = {
         "no action",     "tilt left",   "tilt right",     "next DPI",       "previous DPI",

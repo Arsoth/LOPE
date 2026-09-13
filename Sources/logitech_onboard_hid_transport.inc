@@ -321,9 +321,14 @@ static size_t build_hidpp_frame(bool use_long, uint8_t device_number, uint16_t r
     return frame_length;
 }
 
-static Reply channel_request(HidChannel *channel, uint8_t device_number, uint16_t request_id,
-                             const uint8_t *params, size_t params_length, bool prefer_long,
-                             double timeout_seconds) {
+// channel_request_impl is a test seam: self-test overrides it to inject
+// canned Reply values so device_call/raw_request's feature-resolution and
+// retry logic can be exercised without real IOKit hardware. Production code
+// always runs through channel_request_hardware.
+static Reply channel_request_hardware(HidChannel *channel, uint8_t device_number,
+                                      uint16_t request_id, const uint8_t *params,
+                                      size_t params_length, bool prefer_long,
+                                      double timeout_seconds) {
     Reply reply;
     memset(&reply, 0, sizeof(reply));
     if (params_length > 16) {
@@ -425,6 +430,19 @@ static Reply channel_request(HidChannel *channel, uint8_t device_number, uint16_
         }
         free(node);
     }
+}
+
+typedef Reply (*ChannelRequestFn)(HidChannel *channel, uint8_t device_number, uint16_t request_id,
+                                  const uint8_t *params, size_t params_length, bool prefer_long,
+                                  double timeout_seconds);
+
+static ChannelRequestFn channel_request_impl = channel_request_hardware;
+
+static Reply channel_request(HidChannel *channel, uint8_t device_number, uint16_t request_id,
+                             const uint8_t *params, size_t params_length, bool prefer_long,
+                             double timeout_seconds) {
+    return channel_request_impl(channel, device_number, request_id, params, params_length,
+                                prefer_long, timeout_seconds);
 }
 
 static bool is_receiver_routed_device(const Device *device) {

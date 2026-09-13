@@ -44,8 +44,11 @@ make install-hooks
 ```
 
 Installs `scripts/git-hooks/pre-commit` into `.git/hooks/pre-commit`. It
-runs `make format-check` and `make test` before every commit. This does not
-happen automatically per clone/worktree — run it again after a fresh clone.
+runs `make format-check`, `make test`, and `make coverage-check` before
+every commit. This does not happen automatically per clone/worktree — run
+it again after a fresh clone.
+
+The coverage gate defaults to 90% per file (see `docs/development-standards.md`).
 
 ## Verifying the toolchain
 

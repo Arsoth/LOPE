@@ -49,8 +49,8 @@ specific. For required tooling and one-time setup, see
   includes its `.inc` modules in dependency order, not alphabetical order;
   do not re-enable include sorting.
 - `make install-hooks` copies `scripts/git-hooks/pre-commit` into
-  `.git/hooks/pre-commit`. That hook runs `make format-check` and
-  `make test` before every commit. Each clone needs to run
+  `.git/hooks/pre-commit`. That hook runs `make format-check`, `make test`,
+  and `make coverage-check` before every commit. Each clone needs to run
   `make install-hooks` once; it is not automatic.
 - Never bypass commit hooks.
 - Work TDD-first and keep solutions simple and non-duplicative: T.D.D. ·
@@ -101,13 +101,8 @@ specific. For required tooling and one-time setup, see
   the line minimum only for Swift (branch checking is skipped there since
   the toolchain cannot report it). Override thresholds ad hoc with
   `make coverage-check COVERAGE_MIN_LINE=80`.
-- As of this writing the repository is well below the 90% target on both
-  sides (roughly 23% C lines / 17% C branches, roughly 34% Swift lines) —
-  the gate exists and works, but closing the gap requires writing many more
-  tests over time, per file, following the TDD workflow below. `make
-  coverage-check` is intentionally **not** wired into the pre-commit hook
-  yet, since it would currently block every commit; `make test`/`make lint`
-  are.
+- `make coverage-check` is wired into the pre-commit hook alongside
+  `make test` and `make lint`.
 - For each uncovered line or path you touch:
   1. Write a test for reachable behavior and relevant edge cases.
   2. There is no per-line exclusion comment (no `LCOV_EXCL_LINE` equivalent
