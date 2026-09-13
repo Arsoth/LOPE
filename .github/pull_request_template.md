@@ -2,6 +2,9 @@
 
 <!-- What changed, and why? -->
 
+For mouse descriptor work, use the **Add a mouse profile** template so the
+hardware evidence and write-safety details are captured.
+
 ## Conventional Commit title
 
 Use this format for the pull request title:
@@ -21,6 +24,9 @@ Examples:
 ## Checklist
 
 - [ ] The PR title follows Conventional Commits.
-- [ ] CI passes, including formatting, tests, and coverage checks.
+- [ ] I ran `make lint`.
+- [ ] I ran `make test-modified` or explained why it is not applicable.
 - [ ] I have added or updated tests for behavior changes.
 - [ ] I have updated relevant documentation.
+- [ ] I have not included build output, credentials, device backups, or other
+      local-only files.

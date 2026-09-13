@@ -8,8 +8,7 @@ mouse; Logitech G HUB and Onboard Memory Manager are not required.
 
 ## Use LOPE
 
-Requirements: macOS 13 or newer, a Logitech mouse or receiver, and (for a
-source build) Xcode Command Line Tools.
+Requirements: macOS 13 or newer and a compatible Logitech mouse or receiver.
 
 1. Connect the mouse or receiver and open LOPE.
 2. Choose a device if more than one is listed. Wireless and receiver-connected
@@ -84,47 +83,9 @@ mouse exposes it, along with the other supported onboard features.
 Other catalog entries are not part of this confirmation list unless their
 complete read/write feature set has been tested.
 
-## Build and test
+## Contributing
 
-From the repository root:
-
-```sh
-make
-open outputs/LOPE.app
-```
-
-Run `make test` for the C self-test binary and the Swift XCTest suite (via
-`swift test`). Run `make format` to apply `swift-format`/`clang-format`, or
-`make lint` to check formatting without changing files. Run `make coverage`
-for an `llvm-cov` report, or `make coverage-check` to enforce the per-file
-minimums (see [docs/development-standards.md](docs/development-standards.md)
-for what's actually enforced and why Swift has no branch-coverage numbers).
-`make install-hooks` installs a pre-commit hook that runs the format and
-changed-files test/coverage checks (see
-[docs/development-standards.md](docs/development-standards.md)). See
-[docs/development-setup.md](docs/development-setup.md) for
-required tooling, [the development reference](docs/REFERENCE.md) for the
-source layout, device behavior, troubleshooting, and command-line details.
-Protocol notes are in [docs/PROTOCOL.md](docs/PROTOCOL.md), and descriptor
-maintenance is covered by [Profiles/README.md](Profiles/README.md).
-
-## Continuous integration and releases
-
-Pull requests targeting `main`, and pushes to `main`, run
-[the CI workflow](.github/workflows/ci.yml). It checks formatting, runs the
-complete C and Swift test suites, and runs `make coverage-check`, which
-enforces the repository's configured per-file coverage minimums. The scheduled
-[nightly workflow](.github/workflows/nightly.yml) repeats the same full gate.
-
-To make that check merge-blocking, add `LOPE CI / Format, test, and coverage
-gate` under the required status checks in the branch ruleset for `main`.
-
-Releases are cut by pushing a `vX.Y.Z` tag from `main`. The release workflow
-verifies the tagged source, builds the native arm64 app, signs it with a
-Developer ID Application certificate, submits it to Apple's notary service,
-staples the ticket, and publishes a versioned ZIP plus SHA-256 checksum to the
-GitHub release. The archive is named
-`LOPE-VERSION-macos-arm64.zip`; the tag version becomes
-`CFBundleShortVersionString` and the workflow run number becomes
-`CFBundleVersion`. See [development setup](docs/development-setup.md) for the
-required GitHub secrets.
+For local setup, building, testing, adding a mouse profile, and opening a pull
+request, see [contributing.md](contributing.md). Technical details are in the
+[development reference](docs/REFERENCE.md), [protocol notes](docs/PROTOCOL.md),
+and [profile descriptor guide](Profiles/README.md).

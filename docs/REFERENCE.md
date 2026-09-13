@@ -282,9 +282,9 @@ in `AppModel`.
 `make install-hooks` installs a pre-commit hook (from
 `scripts/git-hooks/pre-commit`) that runs formatting plus the changed-file
 `make test-modified` test and coverage gate before every commit; run it once
-per clone. Pull requests targeting `main` and the nightly workflow run the
-full `make test` and `make coverage-check` gates. The coverage gate is
-deliberately strict (90% per file by default) — see
+per clone. Automated pull-request checks run the full `make test` and
+`make coverage-check` gates. The coverage gate is deliberately strict (90% per
+file by default) — see
 [development-standards.md](development-standards.md#coverage).
 
 For descriptor additions, follow [Profiles/README.md](../Profiles/README.md)

@@ -3,34 +3,29 @@
 This repo is a single macOS app: a C command-line/HID core
 (`Sources/C/Core/main.m` plus the independently compiled
 modules under `Sources/C`) and a SwiftUI/AppKit GUI under `Sources/Swift`,
-packaged together into `outputs/LOPE.app` by the Makefile. These are project
-defaults; the Makefile, existing source conventions, and other project docs
+packaged together into `outputs/LOPE.app` by the Makefile. These are the
+project's contributor defaults; the Makefile and existing source conventions
 override them when they are more specific. For required tooling and one-time
-setup, see
-[development-setup.md](development-setup.md).
+setup, see [development-setup.md](development-setup.md).
 
 ## Working tools
 
 - Search content with `rg`; find files with `fd`.
 - Use `jq` for inspecting or transforming the profile JSON under `Profiles/`.
-- Use `gh` for GitHub pull requests, issues, reviews, CI, and releases rather
-  than scraping GitHub pages or calling its REST API directly when `gh`
-  covers the operation.
 - Do not use `cat -A`.
 
 ## Building and testing
 
-- `./rebuild-signed.sh` is the only command that updates the deliverable at
-  `outputs/LOPE.app` (see the Build section in AGENTS.md/CLAUDE.md).
+- `make app` builds the deliverable at `outputs/LOPE.app`.
 - `make gui` and direct `swiftc` invocations are compile-only checks, useful
-  for fast iteration but not a substitute for `./rebuild-signed.sh`.
+  for fast iteration but not a substitute for `make app`.
 - `make test` runs `./lope self-test` (C core) and `swift test` (the
   `LOPECoreTests` XCTest target defined in `Package.swift`). Run
   `make test-modified` during normal branch work: it selects tests related to
   changed files and checks coverage for changed production files. Run the full
-  `make test` after touching shared test/build infrastructure, and rely on the
-  full PR/nightly gate before landing. Passing test runs print only a concise
-  summary; failing runs print the captured diagnostics.
+  `make test` after touching shared test/build infrastructure, and run the full
+  repository checks before requesting review. Passing test runs print only a
+  concise summary; failing runs print the captured diagnostics.
 - `swift test`/`swift build` are driven by `Package.swift`, which exists
   only to run the Swift unit tests; it does not build or replace the
   shipped app. The app is still built by the Makefile via direct `swiftc`
@@ -38,9 +33,8 @@ setup, see
   entry point and SwiftUI view files (the same split the Makefile used for
   its old model-only test binaries); all C sources live outside the Swift
   package target under `Sources/C`.
-- Building and testing only invoke local tools (`clang`, `swiftc`, `swift`,
-  `codesign`); none of it needs elevated sandbox permissions or network
-  access.
+- Building and testing use local tools supplied by Xcode and Homebrew; they do
+  not require network access once the tools are installed.
 
 ## Formatting and quality
 
@@ -55,8 +49,8 @@ setup, see
   `.git/hooks/pre-commit`. That hook runs `make format-check` and the
   staged-file `make test-modified` gate before every commit. Each clone needs
   to run `make install-hooks` once; it is not automatic. The hook is a fast,
-  changed-files gate; pull requests targeting `main` and the nightly workflow
-  run the complete test and coverage gate.
+  changed-files gate; run `make test` and `make coverage-check` when a full
+  repository check is appropriate.
 - Never bypass commit hooks.
 - Work TDD-first and keep solutions simple and non-duplicative: T.D.D. ·
   K.I.S.S. · D.R.Y.
@@ -168,9 +162,9 @@ setup, see
 - `make test-modified` is wired into the pre-commit hook alongside
   `make format-check`. Its coverage invocation uses the same configured
   per-file thresholds, but limits the report to changed production files.
-- Pull requests targeting `main` run `make test` and `make coverage-check` for
-  the complete repository. The scheduled nightly workflow repeats those full
-  checks so regressions are found even when no new pull request is open.
+- Automated pull-request checks run `make test` and `make coverage-check` for
+  the complete repository. Run those same commands locally for broad changes
+  or before requesting review.
 - For each uncovered line or path you touch:
   1. Write a test for reachable behavior and relevant edge cases.
   2. There is no per-line exclusion comment (no `LCOV_EXCL_LINE` equivalent
@@ -181,8 +175,7 @@ setup, see
      that does not exist for this tooling.
   3. Add any newly discovered edge case to the relevant test file.
 - Prefer running `make test-modified` for ordinary branch work; run
-  `make coverage-check` before landing changes meant to close a coverage gap,
-  before release candidates, and whenever a full local verification is useful.
+  `make coverage-check` for broad changes and before requesting review.
 
 ## Style
 
