@@ -10,6 +10,7 @@ struct SettingsPane: View {
   var body: some View {
     GeometryReader { geometry in
       let contentWidth = max(geometry.size.width - 40, 0)
+      let themeColumnWidth = max((contentWidth - 20) / 2, 0)
 
       VStack(alignment: .leading, spacing: 12) {
         Text("Settings")
@@ -38,8 +39,8 @@ struct SettingsPane: View {
             }
           }
           .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
         }
-        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Mouse profiles") {
           VStack(alignment: .leading, spacing: 8) {
             Text(
@@ -56,8 +57,8 @@ struct SettingsPane: View {
             Button("Open custom profiles folder", action: model.openCustomProfilesDirectoryInFinder)
           }
           .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
         }
-        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Advanced display") {
           VStack(alignment: .leading, spacing: 6) {
             Toggle(
@@ -75,8 +76,8 @@ struct SettingsPane: View {
             .foregroundStyle(.secondary)
           }
           .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
         }
-        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Keyboard outputs") {
           VStack(alignment: .leading, spacing: 6) {
             Toggle(
@@ -123,8 +124,8 @@ struct SettingsPane: View {
             .padding(.top, 2)
           }
           .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
         }
-        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Appearance") {
           VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 12) {
@@ -157,7 +158,8 @@ struct SettingsPane: View {
                   get: { model.selectedLightThemeID },
                   set: { model.setLightThemeID($0) }
                 ),
-                themes: model.lightThemes
+                themes: model.lightThemes,
+                width: themeColumnWidth
               )
               themePicker(
                 "Dark theme",
@@ -165,7 +167,8 @@ struct SettingsPane: View {
                   get: { model.selectedDarkThemeID },
                   set: { model.setDarkThemeID($0) }
                 ),
-                themes: model.darkThemes
+                themes: model.darkThemes,
+                width: themeColumnWidth
               )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,8 +184,8 @@ struct SettingsPane: View {
             .foregroundStyle(.secondary)
           }
           .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
         }
-        .frame(width: contentWidth, alignment: .leading)
         Spacer()
       }
       .padding(.top, 4)
@@ -194,7 +197,8 @@ struct SettingsPane: View {
   private func themePicker(
     _ title: String,
     selection: Binding<String>,
-    themes: [ThemeDefinition]
+    themes: [ThemeDefinition],
+    width: CGFloat
   ) -> some View {
     HStack(alignment: .center, spacing: 8) {
       Text(title)
@@ -206,7 +210,7 @@ struct SettingsPane: View {
       }
       .labelsHidden()
       .pickerStyle(.menu)
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(width: width, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
