@@ -52,7 +52,7 @@ struct ContentView: View {
       .frame(width: 0, height: 0)
 
       VStack(alignment: .leading, spacing: 0) {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 0) {
           if selectedTab != .settings {
             deviceHeaderSurface
               .zIndex(1)
@@ -85,6 +85,7 @@ struct ContentView: View {
               .tabItem { Label("Settings", systemImage: "gearshape") }
               .tag(AppTab.settings)
           }
+          .padding(.top, selectedTab == .settings ? 0 : 20)
         }
         .simultaneousGesture(
           TapGesture().onEnded {
