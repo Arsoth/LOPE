@@ -10,7 +10,6 @@ struct SettingsPane: View {
   var body: some View {
     GeometryReader { geometry in
       let contentWidth = max(geometry.size.width - 40, 0)
-      let themeColumnWidth = max((contentWidth - 20) / 2, 0)
 
       VStack(alignment: .leading, spacing: 12) {
         Text("Settings")
@@ -158,8 +157,7 @@ struct SettingsPane: View {
                   get: { model.selectedLightThemeID },
                   set: { model.setLightThemeID($0) }
                 ),
-                themes: model.lightThemes,
-                width: themeColumnWidth
+                themes: model.lightThemes
               )
               themePicker(
                 "Dark theme",
@@ -167,8 +165,7 @@ struct SettingsPane: View {
                   get: { model.selectedDarkThemeID },
                   set: { model.setDarkThemeID($0) }
                 ),
-                themes: model.darkThemes,
-                width: themeColumnWidth
+                themes: model.darkThemes
               )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -197,12 +194,12 @@ struct SettingsPane: View {
   private func themePicker(
     _ title: String,
     selection: Binding<String>,
-    themes: [ThemeDefinition],
-    width: CGFloat
+    themes: [ThemeDefinition]
   ) -> some View {
     HStack(alignment: .center, spacing: 8) {
       Text(title)
         .font(.callout.weight(.medium))
+        .fixedSize()
       Picker("", selection: selection) {
         ForEach(themes) { theme in
           Text(theme.name).tag(theme.id)
@@ -210,7 +207,7 @@ struct SettingsPane: View {
       }
       .labelsHidden()
       .pickerStyle(.menu)
-      .frame(width: width, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }
