@@ -606,6 +606,9 @@ int test_hid_discovery(void) {
     discover_direct_interface.is_mouse = true;
     receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
     discover_direct_interface.is_mouse = false;
+    discover_direct_interface.has_mouse_collection = true;
+    receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
+    discover_direct_interface.has_mouse_collection = false;
     keyboard_device.feature_count = 1;
     keyboard_device.features[0] = (Feature){FEATURE_ONBOARD_PROFILES, 1, 1};
     receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
@@ -626,6 +629,13 @@ int test_hid_discovery(void) {
     keyboard_device.features[0] = (Feature){FEATURE_ADJUSTABLE_DPI, 2, 1};
     keyboard_device.feature_count = 1;
     receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
+    keyboard_device.feature_count = 0;
+    discover_direct_interface.product_id = 0xB034;
+    receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
+    discover_direct_interface.product_id = 0xC24A;
+    receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
+    discover_direct_interface.product_id = 0x0001;
+    receiver_ok = receiver_ok && !is_mouse_device(&keyboard_device);
 
     HidInterface endpoint_text_interface = {0};
     Device endpoint_text_device = {.iface = &endpoint_text_interface, .device_number = 0xFF};
@@ -920,6 +930,14 @@ int test_hid_discovery(void) {
                                                           .reply_count = 2};
     g_channel_request_test_context = &name_chunk_empty_context;
     name_ok = name_ok && !hid_discovery_device_name_for_test(&name_device);
+    Reply name_trailing_newline_replies[] = {
+        {.status = REPLY_OK, .length = 1, .bytes = {3}},
+        {.status = REPLY_OK, .length = 3, .bytes = {'A', 'B', '\n'}}};
+    ChannelRequestTestContext name_trailing_newline_context = {
+        .replies = name_trailing_newline_replies, .reply_count = 2};
+    g_channel_request_test_context = &name_trailing_newline_context;
+    name_ok = name_ok && hid_discovery_device_name_for_test(&name_device) &&
+              strcmp(name_device.name, "AB") == 0;
 
     Device feature_device = {.iface = &name_interface, .request_device_number = 0xFF};
     Reply feature_replies[] = {
@@ -1019,6 +1037,14 @@ int test_hid_discovery(void) {
     receiver_name_ok = receiver_name_ok &&
                        hid_discovery_receiver_device_name_for_test(&receiver_name_device, 1) &&
                        strcmp(receiver_name_device.name, "Nam") == 0;
+
+    Reply short_ok_name_reply = {.status = REPLY_OK, .length = 1, .bytes = {4}};
+    receiver_name_context.replies = &short_ok_name_reply;
+    receiver_name_context.reply_count = 1;
+    receiver_name_context.calls = 0;
+    memset(receiver_name_device.name, 0, sizeof(receiver_name_device.name));
+    receiver_name_ok =
+        receiver_name_ok && !hid_discovery_receiver_device_name_for_test(&receiver_name_device, 1);
 
     HidInterface closed_mouse = {.product_id = 0x4085, .is_vendor = true, .is_mouse = true};
     HidInterface closed_nonmouse = {.product_id = 0x4085, .is_vendor = true};
@@ -1140,6 +1166,22 @@ int test_hid_discovery(void) {
     bool denied_key_ok = discover_device_by_key(&denied_key_context, "50-60-02",
                                                 direct_request_devices, &denied_key_count) &&
                          denied_key_count == 0 && !denied_key_interface.channel_open;
+
+    // A direct wired product (outside the wireless/Bluetooth ranges)
+    // actually needs Input Monitoring, unlike the wireless 0x4085 interface
+    // above, so this is the only way to reach the denied-access return.
+    HidInterface denied_wired_key_interface = {
+        .product_id = 0xC099, .is_vendor = true, .location_id = 0x70, .registry_id = 0x80};
+    snprintf(denied_wired_key_interface.transport, sizeof(denied_wired_key_interface.transport),
+             "USB");
+    HidContext denied_wired_key_context = {.items = &denied_wired_key_interface, .count = 1};
+    hid_check_access_impl = discovery_check_access_denied_double;
+    size_t denied_wired_key_count = 0;
+    denied_key_ok = denied_key_ok &&
+                    discover_device_by_key(&denied_wired_key_context, "70-80-02",
+                                           direct_request_devices, &denied_wired_key_count) &&
+                    denied_wired_key_count == 0 && !denied_wired_key_interface.channel_open;
+    hid_check_access_impl = IOHIDCheckAccess;
 
     HidInterface key_receiver_interface = receiver_interface;
     key_receiver_interface.location_id = 0x30;

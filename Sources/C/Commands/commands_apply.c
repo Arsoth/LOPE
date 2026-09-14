@@ -9,7 +9,6 @@
 #include "report_rate.h"
 
 #include <ctype.h>
-#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,9 +32,11 @@ bool parse_batch_raw_record(const char *text, uint8_t spec[4]) {
     for (size_t i = 0; i < 4; i++) {
         char pair[3] = {text[i * 2], text[i * 2 + 1], '\0'};
         char *end = NULL;
-        errno = 0;
+        // pair holds at most 2 hex digits, so strtoul's result can never
+        // overflow unsigned long; no errno check is reachable here.
         unsigned long value = strtoul(pair, &end, 16);
-        if (errno != 0 || end == pair || *end != '\0' || value > 0xFF) {
+        // pair holds at most 2 hex digits, so value can never exceed 0xFF.
+        if (end == pair || *end != '\0') {
             return false;
         }
         spec[i] = (uint8_t)value;
@@ -69,9 +70,10 @@ bool parse_batch_button_change(const char *text, int *button, bool *gshift, uint
     memcpy(number_text, payload, number_length);
     number_text[number_length] = '\0';
     char *end = NULL;
-    errno = 0;
+    // number_text holds at most 15 digit characters (guarded above), so
+    // strtol's result can never overflow long; no errno check is reachable.
     long number = strtol(number_text, &end, 10);
-    if (errno != 0 || end == number_text || *end != '\0' || number < 1 || number > 100000) {
+    if (end == number_text || *end != '\0' || number < 1 || number > 100000) {
         return false;
     }
     if (!parse_batch_raw_record(separator + 1, spec)) {
@@ -97,10 +99,10 @@ bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]) {
     memcpy(number_text, text, number_length);
     number_text[number_length] = '\0';
     char *end = NULL;
-    errno = 0;
+    // number_text holds at most 15 digit characters (guarded above), so
+    // strtol's result can never overflow long; no errno check is reachable.
     long number = strtol(number_text, &end, 10);
-    if (errno != 0 || end == number_text || *end != '\0' || number < 1 ||
-        number > RGB_PROFILE_RECORD_COUNT) {
+    if (end == number_text || *end != '\0' || number < 1 || number > RGB_PROFILE_RECORD_COUNT) {
         return false;
     }
     const char *hex = separator + 1;
@@ -110,9 +112,11 @@ bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]) {
     for (size_t i = 0; i < 3; i++) {
         char pair[3] = {hex[i * 2], hex[i * 2 + 1], '\0'};
         char *byte_end = NULL;
-        errno = 0;
+        // pair holds at most 2 hex digits, so strtoul's result can never
+        // overflow unsigned long; no errno check is reachable here.
         unsigned long byte_value = strtoul(pair, &byte_end, 16);
-        if (errno != 0 || byte_end == pair || *byte_end != '\0' || byte_value > 0xFF) {
+        // pair holds at most 2 hex digits, so byte_value can never exceed 0xFF.
+        if (byte_end == pair || *byte_end != '\0') {
             return false;
         }
         color[i] = (uint8_t)byte_value;
@@ -137,9 +141,10 @@ bool parse_batch_profile_state(const char *text, int *profile, bool *enabled) {
     memcpy(number_text, text, number_length);
     number_text[number_length] = '\0';
     char *end = NULL;
-    errno = 0;
+    // number_text holds at most 15 digit characters (guarded above), so
+    // strtol's result can never overflow long; no errno check is reachable.
     long number = strtol(number_text, &end, 10);
-    if (errno != 0 || end == number_text || *end != '\0' || number < 1 || number > MAX_HEADERS) {
+    if (end == number_text || *end != '\0' || number < 1 || number > MAX_HEADERS) {
         return false;
     }
     if (strcmp(separator + 1, "enable") == 0) {
@@ -169,7 +174,10 @@ bool batch_operation_id_is_safe(const char *operation_id) {
 bool make_batch_backup_path(const char *directory, const char *operation_id, char path[512]) {
     const char *base = directory == NULL || *directory == '\0' ? "." : directory;
     int length = snprintf(path, 512, "%s/%s.logiob", base, operation_id);
-    return length > 0 && length < 512;
+    // base and operation_id are always non-empty by the time this is called
+    // (batch_operation_id_is_safe requires a non-empty operation_id), so the
+    // formatted path is always non-empty and length can never be <= 0.
+    return length < 512;
 }
 
 bool batch_sector_changed(const uint8_t *before, const uint8_t *after, size_t length) {

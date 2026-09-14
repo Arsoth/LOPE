@@ -120,6 +120,7 @@ int test_commands_apply(void) {
                                    &profile_state_enabled) &&
         !parse_batch_profile_state("-1:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("ZZ:enable", &profile_state_number, &profile_state_enabled) &&
+        !parse_batch_profile_state("5x:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("0:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("99:enable", &profile_state_number, &profile_state_enabled) &&
         !parse_batch_profile_state("abc:enable", &profile_state_number, &profile_state_enabled);
@@ -209,10 +210,13 @@ int test_commands_apply(void) {
         parsed_rgb_color[2] == 0xC3 &&
         !parse_batch_rgb_change("3:GG0000", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("1:ZZ0000", &parsed_rgb_zone, parsed_rgb_color) &&
+        !parse_batch_rgb_change("1:1G0000", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change(NULL, &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change(":AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("1:", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("12345678901234567:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
+        !parse_batch_rgb_change("999:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
+        !parse_batch_rgb_change("5x:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("0:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("-1:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
         !parse_batch_rgb_change("abc:AABBCC", &parsed_rgb_zone, parsed_rgb_color) &&
@@ -253,6 +257,8 @@ int test_commands_apply(void) {
         !parse_batch_button_change("normal:200000:80010004", &parsed_button, &parsed_gshift,
                                    parsed_button_spec) &&
         !parse_batch_button_change("normal:abc:80010004", &parsed_button, &parsed_gshift,
+                                   parsed_button_spec) &&
+        !parse_batch_button_change("normal:5x:80010004", &parsed_button, &parsed_gshift,
                                    parsed_button_spec) &&
         !parse_batch_button_change("normal:ZZ:80010004", &parsed_button, &parsed_gshift,
                                    parsed_button_spec) &&
