@@ -8,6 +8,65 @@ import XCTest
 
 @MainActor
 final class AppModelRefreshTests: XCTestCase {
+  func testInputMonitoringSettingsRetriesDeniedRequestAndAlwaysOpensPane() {
+    let model = AppModel(startInitialRefresh: false)
+    model.inputMonitoringAuthorized = false
+    model.inputMonitoringRequestInProgress = true
+    model.busy = true
+    model.loadingProfile = true
+    let refreshTask = Task<Void, Never> {}
+    let devicePollTask = Task<Void, Never> {}
+    let dpiPollTask = Task<Void, Never> {}
+    model.refreshTask = refreshTask
+    model.knownDevicePollTask = devicePollTask
+    model.liveDPIPollTask = dpiPollTask
+    var events: [String] = []
+
+    for _ in 0..<2 {
+      model.openInputMonitoringSettings(
+        requestAccess: {
+          XCTAssertTrue(model.inputMonitoringRequestInProgress)
+          events.append("request")
+        },
+        openSettings: {
+          XCTAssertFalse(model.inputMonitoringRequestInProgress)
+          events.append("open")
+        })
+    }
+
+    XCTAssertEqual(events, ["request", "open", "request", "open"])
+    XCTAssertTrue(refreshTask.isCancelled)
+    XCTAssertTrue(devicePollTask.isCancelled)
+    XCTAssertTrue(dpiPollTask.isCancelled)
+    XCTAssertNil(model.refreshTask)
+    XCTAssertNil(model.knownDevicePollTask)
+    XCTAssertNil(model.liveDPIPollTask)
+    XCTAssertFalse(model.busy)
+    XCTAssertFalse(model.loadingProfile)
+    XCTAssertFalse(model.inputMonitoringRequestInProgress)
+  }
+
+  func testInputMonitoringSettingsOpensPaneWhenRequestGrantsAccess() {
+    let model = AppModel(startInitialRefresh: false)
+    model.inputMonitoringAuthorized = false
+    var opened = false
+    model.openInputMonitoringSettings(
+      requestAccess: { model.inputMonitoringAuthorized = true },
+      openSettings: { opened = true })
+    XCTAssertTrue(opened)
+    XCTAssertFalse(model.inputMonitoringRequestInProgress)
+  }
+
+  func testInputMonitoringSettingsAlreadyAuthorizedOnlyOpensPane() {
+    let model = AppModel(startInitialRefresh: false)
+    model.inputMonitoringAuthorized = true
+    var opened = false
+    model.openInputMonitoringSettings(
+      requestAccess: { XCTFail("Already authorized") },
+      openSettings: { opened = true })
+    XCTAssertTrue(opened)
+  }
+
   func testSleepingDeviceTransitionKeepsUnderlyingProfileSurface() {
     let sleepingModel = AppModel(startInitialRefresh: false)
     sleepingModel.devices = [

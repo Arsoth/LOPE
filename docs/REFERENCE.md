@@ -75,10 +75,22 @@ reports that a wired HID interface needs Input Monitoring, the picker keeps the
 real wired mouse visible. Selecting it explains the permission and opens the
 matching System Settings page. The explicit permission action calls
 `IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)`, which registers LOPE with
-the Input Monitoring privacy pane before the user enables it. LOPE waits for
-that registration to settle before opening the pane, so the app appears as a
-disabled row instead of requiring manual addition. Wireless and receiver
-devices stay usable without this permission.
+the Input Monitoring privacy pane before the user enables it. Both buttons
+request access from the GUI process and then open the pane, including on
+repeated clicks after denial. They do not wait for the CLI or open extra HID
+interfaces to trigger registration. macOS owns the permission prompt and list;
+a successful settings URL launch alone does not verify registration. Wireless
+and receiver devices stay usable without this permission.
+
+For development testing, removing the Input Monitoring row does not clear
+an old Accessibility permission tied to a different signing certificate.
+TCC can reject that stale code requirement while evaluating Input Monitoring
+through Accessibility. A clean test after changing the signing certificate
+requires quitting LOPE, resetting **only LOPE's** `Accessibility` and
+`ListenEvent` records with `tccutil reset <service> com.cotyledonlabs.lope`,
+and relaunching the signed app. This is a development diagnostic, not an
+operation the app performs or a normal setup requirement. Keep the signing
+certificate stable between builds.
 
 Keyboard recording uses an app-local event monitor while LOPE is active, so it
 does not request Input Monitoring. It does not capture keys from other apps.

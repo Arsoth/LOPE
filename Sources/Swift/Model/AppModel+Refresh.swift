@@ -18,6 +18,28 @@ enum AppModelRefreshConfiguration {
 
 @MainActor
 extension AppModel {
+  /// Both permission buttons share this sequence. Keep the OS calls injected
+  /// so denial, retries, and opening Settings can be verified without changing
+  /// the test runner's real privacy permissions.
+  func openInputMonitoringSettings(requestAccess: () -> Void, openSettings: () -> Void) {
+    if !inputMonitoringAuthorized {
+      inputMonitoringRequestInProgress = true
+      defer { inputMonitoringRequestInProgress = false }
+      refreshGeneration += 1
+      refreshTask?.cancel()
+      refreshTask = nil
+      knownDevicePollTask?.cancel()
+      knownDevicePollTask = nil
+      stopLiveDPIPolling()
+      busy = false
+      loadingProfile = false
+      requestAccess()
+    }
+    // A settings button must still open the pane when access is already
+    // granted, just became granted, or a previous request was denied.
+    openSettings()
+  }
+
   func refresh() {
     inputMonitoringRequestInProgress = false
     let expectedDevice = knownDisconnectedDevice
