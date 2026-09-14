@@ -74,7 +74,7 @@ struct StatusArea: View {
       .frame(
         maxWidth: .infinity,
         minHeight: showsHistoryHeader ? historyHeaderHeight : nil,
-        alignment: .center
+        alignment: .leading
       )
     }
     .padding(.bottom, showsHistoryHeader ? 0 : 20)
