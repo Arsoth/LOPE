@@ -121,7 +121,7 @@ int test_watch_cli(void) {
         parse_decimal("42", &decimal_value) && decimal_value == 42 &&
         !parse_decimal(NULL, &decimal_value) && !parse_decimal("", &decimal_value) &&
         !parse_decimal("-1", &decimal_value) && !parse_decimal("100001", &decimal_value) &&
-        !parse_decimal("12x", &decimal_value) &&
+        !parse_decimal("12x", &decimal_value) && !parse_decimal("abc", &decimal_value) &&
         !parse_decimal("999999999999999999999999999999", &decimal_value) &&
         parse_slot("ff", &slot_value) && slot_value == 0xFF && parse_slot("FF", &slot_value) &&
         slot_value == 0xFF && parse_slot("0xff", &slot_value) && slot_value == 0xFF &&

@@ -17,8 +17,10 @@ int run_set_profile_state(const Options *options) {
     char *end = NULL;
     errno = 0;
     long requested_profile = strtol(options->positionals[0], &end, 10);
-    if (errno != 0 || end == options->positionals[0] || *end != '\0' || requested_profile < 1 ||
-        requested_profile > MAX_HEADERS) {
+    // On Darwin, strtol also sets errno to EINVAL when no digits are
+    // consumed, not just on overflow, so a separate end == text check is
+    // redundant here.
+    if (errno != 0 || *end != '\0' || requested_profile < 1 || requested_profile > MAX_HEADERS) {
         fprintf(stderr, "invalid profile number '%s'\n", options->positionals[0]);
         return 1;
     }

@@ -104,9 +104,12 @@ int test_commands_backup_bind(void) {
         parse_hex_byte("2B", &hex_byte_value) && hex_byte_value == 0x2B &&
         !parse_hex_byte("2G", &hex_byte_value) && !parse_hex_byte("", &hex_byte_value) &&
         !parse_hex_byte(NULL, &hex_byte_value) && !parse_hex_byte("100", &hex_byte_value) &&
+        !parse_hex_byte("GG", &hex_byte_value) &&
+        !parse_hex_byte("FFFFFFFFFFFFFFFFFFFF", &hex_byte_value) &&
         parse_hex_word("00E9", &hex_word_value) && hex_word_value == 0x00E9 &&
         !parse_hex_word("ZZZZ", &hex_word_value) && !parse_hex_word("", &hex_word_value) &&
-        !parse_hex_word(NULL, &hex_word_value) && !parse_hex_word("10000", &hex_word_value);
+        !parse_hex_word(NULL, &hex_word_value) && !parse_hex_word("10000", &hex_word_value) &&
+        !parse_hex_word("FFFFFFFFFFFFFFFFFFFF", &hex_word_value);
     if (!hex_parser_ok) {
         fprintf(stderr, "parse_hex_byte/parse_hex_word self-test failed\n");
         return 1;

@@ -103,10 +103,17 @@ int test_engine_boundary(void) {
         fprintf(stderr, "engine boundary error-clear self-test failed\n");
         return 1;
     }
+    engine_boundary_error_clear(NULL);
     engine_boundary_error_set(&error, ENGINE_BOUNDARY_ERROR_OPERATION, "bad \\\"request");
     if (error.code != ENGINE_BOUNDARY_ERROR_OPERATION ||
         strcmp(error.message, "bad \\\"request") != 0) {
         fprintf(stderr, "engine boundary error-set self-test failed\n");
+        return 1;
+    }
+    engine_boundary_error_set(NULL, ENGINE_BOUNDARY_ERROR_OPERATION, "ignored");
+    engine_boundary_error_set(&error, ENGINE_BOUNDARY_ERROR_OPERATION, NULL);
+    if (error.message[0] != '\0') {
+        fprintf(stderr, "engine boundary error-set null-message self-test failed\n");
         return 1;
     }
     for (int code = ENGINE_BOUNDARY_ERROR_NONE; code <= ENGINE_BOUNDARY_ERROR_OPERATION; code++) {
@@ -208,7 +215,8 @@ int test_engine_boundary(void) {
         boundary_profile.dpi_stages[0] != 800 || boundary_profile.dpi_default_stage != 3 ||
         boundary_profile.rgb_zone_count != 2 || boundary_profile.rgb_zones[1].color[0] != 0x40 ||
         engine_boundary_profile_from_profile(NULL, &boundary_profile, &error) ||
-        engine_boundary_profile_from_profile(&profile, NULL, &error)) {
+        engine_boundary_profile_from_profile(&profile, NULL, &error) ||
+        engine_boundary_profile_from_profile(NULL, NULL, NULL)) {
         fprintf(stderr, "engine boundary profile projection self-test failed\n");
         return 1;
     }

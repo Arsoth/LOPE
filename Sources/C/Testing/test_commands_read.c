@@ -75,6 +75,8 @@ int test_commands_read(void) {
         !parse_dpi_values("99,1600", parsed_dpi, &parsed_dpi_count) &&
         !parse_dpi_values("800,65536", parsed_dpi, &parsed_dpi_count) &&
         !parse_dpi_values("800x", parsed_dpi, &parsed_dpi_count) &&
+        !parse_dpi_values("abc,1600", parsed_dpi, &parsed_dpi_count) &&
+        !parse_dpi_values("999999999999999999999999999999,1600", parsed_dpi, &parsed_dpi_count) &&
         parse_dpi_values("800 ,1600", parsed_dpi, &parsed_dpi_count);
     if (!dpi_parser_ok) {
         fprintf(stderr, "DPI parser self-test failed\n");
