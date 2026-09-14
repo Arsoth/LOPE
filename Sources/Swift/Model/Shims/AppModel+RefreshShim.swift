@@ -3,6 +3,7 @@
 
 import AppKit
 import Foundation
+import IOKit.hid
 import IOKit.hidsystem
 
 // See the note in AppModel+JSONEditableBackupsShim.swift: everything under
@@ -38,6 +39,7 @@ extension AppModel {
     Task { @MainActor [weak self] in
       await EngineRunner.waitUntilIdle()
       guard let self, !Task.isCancelled else { return }
+      _ = materializeInputMonitoringClient()
       _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
       try? await Task.sleep(nanoseconds: 250_000_000)
       guard !Task.isCancelled else { return }
@@ -50,10 +52,23 @@ extension AppModel {
     }
   }
 
+  /// `IOHIDRequestAccess` is the explicit registration API, but the protected
+  /// HID operation itself is `IOHIDManagerOpen`/`IOHIDDeviceOpen`. Exercise the
+  /// manager path from the GUI once, only after the user clicks this button,
+  /// so TCC materializes LOPE rather than the bundled command-line helper.
+  private func materializeInputMonitoringClient() -> Bool {
+    let options = IOOptionBits(kIOHIDOptionsTypeNone)
+    let manager = IOHIDManagerCreate(kCFAllocatorDefault, options)
+    IOHIDManagerSetDeviceMatching(manager, nil)
+    let result = IOHIDManagerOpen(manager, options)
+    _ = IOHIDManagerClose(manager, options)
+    return result == kIOReturnSuccess
+  }
+
   private func openInputMonitoringSettingsPane() {
     let candidates = [
-      "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
       "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_ListenEvent",
+      "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
     ]
     for value in candidates {
       if let url = URL(string: value), NSWorkspace.shared.open(url) {
