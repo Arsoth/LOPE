@@ -724,6 +724,7 @@ int test_engine_boundary(void) {
     snprintf(duplicate_devices[0].name, sizeof(duplicate_devices[0].name), "Duplicate Mouse");
     duplicate_devices[1].iface = &duplicate_receiver_iface;
     duplicate_devices[1].device_number = 1;
+    duplicate_devices[1].mouse_product_id = 0x4085;
     snprintf(duplicate_devices[1].name, sizeof(duplicate_devices[1].name), "Duplicate Mouse");
     boundary_list_devices = duplicate_devices;
     boundary_list_device_count = 2;

@@ -7,13 +7,17 @@ DPI drag handles. Colors use `#RRGGBB` or `#RRGGBBAA` hex values. The bundled
 
 The app loads bundled themes from this directory and overlays valid JSON
 themes from the selected configuration directory's `Custom Themes` folder.
-A custom theme with the same `id` as a bundled theme replaces it. Files whose
-names begin with `_` are templates and are not loaded as selectable themes.
+The first load creates canonical, hash-validated `light.json` and `dark.json`
+system themes in that custom folder. If either system file is changed, LOPE
+preserves the changed file as `Custom Light (Modified)-<hash>.json` or
+`Custom Dark (Modified)-<hash>.json` and restores the canonical system JSON.
+System theme IDs are reserved and cannot be overridden by custom JSON. The
+preserved copy remains loaded and selectable with a unique catalog ID such as
+`custom-light-modified-<hash>`, a name such as `Custom Light (Modified)`, and
+the modified colors and drag handles.
 
-`Custom Themes/_empty.json` is recreated whenever the custom themes directory
-is checked and the seed file is missing, including after a user renames it.
-Copy it to a filename without the underscore and fill in every required field
-to create a custom theme.
+Copy a system theme or another complete theme to a new filename, give it a new
+ID, and fill in every required field to create a custom theme.
 
 ## Format
 

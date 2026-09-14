@@ -102,7 +102,7 @@ final class ThemeSupportTests: XCTestCase {
       "Theme color header is not a six- or eight-digit hex value: bad.")
   }
 
-  func testThemeCatalogLoadsCustomThemesAndOverlaysBundledID() throws {
+  func testThemeCatalogPreservesModifiedSystemThemeAndLoadsCustomThemes() throws {
     let customDirectory = makeTemporaryDirectory().appendingPathComponent(
       "Custom Themes", isDirectory: true)
     let bundledDirectory = makeTemporaryDirectory().appendingPathComponent(
@@ -121,9 +121,20 @@ final class ThemeSupportTests: XCTestCase {
       customThemesDirectory: customDirectory, builtInThemesDirectory: bundledDirectory)
 
     XCTAssertEqual(catalog.builtInThemeCount, 1)
-    XCTAssertEqual(catalog.customThemeCount, 2)
-    XCTAssertEqual(catalog.themes.map(\.id), ["custom-dark", "light"])
-    XCTAssertEqual(catalog.themes.first(where: { $0.id == "light" })?.name, "Custom Light")
+    XCTAssertEqual(catalog.customThemeCount, 3)
+    XCTAssertTrue(catalog.themes.contains(where: { $0.id == "custom-dark" }))
+    XCTAssertTrue(catalog.themes.contains(where: { $0.id == "light" }))
+    XCTAssertEqual(catalog.themes.first(where: { $0.id == "light" })?.name, "Bundled Light")
+    let preserved = try FileManager.default.contentsOfDirectory(
+      at: customDirectory, includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.hasPrefix("Custom Light (Modified)-") }
+    XCTAssertEqual(preserved.count, 1)
+    XCTAssertTrue(preserved.allSatisfy { !$0.lastPathComponent.hasPrefix("_") })
+    XCTAssertEqual(try Data(contentsOf: preserved[0]), customOverride)
+    let modifiedTheme = catalog.themes.first(
+      where: { $0.id.hasPrefix("custom-light-modified-") })
+    XCTAssertNotNil(modifiedTheme)
+    XCTAssertEqual(modifiedTheme?.name, "Custom Custom Light (Modified)")
   }
 
   func testInvalidCustomThemesAreIgnoredAndUnderscoreFilesAreNotLoaded() throws {
@@ -145,43 +156,87 @@ final class ThemeSupportTests: XCTestCase {
     XCTAssertTrue(catalog.themes.isEmpty)
   }
 
-  func testCustomThemesDirectoryIsSeededAndSeedIsExcludedFromLoading() throws {
+  func testCustomThemesDirectoryIsSeededWithSystemThemes() throws {
     let configurationDirectory = makeTemporaryDirectory()
     let customDirectory = ThemeStorage.customThemesDirectory(in: configurationDirectory)
 
     let bundledDirectory = makeTemporaryDirectory()
     try FileManager.default.createDirectory(at: bundledDirectory, withIntermediateDirectories: true)
+    try themeJSON(id: "light", name: "Light", appearance: "light").write(
+      to: bundledDirectory.appendingPathComponent("light.json"))
+    try themeJSON(id: "dark", name: "Dark", appearance: "dark").write(
+      to: bundledDirectory.appendingPathComponent("dark.json"))
     let catalog = ThemeCatalog(
       customThemesDirectory: customDirectory, builtInThemesDirectory: bundledDirectory)
 
     XCTAssertTrue(FileManager.default.fileExists(atPath: customDirectory.path))
     XCTAssertTrue(
-      FileManager.default.fileExists(atPath: ThemeStorage.emptyThemeURL(in: customDirectory).path))
-    XCTAssertEqual(catalog.customThemeCount, 0)
-    XCTAssertTrue(catalog.themes.isEmpty)
+      FileManager.default.fileExists(
+        atPath: ThemeStorage.systemThemeURL(id: "light", in: customDirectory).path))
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: ThemeStorage.systemThemeURL(id: "dark", in: customDirectory).path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: customDirectory.appendingPathComponent("_empty.json").path))
+    XCTAssertEqual(catalog.customThemeCount, 2)
+    XCTAssertEqual(catalog.themes.map(\.id), ["dark", "light"])
   }
 
-  func testMissingOrRenamedSeedThemeIsRecreatedOnNextLoad() throws {
+  func testMissingOrModifiedSystemThemeIsRecreatedAndPreservedOnNextLoad() throws {
     let configurationDirectory = makeTemporaryDirectory()
     let customDirectory = ThemeStorage.customThemesDirectory(in: configurationDirectory)
     let bundledDirectory = makeTemporaryDirectory()
     try FileManager.default.createDirectory(at: bundledDirectory, withIntermediateDirectories: true)
+    let bundledLight = try themeJSON(id: "light", name: "Light", appearance: "light")
+    try bundledLight.write(to: bundledDirectory.appendingPathComponent("light.json"))
+    try themeJSON(id: "dark", name: "Dark", appearance: "dark").write(
+      to: bundledDirectory.appendingPathComponent("dark.json"))
     _ = ThemeCatalog(
       customThemesDirectory: customDirectory, builtInThemesDirectory: bundledDirectory)
-    let emptyThemeURL = ThemeStorage.emptyThemeURL(in: customDirectory)
+    let lightURL = ThemeStorage.systemThemeURL(id: "light", in: customDirectory)
 
-    try FileManager.default.removeItem(at: emptyThemeURL)
-    XCTAssertFalse(FileManager.default.fileExists(atPath: emptyThemeURL.path))
+    try FileManager.default.removeItem(at: lightURL)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: lightURL.path))
     _ = ThemeCatalog(
       customThemesDirectory: customDirectory, builtInThemesDirectory: bundledDirectory)
-    XCTAssertTrue(FileManager.default.fileExists(atPath: emptyThemeURL.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: lightURL.path))
 
-    let renamedURL = customDirectory.appendingPathComponent("renamed-empty.json")
-    try FileManager.default.moveItem(at: emptyThemeURL, to: renamedURL)
+    var modified = try themeJSON(id: "light", name: "Modified Light", appearance: "light")
+    modified = Data(
+      String(decoding: modified, as: UTF8.self)
+        .replacingOccurrences(of: "#111111", with: "#010203")
+        .utf8)
+    try modified.write(to: lightURL)
+    let catalog = ThemeCatalog(
+      customThemesDirectory: customDirectory, builtInThemesDirectory: bundledDirectory)
+    XCTAssertEqual(catalog.themes.first(where: { $0.id == "light" })?.name, "Light")
+    let modifiedTheme = catalog.themes.first(
+      where: { $0.id.hasPrefix("custom-light-modified-") })
+    XCTAssertNotNil(modifiedTheme)
+    XCTAssertEqual(modifiedTheme?.name, "Custom Modified Light (Modified)")
+    XCTAssertEqual(modifiedTheme?.colors.header, "#010203")
+    XCTAssertEqual(modifiedTheme?.colors.mainBackground, "#888888")
+    XCTAssertEqual(
+      try Data(contentsOf: lightURL),
+      try ThemeStorage.canonicalThemeData(
+        JSONDecoder().decode(ThemeDefinition.self, from: bundledLight)))
+    let preserved = try FileManager.default.contentsOfDirectory(
+      at: customDirectory, includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.hasPrefix("Custom Light (Modified)-") }
+    XCTAssertEqual(preserved.count, 1)
+    XCTAssertTrue(preserved.allSatisfy { !$0.lastPathComponent.hasPrefix("_") })
+    XCTAssertEqual(try Data(contentsOf: preserved[0]), modified)
+
+    try Data("not json".utf8).write(to: lightURL)
     _ = ThemeCatalog(
       customThemesDirectory: customDirectory, builtInThemesDirectory: bundledDirectory)
-    XCTAssertTrue(FileManager.default.fileExists(atPath: emptyThemeURL.path))
-    XCTAssertTrue(FileManager.default.fileExists(atPath: renamedURL.path))
+    let preservedAfterInvalidEdit = try FileManager.default.contentsOfDirectory(
+      at: customDirectory, includingPropertiesForKeys: nil
+    ).filter { $0.lastPathComponent.hasPrefix("Custom Light (Modified)-") }
+    XCTAssertEqual(preservedAfterInvalidEdit.count, 2)
+    XCTAssertTrue(
+      preservedAfterInvalidEdit.contains { (try? Data(contentsOf: $0)) == Data("not json".utf8) })
   }
 
   func testThemeStorageReportsFailureWhenDirectoryPathIsAFile() throws {

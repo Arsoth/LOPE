@@ -133,7 +133,8 @@ extension AppModel {
       let remainingDevices = self.devices.filter {
         !$0.isWiredAccessPrompt && !$0.matchesReconnectIdentity(device)
       }
-      self.devices = remainingDevices + (prompt.map { [$0] } ?? [])
+      self.publishDevices(
+        remainingDevices + (prompt.map { [$0] } ?? []), preservingSuppressedWired: true)
       if remainingDevices.isEmpty {
         self.selectedDeviceIndex = 0
         self.currentDeviceName = ""
@@ -197,7 +198,7 @@ extension AppModel {
       let resolvedDevices = enumeration.devices.map {
         $0.deviceKey == resolvedSelected.deviceKey ? resolvedSelected : $0
       }
-      self.devices = resolvedDevices
+      self.publishDevices(resolvedDevices)
       self.selectedDeviceIndex = selected.id
       self.currentDeviceName = resolvedSelected.name
       self.deviceSummary = "\(resolvedSelected.title) — waiting for the mouse"
@@ -266,10 +267,10 @@ extension AppModel {
     // is being polled.
     status = knownDeviceRefreshStatus(for: device, expired: false)
     if availableDevices.isEmpty {
-      devices = [device]
-      selectedDeviceIndex = device.id
+      publishDevices([])
+      selectedDeviceIndex = 0
     } else {
-      devices = availableDevices
+      publishDevices(availableDevices)
       // Keep other detected mice selectable while the known target is
       // being watched. Zero is deliberately not a device ID: the
       // engine's list is one-based, so the picker has no stale target.

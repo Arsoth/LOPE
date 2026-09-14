@@ -84,6 +84,28 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     XCTAssertFalse(model.wiredAccessInstructionsPresented)
   }
 
+  func testApplyRefreshSnapshotHidesUnauthorizedWiredDeviceUntilPopupDismisses() {
+    let model = AppModel(startInitialRefresh: false)
+    let wired = DeviceChoice(
+      id: 1, name: "Wired Mouse", connection: "Wired", productID: "0xCCCC", deviceKey: "cccc")
+    let wireless = DeviceChoice(
+      id: 2, name: "Wireless Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa")
+
+    model.applyRefreshSnapshot(
+      makeSnapshot(
+        devices: [wired, wireless, .wiredAccessPrompt], selectedDeviceIndex: wireless.id,
+        accessWarning: true))
+
+    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertFalse(model.devices.contains(where: { $0.deviceKey == wired.deviceKey }))
+    XCTAssertEqual(model.devices, [wireless, .wiredAccessPrompt])
+
+    model.wiredAccessInstructionsPresented = false
+
+    XCTAssertEqual(model.devices, [wireless, wired, .wiredAccessPrompt])
+  }
+
   // MARK: - Selected device, no profile text
 
   func testApplyRefreshSnapshotDoesNotWakePollAWiredDevice() {

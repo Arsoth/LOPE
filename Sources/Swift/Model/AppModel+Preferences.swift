@@ -27,7 +27,7 @@ extension AppModel {
     case .dark:
       return .dark
     case .system:
-      let appearance = NSApp.windows.first?.effectiveAppearance ?? NSApp.effectiveAppearance
+      let appearance = NSApp.effectiveAppearance
       return appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light
     }
   }
@@ -54,12 +54,14 @@ extension AppModel {
   }
 
   func setLightThemeID(_ id: String) {
+    reloadThemes()
     guard themes.contains(where: { $0.id == id && $0.appearance == .light }) else { return }
     selectedLightThemeID = id
     UserDefaults.standard.set(id, forKey: AppModelPreferenceKeys.lightThemeID)
   }
 
   func setDarkThemeID(_ id: String) {
+    reloadThemes()
     guard themes.contains(where: { $0.id == id && $0.appearance == .dark }) else { return }
     selectedDarkThemeID = id
     UserDefaults.standard.set(id, forKey: AppModelPreferenceKeys.darkThemeID)
@@ -103,13 +105,31 @@ extension AppModel {
   }
 
   var filteredExtendedKeyboardKeyGroups: [KeyboardKeyGroupChoice] {
-    extendedKeyboardKeyGroups.filter { enabledKeyboardKeyGroups.contains($0.group) }
+    filteredExtendedKeyboardKeyGroups(including: nil)
+  }
+
+  func filteredExtendedKeyboardKeyGroups(including selectedKey: UInt8?)
+    -> [KeyboardKeyGroupChoice]
+  {
+    extendedKeyboardKeyGroups.compactMap { group in
+      let keys = group.keys.filter {
+        enabledKeyboardKeyGroups.contains(group.group) || $0.id == selectedKey
+      }
+      guard !keys.isEmpty else { return nil }
+      return KeyboardKeyGroupChoice(group: group.group, keys: keys)
+    }
   }
 
   var filteredExtendedKeyboardKeyLayoutGroups: [KeyboardKeyLayoutGroupChoice] {
+    filteredExtendedKeyboardKeyLayoutGroups(including: nil)
+  }
+
+  func filteredExtendedKeyboardKeyLayoutGroups(including selectedKey: UInt8?)
+    -> [KeyboardKeyLayoutGroupChoice]
+  {
     extendedKeyboardKeyLayoutGroups.compactMap { group in
       let keys = group.keys.filter {
-        enabledKeyboardKeyGroups.contains(keyboardKeyGroup(for: $0))
+        enabledKeyboardKeyGroups.contains(keyboardKeyGroup(for: $0)) || $0.id == selectedKey
       }
       guard !keys.isEmpty else { return nil }
       return KeyboardKeyLayoutGroupChoice(group: group.group, keys: keys)

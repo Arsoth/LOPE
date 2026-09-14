@@ -35,6 +35,7 @@ struct SettingsPane: View {
         }
         .padding(4)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       GroupBox("Mouse profiles") {
         VStack(alignment: .leading, spacing: 8) {
           Text(
@@ -52,17 +53,7 @@ struct SettingsPane: View {
         }
         .padding(4)
       }
-      GroupBox("Themes") {
-        VStack(alignment: .leading, spacing: 8) {
-          Text(
-            "Light and dark themes are loaded from the bundled themes and Custom Themes folders."
-          )
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          Button("Open custom themes folder", action: model.openCustomThemesDirectoryInFinder)
-        }
-        .padding(4)
-      }
+      .frame(maxWidth: .infinity, alignment: .leading)
       GroupBox("Advanced display") {
         VStack(alignment: .leading, spacing: 6) {
           Toggle(
@@ -81,6 +72,7 @@ struct SettingsPane: View {
         }
         .padding(4)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       GroupBox("Keyboard outputs") {
         VStack(alignment: .leading, spacing: 6) {
           Toggle(
@@ -99,70 +91,112 @@ struct SettingsPane: View {
           VStack(alignment: .leading, spacing: 4) {
             Text("Key categories")
               .font(.callout.weight(.medium))
-            ForEach(KeyboardKeyGroup.allCases, id: \.self) { group in
-              Toggle(
-                group.rawValue,
-                isOn: Binding(
-                  get: { model.isKeyboardKeyGroupEnabled(group) },
-                  set: { model.setKeyboardKeyGroup(group, enabled: $0) }
-                )
-              )
-              .toggleStyle(.checkbox)
-              .controlSize(.small)
-              .tint(theme.checkboxActive)
+            LazyVGrid(
+              columns: [
+                GridItem(.flexible(), alignment: .leading),
+                GridItem(.flexible(), alignment: .leading),
+              ],
+              alignment: .leading,
+              spacing: 4
+            ) {
+              ForEach(KeyboardKeyGroup.allCases, id: \.self) { group in
+                Toggle(
+                  isOn: Binding(
+                    get: { model.isKeyboardKeyGroupEnabled(group) },
+                    set: { model.setKeyboardKeyGroup(group, enabled: $0) }
+                  )
+                ) {
+                  Text(group.rawValue)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .tint(theme.checkboxActive)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              }
             }
           }
           .padding(.top, 2)
         }
         .padding(4)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       GroupBox("Appearance") {
         VStack(alignment: .leading, spacing: 6) {
-          Picker(
-            "Color mode",
-            selection: Binding(
-              get: { model.appearancePreference },
-              set: { model.setAppearancePreference($0) }
-            )
-          ) {
-            ForEach(AppearancePreference.allCases, id: \.self) { preference in
-              Text(preference.label).tag(preference)
+          HStack(alignment: .center, spacing: 12) {
+            Picker(
+              "Color mode",
+              selection: Binding(
+                get: { model.appearancePreference },
+                set: { model.setAppearancePreference($0) }
+              )
+            ) {
+              ForEach(AppearancePreference.allCases, id: \.self) { preference in
+                Text(preference.label).tag(preference)
+              }
             }
+            .pickerStyle(.segmented)
+            Button("Open custom themes folder", action: model.openCustomThemesDirectoryInFinder)
+            Button("Refresh themes", action: model.refreshThemes)
           }
-          .pickerStyle(.segmented)
-          Picker(
-            "Light theme",
-            selection: Binding(
-              get: { model.selectedLightThemeID },
-              set: { model.setLightThemeID($0) }
-            )
+          LazyVGrid(
+            columns: [
+              GridItem(.flexible(minimum: 0), alignment: .leading),
+              GridItem(.flexible(minimum: 0), alignment: .leading),
+            ],
+            alignment: .leading,
+            spacing: 12
           ) {
-            ForEach(model.lightThemes) { theme in
-              Text(theme.name).tag(theme.id)
-            }
-          }
-          Picker(
-            "Dark theme",
-            selection: Binding(
-              get: { model.selectedDarkThemeID },
-              set: { model.setDarkThemeID($0) }
+            themePicker(
+              "Light theme",
+              selection: Binding(
+                get: { model.selectedLightThemeID },
+                set: { model.setLightThemeID($0) }
+              ),
+              themes: model.lightThemes
             )
-          ) {
-            ForEach(model.darkThemes) { theme in
-              Text(theme.name).tag(theme.id)
-            }
+            themePicker(
+              "Dark theme",
+              selection: Binding(
+                get: { model.selectedDarkThemeID },
+                set: { model.setDarkThemeID($0) }
+              ),
+              themes: model.darkThemes
+            )
           }
+          .frame(maxWidth: .infinity, alignment: .leading)
           Text(
             "System follows macOS and selects the matching theme. Light and dark modes use the theme selected below."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          Text(
+            "Light and dark themes are loaded from the bundled themes and Custom Themes folders."
           )
           .font(.caption)
           .foregroundStyle(.secondary)
         }
         .padding(4)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       Spacer()
     }
     .padding(.top, 4)
     .padding(.horizontal, 20)
+    .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func themePicker(
+    _ title: String,
+    selection: Binding<String>,
+    themes: [ThemeDefinition]
+  ) -> some View {
+    Picker(title, selection: selection) {
+      ForEach(themes) { theme in
+        Text(theme.name).tag(theme.id)
+      }
+    }
+    .pickerStyle(.menu)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

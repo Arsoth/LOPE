@@ -16,19 +16,22 @@ extension AppModel {
     }
 
     if let errorMessage = snapshot.errorMessage {
-      devices = []
+      publishDevices([])
       resetEditorState()
       deviceSummary = "Unable to access the Logitech HID++ interface"
       status = errorMessage
       return
     }
 
-    devices = snapshot.devices
-    if snapshot.accessWarning {
-      presentWiredAccessInstructions(for: devices.first(where: { $0.isWiredDevice }))
+    let selectedSnapshotDevice = snapshot.selectedDeviceIndex.flatMap { selectedIndex in
+      snapshot.devices.first(where: { $0.id == selectedIndex })
     }
-    guard let selectedIndex = snapshot.selectedDeviceIndex,
-      let selected = devices.first(where: { $0.id == selectedIndex })
+    let accessWarningDevice = snapshot.devices.first(where: { $0.isWiredDevice })
+    publishDevices(snapshot.devices)
+    if snapshot.accessWarning {
+      presentWiredAccessInstructions(for: accessWarningDevice)
+    }
+    guard let selected = selectedSnapshotDevice
     else {
       selectedDeviceIndex = 0
       currentDeviceName = ""

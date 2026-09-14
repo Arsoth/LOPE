@@ -62,6 +62,50 @@ final class AppModelPreferencesTests: XCTestCase {
     XCTAssertNil(UserDefaults.standard.string(forKey: darkThemeKey))
   }
 
+  func testThemeRefreshAndSelectionReadCurrentJSON() throws {
+    let configurationKey = "\(AppConstants.defaultsPrefix).configurationDirectory"
+    let previousConfiguration = UserDefaults.standard.string(forKey: configurationKey)
+    let model = AppModel(startInitialRefresh: false)
+    let configurationDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "lope-live-theme-test-\(UUID().uuidString)", isDirectory: true)
+    defer {
+      try? FileManager.default.removeItem(at: configurationDirectory)
+      if let previousConfiguration {
+        UserDefaults.standard.set(previousConfiguration, forKey: configurationKey)
+      } else {
+        UserDefaults.standard.removeObject(forKey: configurationKey)
+      }
+      ThemeCatalog.reload(customThemesDirectory: nil)
+    }
+
+    model.setConfigurationDirectory(configurationDirectory)
+    let sourceURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+      .appendingPathComponent("Themes/light.json")
+    var source = try String(contentsOf: sourceURL, encoding: .utf8)
+    source = source.replacingOccurrences(of: "\"id\": \"light\"", with: "\"id\": \"live-light\"")
+    source = source.replacingOccurrences(
+      of: "\"name\": \"Light\"", with: "\"name\": \"Live Light\"")
+    let themeURL = model.customThemesDirectory.appendingPathComponent("live-light.json")
+    try Data(source.utf8).write(to: themeURL)
+
+    model.refreshThemes()
+    XCTAssertEqual(model.themes.first(where: { $0.id == "live-light" })?.name, "Live Light")
+
+    source = source.replacingOccurrences(
+      of: "\"name\": \"Live Light\"", with: "\"name\": \"Updated Live Light\"")
+    try Data(source.utf8).write(to: themeURL)
+    model.refreshThemes()
+    XCTAssertEqual(
+      model.themes.first(where: { $0.id == "live-light" })?.name, "Updated Live Light")
+
+    source = source.replacingOccurrences(
+      of: "\"name\": \"Updated Live Light\"", with: "\"name\": \"Selected Live Light\"")
+    try Data(source.utf8).write(to: themeURL)
+    model.setAppearancePreference(.light)
+    model.setLightThemeID("live-light")
+    XCTAssertEqual(model.activeTheme?.name, "Selected Live Light")
+  }
+
   func testPreferencesLoadFromUserDefaults() {
     UserDefaults.standard.set("light", forKey: lightThemeKey)
     UserDefaults.standard.set("dark", forKey: darkThemeKey)
@@ -106,6 +150,32 @@ final class AppModelPreferencesTests: XCTestCase {
         group.keys.filter { model.keyboardKeyGroup(for: $0) == .function }
       }
     )
+  }
+
+  func testFilteredKeyboardGroupsKeepSelectedKeyFromDisabledCategory() {
+    let model = AppModel(startInitialRefresh: false)
+    model.setKeyboardKeyGroup(.standard, enabled: false)
+    model.setKeyboardKeyGroup(.function, enabled: false)
+    model.setKeyboardKeyGroup(.media, enabled: false)
+    model.setKeyboardKeyGroup(.other, enabled: false)
+
+    let groups = model.filteredExtendedKeyboardKeyGroups(including: 0x68)
+
+    XCTAssertEqual(groups.map(\.group), [.function])
+    XCTAssertEqual(groups[0].keys.map(\.label), ["F13"])
+  }
+
+  func testFilteredKeyboardLayoutGroupsKeepSelectedKeyFromDisabledCategory() {
+    let model = AppModel(startInitialRefresh: false)
+    model.setKeyboardKeyGroup(.standard, enabled: false)
+    model.setKeyboardKeyGroup(.function, enabled: false)
+    model.setKeyboardKeyGroup(.media, enabled: false)
+    model.setKeyboardKeyGroup(.other, enabled: false)
+
+    let groups = model.filteredExtendedKeyboardKeyLayoutGroups(including: 0x49)
+
+    XCTAssertEqual(groups.map(\.group), [.navigation])
+    XCTAssertEqual(groups[0].keys.map(\.label), ["Insert"])
   }
 
   func testDirectExtendedKeySelectionIgnoresCategoryFilters() {

@@ -602,7 +602,10 @@ int test_hid_discovery(void) {
     keyboard_device.features[0] = (Feature){FEATURE_ONBOARD_PROFILES, 1, 1};
     receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
     keyboard_device.feature_count = 0;
+    receiver_ok = receiver_ok && !is_mouse_device(&keyboard_device);
+    discover_direct_interface.product_id = 0x4085;
     receiver_ok = receiver_ok && is_mouse_device(&keyboard_device);
+    discover_direct_interface.product_id = 0xC099;
     snprintf(keyboard_device.name, sizeof(keyboard_device.name), "Mouse");
     snprintf(discover_direct_interface.product, sizeof(discover_direct_interface.product),
              "Keyboard");

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
+import CryptoKit
 import Foundation
 
 enum ThemeColorHex {
@@ -93,6 +94,33 @@ struct ThemeDefinition: Codable, Equatable, Hashable, Sendable, Identifiable {
   let appearance: ThemeAppearance
   let colors: ThemeColors
   let dragHandles: ThemeDragHandles
+
+  init(
+    schemaVersion: Int,
+    id: String,
+    name: String,
+    appearance: ThemeAppearance,
+    colors: ThemeColors,
+    dragHandles: ThemeDragHandles
+  ) {
+    self.schemaVersion = schemaVersion
+    self.id = id
+    self.name = name
+    self.appearance = appearance
+    self.colors = colors
+    self.dragHandles = dragHandles
+  }
+
+  func replacingID(_ id: String, name: String? = nil) -> ThemeDefinition {
+    ThemeDefinition(
+      schemaVersion: schemaVersion,
+      id: id,
+      name: name ?? self.name,
+      appearance: appearance,
+      colors: colors,
+      dragHandles: dragHandles
+    )
+  }
 
   func validate() throws {
     guard schemaVersion == Self.currentSchemaVersion else {
@@ -191,25 +219,48 @@ enum ThemeValidationError: LocalizedError, Equatable {
 
 enum ThemeStorage {
   static let customThemesDirectoryName = "Custom Themes"
-  static let emptyThemeFilename = "_empty.json"
+  static let systemThemeIDs: Set<String> = ["light", "dark"]
 
   static func customThemesDirectory(in configurationDirectory: URL) -> URL {
     configurationDirectory.appendingPathComponent(customThemesDirectoryName, isDirectory: true)
   }
 
-  static func emptyThemeURL(in customThemesDirectory: URL) -> URL {
-    customThemesDirectory.appendingPathComponent(emptyThemeFilename)
+  static func systemThemeURL(id: String, in customThemesDirectory: URL) -> URL {
+    customThemesDirectory.appendingPathComponent("\(id).json")
   }
 
   @discardableResult
   static func ensureCustomThemesDirectory(
-    at directory: URL, fileManager: FileManager = .default
+    at directory: URL,
+    systemThemes: [ThemeDefinition] = [],
+    fileManager: FileManager = .default
   ) -> Bool {
     do {
       try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-      let emptyThemeURL = emptyThemeURL(in: directory)
-      if !fileManager.fileExists(atPath: emptyThemeURL.path) {
-        try Data(emptyThemeJSON.utf8).write(to: emptyThemeURL, options: .atomic)
+
+      for theme in systemThemes where systemThemeIDs.contains(theme.id) {
+        let canonicalData = try canonicalThemeData(theme)
+        let url = systemThemeURL(id: theme.id, in: directory)
+
+        guard fileManager.fileExists(atPath: url.path) else {
+          try canonicalData.write(to: url, options: .atomic)
+          continue
+        }
+
+        let existingData = try? Data(contentsOf: url)
+        if existingData == canonicalData {
+          continue
+        }
+
+        let preservedURL = preservedSystemThemeURL(
+          id: theme.id, originalData: existingData, in: directory, fileManager: fileManager)
+        try fileManager.moveItem(at: url, to: preservedURL)
+        do {
+          try canonicalData.write(to: url, options: .atomic)
+        } catch {
+          try? fileManager.moveItem(at: preservedURL, to: url)
+          throw error
+        }
       }
       return true
     } catch {
@@ -217,47 +268,32 @@ enum ThemeStorage {
     }
   }
 
-  private static let emptyThemeJSON = """
-    {
-      "schemaVersion": 1,
-      "id": "_empty",
-      "name": "",
-      "appearance": "light",
-      "colors": {
-        "header": "",
-        "footer": "",
-        "recentEventsHeader": "",
-        "buttonActive": "",
-        "buttonInactive": "",
-        "checkboxActive": "",
-        "checkboxInactive": "",
-        "mainBackground": "",
-        "primaryText": "",
-        "secondaryText": "",
-        "tertiaryText": "",
-        "card": "",
-        "cardBorder": "",
-        "controlBackground": "",
-        "controlBorder": "",
-        "dpiBar": "",
-        "dpiBackground": "",
-        "accent": "",
-        "success": "",
-        "warning": "",
-        "error": "",
-        "separator": "",
-        "shadow": "",
-        "hover": "",
-        "selected": "",
-        "disabled": ""
-      },
-      "dragHandles": {
-        "defaultStage": { "color": "", "outline": "", "textColor": "", "shape": "circle" },
-        "shiftStage": { "color": "", "outline": "", "textColor": "", "shape": "pentagon" },
-        "otherStage": { "color": "", "outline": "", "textColor": "", "shape": "roundedRectangle" }
-      }
+  static func canonicalThemeData(_ theme: ThemeDefinition) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    return try encoder.encode(theme)
+  }
+
+  static func sha256Hex(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+
+  private static func preservedSystemThemeURL(
+    id: String,
+    originalData: Data?,
+    in directory: URL,
+    fileManager: FileManager
+  ) -> URL {
+    let digest = originalData.map { String(sha256Hex($0).prefix(12)) } ?? "unreadable"
+    let baseName = "Custom \(id.capitalized) (Modified)-\(digest)"
+    var candidate = directory.appendingPathComponent("\(baseName).json")
+    var suffix = 2
+    while fileManager.fileExists(atPath: candidate.path) {
+      candidate = directory.appendingPathComponent("\(baseName)-\(suffix).json")
+      suffix += 1
     }
-    """
+    return candidate
+  }
 }
 
 struct ThemeCatalog: Sendable {
@@ -288,7 +324,8 @@ struct ThemeCatalog: Sendable {
 
     let bundledDirectory = builtInThemesDirectory ?? Self.defaultBundledThemesDirectory
     let bundled = Self.loadThemes(in: bundledDirectory, fileManager: fileManager)
-    let custom = Self.loadCustomThemes(in: customDirectory, fileManager: fileManager)
+    let custom = Self.loadCustomThemes(
+      in: customDirectory, systemThemes: bundled, fileManager: fileManager)
     bundledThemes = bundled
     customThemes = custom
     builtInThemeCount = bundled.count
@@ -302,6 +339,18 @@ struct ThemeCatalog: Sendable {
 
   static func loadThemes(in directory: URL, fileManager: FileManager = .default)
     -> [ThemeDefinition]
+  {
+    loadThemeFiles(in: directory, fileManager: fileManager).map(\.theme)
+  }
+
+  private struct ThemeFile {
+    let url: URL
+    let theme: ThemeDefinition
+    let data: Data
+  }
+
+  private static func loadThemeFiles(in directory: URL, fileManager: FileManager)
+    -> [ThemeFile]
   {
     guard
       let urls = try? fileManager.contentsOfDirectory(
@@ -317,15 +366,36 @@ struct ThemeCatalog: Sendable {
       .sorted { $0.lastPathComponent < $1.lastPathComponent }
       .compactMap { url in
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(ThemeDefinition.self, from: data)
+        guard let theme = try? JSONDecoder().decode(ThemeDefinition.self, from: data) else {
+          return nil
+        }
+        return ThemeFile(url: url, theme: theme, data: data)
       }
   }
 
-  private static func loadCustomThemes(in directory: URL, fileManager: FileManager)
+  private static func loadCustomThemes(
+    in directory: URL,
+    systemThemes: [ThemeDefinition],
+    fileManager: FileManager
+  )
     -> [ThemeDefinition]
   {
-    ThemeStorage.ensureCustomThemesDirectory(at: directory, fileManager: fileManager)
-    return loadThemes(in: directory, fileManager: fileManager)
+    ThemeStorage.ensureCustomThemesDirectory(
+      at: directory, systemThemes: systemThemes, fileManager: fileManager)
+    return loadThemeFiles(in: directory, fileManager: fileManager).map { file in
+      guard
+        file.url.deletingPathExtension().lastPathComponent
+          .hasPrefix("Custom \(file.theme.id.capitalized) (Modified)-")
+      else {
+        return file.theme
+      }
+
+      let digest = String(ThemeStorage.sha256Hex(file.data).prefix(12))
+      return file.theme.replacingID(
+        "custom-\(file.theme.id)-modified-\(digest)",
+        name: "Custom \(file.theme.name) (Modified)"
+      )
+    }
   }
 
   private static var defaultBundledThemesDirectory: URL {

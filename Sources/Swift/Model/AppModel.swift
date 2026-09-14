@@ -37,9 +37,16 @@ final class AppModel: ObservableObject {
   @Published var busy = false
   @Published var loadingProfile = false
   @Published var inputMonitoringAuthorized = false
-  @Published var wiredAccessInstructionsPresented = false
+  @Published var wiredAccessInstructionsPresented = false {
+    didSet {
+      if oldValue && !wiredAccessInstructionsPresented {
+        restoreWiredAccessDevices()
+      }
+    }
+  }
   var wiredAccessInstructionsShown = false
   var wiredAccessDeviceName: String?
+  var wiredAccessSuppressedDevices: [DeviceChoice] = []
   @Published var backups: [BackupEntry] = []
   @Published var showAllBackups = false
   @Published var recoveryBackups: [URL] = []
@@ -51,6 +58,7 @@ final class AppModel: ObservableObject {
   @Published var knownDevicePollAttempts = 0
   @Published var appearancePreference: AppearancePreference
   @Published var isDarkAppearance = false
+  @Published var themes: [ThemeDefinition] = []
   @Published var selectedLightThemeID = "light"
   @Published var selectedDarkThemeID = "dark"
   @Published var enabledKeyboardKeyGroups: Set<KeyboardKeyGroup> = [.standard]
@@ -274,9 +282,10 @@ final class AppModel: ObservableObject {
   var defaultConfigurationDirectoryPath: String { defaultConfigurationDirectory.path }
 
   func setAppearancePreference(_ preference: AppearancePreference) {
-    appearancePreference = preference
     applyWindowAppearance(preference)
-    isDarkAppearance = effectiveAppearanceIsDark(for: preference)
+    let nextIsDarkAppearance = effectiveAppearanceIsDark(for: preference)
+    appearancePreference = preference
+    isDarkAppearance = nextIsDarkAppearance
     UserDefaults.standard.set(
       preference.rawValue,
       forKey: "\(AppConstants.defaultsPrefix).\(AppConstants.appearancePreferenceKey)")
@@ -289,7 +298,7 @@ final class AppModel: ObservableObject {
     case .dark:
       return true
     case .system:
-      let appearance = NSApp.windows.first?.effectiveAppearance ?? NSApp.effectiveAppearance
+      let appearance = NSApp.effectiveAppearance
       return appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     }
   }

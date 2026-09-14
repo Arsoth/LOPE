@@ -422,7 +422,7 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
 
   // MARK: - showKnownDeviceUnavailable
 
-  func testShowKnownDeviceUnavailableWithNoAvailableDevicesUsesSingleDevicePlaceholder() {
+  func testShowKnownDeviceUnavailableWithNoAvailableDevicesDoesNotShowMissingDevice() {
     let model = makeModel()
     let device = DeviceChoice(
       id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
@@ -443,8 +443,8 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     XCTAssertEqual(model.knownDisconnectedDevice, device)
     XCTAssertTrue(model.waitingForKnownDevice)
     XCTAssertEqual(model.currentDeviceName, device.name)
-    XCTAssertEqual(model.devices, [device])
-    XCTAssertEqual(model.selectedDeviceIndex, device.id)
+    XCTAssertTrue(model.devices.isEmpty)
+    XCTAssertEqual(model.selectedDeviceIndex, 0)
     XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: false))
     XCTAssertNotNil(model.knownDevicePollTask)
   }

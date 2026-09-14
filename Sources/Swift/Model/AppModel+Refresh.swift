@@ -67,6 +67,11 @@ extension AppModel {
     inputMonitoringAuthorized =
       IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
     if inputMonitoringAuthorized {
+      if wiredAccessInstructionsPresented {
+        wiredAccessInstructionsPresented = false
+      } else {
+        restoreWiredAccessDevices()
+      }
       wiredAccessInstructionsShown = false
       wiredAccessDeviceName = nil
     }
@@ -77,6 +82,47 @@ extension AppModel {
     wiredAccessInstructionsShown = true
     wiredAccessDeviceName = device?.name
     wiredAccessInstructionsPresented = true
+    suppressWiredAccessDevices()
+  }
+
+  /// Publishes a discovery list while keeping wired-device suppression scoped
+  /// to the access alert. Discovery snapshots are authoritative; small model
+  /// state updates can preserve an already hidden wired entry.
+  func publishDevices(_ discovered: [DeviceChoice], preservingSuppressedWired: Bool = false) {
+    if wiredAccessInstructionsPresented {
+      let wired = discovered.filter(\.isWiredDevice)
+      if !preservingSuppressedWired || !wired.isEmpty {
+        wiredAccessSuppressedDevices = wired
+      }
+      devices = discovered.filter { !$0.isWiredDevice }
+      return
+    }
+    devices = discovered
+    if !preservingSuppressedWired {
+      wiredAccessSuppressedDevices.removeAll()
+    }
+  }
+
+  func suppressWiredAccessDevices() {
+    guard wiredAccessInstructionsPresented else { return }
+    let wired = devices.filter(\.isWiredDevice)
+    guard !wired.isEmpty else { return }
+    wiredAccessSuppressedDevices = wired
+    devices.removeAll(where: \.isWiredDevice)
+  }
+
+  func restoreWiredAccessDevices() {
+    guard !wiredAccessSuppressedDevices.isEmpty else { return }
+    let prompt = devices.first(where: { $0.isWiredAccessPrompt })
+    let visibleDevices = devices.filter { !$0.isWiredAccessPrompt && !$0.isWiredDevice }
+    let visibleKeys = Set(visibleDevices.map(\.deviceKey))
+    let restored =
+      (visibleDevices
+        + wiredAccessSuppressedDevices.filter {
+          !visibleKeys.contains($0.deviceKey)
+        })
+    devices = restored + (prompt.map { [$0] } ?? [])
+    wiredAccessSuppressedDevices.removeAll()
   }
 
   func reloadSelectedProfile() {

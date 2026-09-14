@@ -61,7 +61,7 @@ struct StatusArea: View {
           Text("Last \(events.count)")
             .font(.caption)
             .foregroundStyle(theme.secondaryText)
-        } else {
+        } else if !status.isEmpty {
           Text(status)
             .font(.callout)
             .foregroundStyle(theme.secondaryText)

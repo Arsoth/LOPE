@@ -83,17 +83,10 @@ struct ConfigureSurfaceView: View {
         title: "Wake \(model.currentDeviceName)",
         message: knownDeviceWakeMessage,
         symbol: "computermouse.fill",
-        onDefaultAction: refreshFromWakeModal,
-        onCancel: {}
+        onCancel: {},
+        showsActions: false
       ) {
-        HStack(spacing: 10) {
-          ProgressView()
-            .controlSize(.small)
-            .accessibilityLabel("Checking for the mouse")
-          Button("Refresh", action: refreshFromWakeModal)
-            .buttonStyle(.borderedProminent)
-            .disabled(model.busy)
-        }
+        EmptyView()
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -116,10 +109,6 @@ struct ConfigureSurfaceView: View {
     return messages.joined(separator: "\n\n")
   }
 
-  private func refreshFromWakeModal() {
-    guard !model.busy else { return }
-    model.refresh()
-  }
 }
 
 struct LoadingProfileStateView: View {

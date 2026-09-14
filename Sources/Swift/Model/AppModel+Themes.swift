@@ -13,11 +13,16 @@ extension AppModel {
     customThemesDirectory.path
   }
 
-  var themes: [ThemeDefinition] {
-    ThemeCatalog.shared.themes
-  }
-
   func reloadThemes() {
     ThemeCatalog.reload(customThemesDirectory: customThemesDirectory)
+    themes = ThemeCatalog.shared.themes
+  }
+
+  /// Re-reads the bundled and custom theme JSON files and republishes the
+  /// catalog so the settings UI can refresh without rebuilding the app.
+  func refreshThemes() {
+    reloadThemes()
+    loadThemePreferences()
+    status = "Themes refreshed from \(customThemesDirectory.path)."
   }
 }

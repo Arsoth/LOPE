@@ -28,13 +28,51 @@ jobs:
       - name: Verify Apple toolchain
         run: |
           set -euo pipefail
-          echo "DEVELOPER_DIR=$DEVELOPER_DIR"
-          xcodebuild -version
-          xcrun --find clang
-          xcrun --find llvm-cov
-          xcrun --find llvm-profdata
-          xcrun --find swift
-          xcrun swift --version
+          quiet() {
+            local output status
+            output="$(mktemp)"
+            if "$@" >"$output" 2>&1; then
+              status=0
+            else
+              status=$?
+              cat "$output" >&2
+            fi
+            rm -f "$output"
+            return "$status"
+          }
 
-      - name: Enforce coverage minimums
-        run: make coverage-check
+          quiet xcodebuild -version
+          quiet xcrun --find clang
+          quiet xcrun --find llvm-cov
+          quiet xcrun --find llvm-profdata
+          quiet xcrun --find swift
+          quiet xcrun swift --version
+
+      - name: Publish coverage tables and enforce minimums
+        run: |
+          set -uo pipefail
+
+          report="$RUNNER_TEMP/lope-coverage-report.txt"
+          make coverage >"$report" 2>&1
+          report_status=$?
+          cat "$report"
+
+          {
+            echo "## Coverage report"
+            echo
+            echo '```text'
+            cat "$report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( report_status != 0 )); then
+            exit "$report_status"
+          fi
+
+          gate="$RUNNER_TEMP/lope-coverage-gate.txt"
+          make coverage-check >"$gate" 2>&1
+          gate_status=$?
+          if (( gate_status != 0 )); then
+            cat "$gate"
+            exit "$gate_status"
+          fi

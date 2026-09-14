@@ -210,7 +210,10 @@ struct ButtonAssignmentsView: View {
   }
 
   private func keyboardChoiceCard(buttonID: Int) -> some View {
-    Picker(
+    let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
+    let selectedKey = UInt8(exactly: model.keyboardKeyChoice(buttonIndex: buttonIndex))
+
+    return Picker(
       "Extended key",
       selection: Binding(
         get: {
@@ -223,15 +226,19 @@ struct ButtonAssignmentsView: View {
         })
     ) {
       Text("Use Recorded Key").tag(0)
-      ForEach(model.filteredExtendedKeyboardKeyLayoutGroups) { group in
+      ForEach(model.filteredExtendedKeyboardKeyLayoutGroups(including: selectedKey)) { group in
         Section(group.label) {
           ForEach(group.keys) { key in
             Text(key.label).tag(Int(key.id))
           }
         }
       }
-      ForEach(model.filteredExtendedKeyboardKeyGroups.filter { $0.group != .standard }) { group in
-        Section(group.label) {
+      ForEach(
+        model.filteredExtendedKeyboardKeyGroups(including: selectedKey).filter {
+          $0.group != .standard
+        }
+      ) { group in
+        Section(keyboardKeyGroupLabel(group, selectedKey: selectedKey)) {
           ForEach(group.keys) { key in
             Text(key.label).tag(Int(key.id))
           }
@@ -242,5 +249,15 @@ struct ButtonAssignmentsView: View {
     .labelsHidden()
     .frame(width: 150)
     .help("Insert an extended HID keyboard usage directly.")
+  }
+
+  private func keyboardKeyGroupLabel(
+    _ group: KeyboardKeyGroupChoice,
+    selectedKey: UInt8?
+  ) -> String {
+    let containsHiddenSelection =
+      group.keys.contains { $0.id == selectedKey }
+      && !model.isKeyboardKeyGroupEnabled(group.group)
+    return containsHiddenSelection ? "\(group.label) (hidden)" : group.label
   }
 }

@@ -25,9 +25,9 @@ extension AppModel {
       return
     }
 
-    // Keep the cached device visible while the targeted read is in flight.
-    // The full device list is refreshed after this read succeeds.
-    devices = [cachedDevice]
+    // The cached device remains the targeted read identity, but it is not
+    // placed in the picker until discovery proves that it is present.
+    devices = []
     selectedDeviceIndex = cachedDevice.id
     prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
     let profileReadProgress = profileReadProgressHandler(generation: generation)
@@ -153,15 +153,15 @@ extension AppModel {
       // profile read is slower, but the picker can now populate while
       // the button editor remains in its explicit loading state.
       let previousName = self.devices.first(where: { $0.deviceKey == selected.deviceKey })?.name
-      self.devices = enumeration.devices
       self.selectedDeviceIndex = selected.id
       let resolvedSelected = selected.replacingName(
         DeviceChoice.preferredName(
           reported: selected.name,
           fallback: previousName ?? self.currentDeviceName))
-      self.devices = self.devices.map {
+      let resolvedDevices = enumeration.devices.map {
         $0.deviceKey == resolvedSelected.deviceKey ? resolvedSelected : $0
       }
+      self.publishDevices(resolvedDevices)
       self.currentDeviceName = resolvedSelected.name
       self.deviceSummary = resolvedSelected.title
       if expectedDevice != nil {
@@ -173,12 +173,12 @@ extension AppModel {
       self.status = "Found \(selected.name). Reading onboard profile…"
       let profileReadProgress = self.profileReadProgressHandler(generation: generation)
 
-      let resolvedDevices = self.devices
+      let devicesForProfileRead = self.devices
       let snapshot = await Task.detached(priority: .userInitiated) {
         Self.makeProfileSnapshot(
           executable: engine,
           currentDirectory: currentDirectory,
-          devices: resolvedDevices,
+          devices: devicesForProfileRead,
           selectedDeviceKey: selected.deviceKey,
           selectedDeviceIndex: selected.id,
           preferredProfileNumber: preferredProfileNumber,

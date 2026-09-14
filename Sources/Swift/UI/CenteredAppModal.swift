@@ -9,6 +9,7 @@ struct CenteredAppModal<Actions: View>: View {
   let symbol: String
   let onDefaultAction: () -> Void
   let onCancel: () -> Void
+  let showsActions: Bool
   let actions: () -> Actions
 
   init(
@@ -17,6 +18,7 @@ struct CenteredAppModal<Actions: View>: View {
     symbol: String = "info.circle",
     onDefaultAction: @escaping () -> Void = {},
     onCancel: @escaping () -> Void = {},
+    showsActions: Bool = true,
     @ViewBuilder actions: @escaping () -> Actions
   ) {
     self.title = title
@@ -24,6 +26,7 @@ struct CenteredAppModal<Actions: View>: View {
     self.symbol = symbol
     self.onDefaultAction = onDefaultAction
     self.onCancel = onCancel
+    self.showsActions = showsActions
     self.actions = actions
   }
 
@@ -42,9 +45,11 @@ struct CenteredAppModal<Actions: View>: View {
             .textSelection(.enabled)
         }
       }
-      HStack {
-        Spacer()
-        actions()
+      if showsActions {
+        HStack {
+          Spacer()
+          actions()
+        }
       }
     }
     .padding(22)

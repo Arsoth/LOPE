@@ -526,6 +526,27 @@ static uint8_t receiver_slot_limit(const HidInterface *iface) {
     }
 }
 
+static bool interface_has_mouse_collection(const HidContext *context, const HidInterface *iface) {
+    if (context == NULL || iface == NULL || is_receiver_interface(iface)) {
+        return false;
+    }
+    if (iface->is_mouse) {
+        return true;
+    }
+    // macOS commonly exposes a direct mouse's standard collection beside its
+    // vendor HID++ collection. The vendor interface is the endpoint we can
+    // query, but the matching standard collection is the evidence that the
+    // endpoint belongs to a mouse rather than another Logitech HID++ device.
+    for (size_t other = 0; other < context->count; other++) {
+        const HidInterface *candidate = &context->items[other];
+        if (candidate->is_mouse && candidate->location_id == iface->location_id &&
+            candidate->product_id == iface->product_id) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool is_receiver_endpoint(const Device *device);
 bool is_mouse_device(const Device *device);
 bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,
@@ -563,32 +584,22 @@ int discover_devices(HidContext *context, int requested_slot, Device *devices, s
         if (!iface->is_vendor) {
             continue;
         }
+        bool has_mouse_collection = interface_has_mouse_collection(context, iface);
         // A standard mouse collection is enough to identify a direct mouse
         // even when macOS blocks its separate HID++ vendor channel. Keep it
         // in the device picker so the UI can accurately report that profiles
         // are unavailable, rather than silently dropping the mouse.
         if (!iface->channel_open) {
-            bool has_mouse_collection = iface->is_mouse;
-            if (!has_mouse_collection && !is_receiver_interface(iface)) {
-                // A mouse commonly exposes separate standard-mouse and
-                // vendor interfaces. They share the physical location and
-                // product ID even though only the vendor interface can carry
-                // HID++. Preserve the vendor interface as an inaccessible
-                // wired mouse when its matching standard collection is still
-                // enumerable.
-                for (size_t other = 0; other < context->count; other++) {
-                    const HidInterface *candidate = &context->items[other];
-                    if (candidate->is_mouse && candidate->location_id == iface->location_id &&
-                        candidate->product_id == iface->product_id) {
-                        has_mouse_collection = true;
-                        break;
-                    }
-                }
-            }
             if (has_mouse_collection && !is_receiver_interface(iface)) {
+                iface->has_mouse_collection = true;
                 add_device(devices, count, iface, 0xFF, 0xFF, 0.0, inspect_features);
             }
             continue;
+        }
+        // Preserve the same eligibility evidence for an accessible vendor
+        // interface before the HID++ ping creates its Device record.
+        if (has_mouse_collection) {
+            iface->has_mouse_collection = true;
         }
         // G600 uses legacy numbered feature reports rather than HID++ 0x8100.
         // It has no HID++ ping response, so the product ID is the discovery
@@ -802,7 +813,7 @@ uint32_t device_mouse_product_id(const Device *device) {
 }
 
 bool is_receiver_endpoint(const Device *device) {
-    if (device == NULL || device->device_number != 0xFF) {
+    if (device == NULL || device->iface == NULL || device->device_number != 0xFF) {
         return false;
     }
     return is_receiver_interface(device->iface) ||
@@ -813,7 +824,7 @@ bool is_receiver_endpoint(const Device *device) {
 }
 
 bool is_mouse_device(const Device *device) {
-    if (device == NULL || is_receiver_endpoint(device)) {
+    if (device == NULL || device->iface == NULL || is_receiver_endpoint(device)) {
         return false;
     }
     if (text_contains_case_insensitive(device_label(device), "keyboard") ||
@@ -822,7 +833,7 @@ bool is_mouse_device(const Device *device) {
         text_contains_case_insensitive(device->iface->product, "keypad")) {
         return false;
     }
-    if (device->iface->is_mouse) {
+    if (device->iface->is_mouse || device->iface->has_mouse_collection) {
         return true;
     }
     // A paired mouse may not have a standard mouse HID interface of its own;
@@ -831,11 +842,19 @@ bool is_mouse_device(const Device *device) {
         device_feature_index(device, FEATURE_ADJUSTABLE_DPI, &(uint8_t){0})) {
         return true;
     }
-    // A paired HID++ slot is a real peripheral rather than the receiver
-    // itself. Keep it visible when older firmware does not expose the
-    // mouse-specific feature list; the name checks above still suppress
-    // ordinary paired keyboards.
-    return true;
+    // Receiver-backed slots are identified by the receiver pairing record.
+    // The paired WPID is retained separately from the receiver PID, so an
+    // uninspected slot can still be listed without treating every arbitrary
+    // HID++ endpoint as a mouse.
+    if (device->request_device_number != 0xFF && is_receiver_interface(device->iface)) {
+        return device->mouse_product_id != 0;
+    }
+    // Some direct wireless/Bluetooth interfaces hide their standard mouse
+    // collection from macOS. Their Logitech model-ID range is the remaining
+    // positive eligibility signal; unknown wired HID++ endpoints are not.
+    return is_wireless_device_product(device->iface->product_id) ||
+           is_bluetooth_device_product(device->iface->product_id) ||
+           device->iface->product_id == 0xC24A;
 }
 
 bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *devices,

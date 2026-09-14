@@ -152,6 +152,7 @@ final class AppModelRefreshTests: XCTestCase {
     // from the cached device before bailing out, proving the cached value
     // (not the no-device `refresh()` path) was used.
     XCTAssertEqual(model.currentDeviceName, "G502 X")
+    XCTAssertTrue(model.devices.isEmpty)
     XCTAssertEqual(model.status, EngineError.unavailable.localizedDescription)
   }
 

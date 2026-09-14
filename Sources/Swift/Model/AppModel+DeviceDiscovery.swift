@@ -46,7 +46,7 @@ extension AppModel {
         // The cached mouse disappeared while the list was refreshed. Keep
         // every other device visible, but wait for an explicit selection so
         // the old profile cannot be silently applied to the first new mouse.
-        self.devices = enumeration.devices
+        self.publishDevices(enumeration.devices)
         self.selectedDeviceIndex = 0
         self.currentDeviceName = ""
         let hasSelectableDevice = enumeration.devices.contains(where: { !$0.isWiredAccessPrompt })
@@ -69,13 +69,13 @@ extension AppModel {
       let preservedName =
         self.devices
         .first(where: { $0.deviceKey == cachedDevice.deviceKey })?.name ?? cachedDevice.name
-      self.devices = enumeration.devices
       self.selectedDeviceIndex = selected.id
       let resolvedSelected = selected.replacingName(
         DeviceChoice.preferredName(reported: selected.name, fallback: preservedName))
-      self.devices = self.devices.map {
+      let resolvedDevices = enumeration.devices.map {
         $0.deviceKey == resolvedSelected.deviceKey ? resolvedSelected : $0
       }
+      self.publishDevices(resolvedDevices)
       self.currentDeviceName = resolvedSelected.name
       self.deviceSummary = resolvedSelected.title
       self.rememberSelectedDevice(resolvedSelected)

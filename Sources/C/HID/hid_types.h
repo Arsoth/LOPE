@@ -37,6 +37,10 @@ struct HidInterface {
     char transport[128];
     bool is_vendor;
     bool is_mouse;
+    // A vendor HID++ interface may share a physical device with a separate
+    // standard mouse collection. Keep that evidence distinct from is_mouse,
+    // which identifies the interface used for standard input/watch handling.
+    bool has_mouse_collection;
     // Receiver-backed HID++ devices may require the long report even when
     // the request payload would fit in a short report. This is detected from
     // the interface descriptor (or a known Logitech HID++ product ID).
