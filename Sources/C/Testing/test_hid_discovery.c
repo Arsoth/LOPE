@@ -1131,6 +1131,16 @@ int test_hid_discovery(void) {
                                              &direct_request_count) &&
                       direct_request_count == 0;
 
+    HidInterface denied_key_interface = {
+        .product_id = 0x4085, .is_vendor = true, .location_id = 0x50, .registry_id = 0x60};
+    snprintf(denied_key_interface.transport, sizeof(denied_key_interface.transport), "USB");
+    HidContext denied_key_context = {.items = &denied_key_interface, .count = 1};
+    hid_check_access_impl = discovery_check_access_denied_double;
+    size_t denied_key_count = 0;
+    bool denied_key_ok = discover_device_by_key(&denied_key_context, "50-60-02",
+                                                direct_request_devices, &denied_key_count) &&
+                         denied_key_count == 0 && !denied_key_interface.channel_open;
+
     HidInterface key_receiver_interface = receiver_interface;
     key_receiver_interface.location_id = 0x30;
     key_receiver_interface.registry_id = 0x40;
@@ -1294,14 +1304,14 @@ int test_hid_discovery(void) {
     reset_hid_test_seams();
     if (!receiver_ok || !helper_ok || !ping_ok || !name_ok || !feature_ok || !receiver_name_ok ||
         !closed_ok || !open_channels_ok || !direct_request_ok || !key_fallback_ok ||
-        !receiver_key_ok || !options_hardware_ok || !hardware_ok || !release_ok) {
+        !denied_key_ok || !receiver_key_ok || !options_hardware_ok || !hardware_ok || !release_ok) {
         fprintf(stderr,
                 "receiver discovery flags receiver=%d helper=%d ping=%d name=%d feature=%d "
-                "receiver-name=%d closed=%d open=%d direct=%d key=%d receiver-key=%d options=%d "
-                "hardware=%d release=%d\n",
+                "receiver-name=%d closed=%d open=%d direct=%d key=%d denied-key=%d "
+                "receiver-key=%d options=%d hardware=%d release=%d\n",
                 receiver_ok, helper_ok, ping_ok, name_ok, feature_ok, receiver_name_ok, closed_ok,
-                open_channels_ok, direct_request_ok, key_fallback_ok, receiver_key_ok,
-                options_hardware_ok, hardware_ok, release_ok);
+                open_channels_ok, direct_request_ok, key_fallback_ok, denied_key_ok,
+                receiver_key_ok, options_hardware_ok, hardware_ok, release_ok);
         return 1;
     }
 

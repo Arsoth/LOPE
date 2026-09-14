@@ -734,6 +734,14 @@ int discover_device_by_key(HidContext *context, const char *key, Device *devices
             iface->registry_id != registry_id) {
             continue;
         }
+        if (!iface->channel_open && interface_needs_input_monitoring(iface) &&
+            hid_check_access_impl(kIOHIDRequestTypeListenEvent) != kIOHIDAccessTypeGranted) {
+            // A cached wired device can reach this keyed profile-read path
+            // during the initial refresh. Keep that background read passive;
+            // the GUI's explicit permission action is the only place that may
+            // request Input Monitoring.
+            return 1;
+        }
         if (!iface->channel_open && !channel_open(&iface->channel, iface->device)) {
             return 1;
         }

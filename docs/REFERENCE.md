@@ -75,8 +75,10 @@ reports that a wired HID interface needs Input Monitoring, the picker keeps the
 real wired mouse visible. Selecting it explains the permission and opens the
 matching System Settings page. The explicit permission action calls
 `IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)`, which registers LOPE with
-the Input Monitoring privacy pane before the user enables it. Wireless and
-receiver devices stay usable without this permission.
+the Input Monitoring privacy pane before the user enables it. LOPE waits for
+that registration to settle before opening the pane, so the app appears as a
+disabled row instead of requiring manual addition. Wireless and receiver
+devices stay usable without this permission.
 
 Keyboard recording uses an app-local event monitor while LOPE is active, so it
 does not request Input Monitoring. It does not capture keys from other apps.
