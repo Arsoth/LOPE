@@ -32,6 +32,7 @@ jobs:
           echo "DEVELOPER_DIR=$DEVELOPER_DIR"
           xcodebuild -version
           xcrun --find swift-format
+          xcrun --find clang-format
           xcrun swift-format --version
           xcrun --find codesign
           xcrun swift --version

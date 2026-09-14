@@ -1,4 +1,4 @@
-name: Formatting
+name: Tests
 
 on:
   pull_request:
@@ -8,15 +8,15 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: formatting-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  formatting:
-    name: Formatting
+  tests:
+    name: Tests
     runs-on: macos-15
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
@@ -30,10 +30,9 @@ jobs:
           set -euo pipefail
           echo "DEVELOPER_DIR=$DEVELOPER_DIR"
           xcodebuild -version
-          xcrun --find swift-format
-          xcrun --find clang-format
-          xcrun swift-format --version
+          xcrun --find clang
+          xcrun --find swift
           xcrun swift --version
 
-      - name: Check formatting
-        run: make lint
+      - name: Run unit and self-tests
+        run: make test

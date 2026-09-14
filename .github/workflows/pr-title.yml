@@ -1,4 +1,4 @@
-name: PR title
+name: PR Title
 
 on:
   pull_request:
@@ -7,8 +7,8 @@ on:
 permissions: {}
 
 jobs:
-  conventional-commit-title:
-    name: Conventional Commit PR title
+  pr-title:
+    name: PR Title
     runs-on: ubuntu-latest
     steps:
       - name: Validate title
