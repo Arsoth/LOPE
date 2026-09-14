@@ -53,16 +53,34 @@ extension AppModel {
   }
 
   /// `IOHIDRequestAccess` is the explicit registration API, but the protected
-  /// HID operation itself is `IOHIDManagerOpen`/`IOHIDDeviceOpen`. Exercise the
-  /// manager path from the GUI once, only after the user clicks this button,
-  /// so TCC materializes LOPE rather than the bundled command-line helper.
+  /// HID operation itself is `IOHIDManagerOpen`/`IOHIDDeviceOpen`. Exercise
+  /// both paths from the GUI once, only after the user clicks this button, so
+  /// TCC materializes LOPE rather than the bundled command-line helper.
   private func materializeInputMonitoringClient() -> Bool {
     let options = IOOptionBits(kIOHIDOptionsTypeNone)
     let manager = IOHIDManagerCreate(kCFAllocatorDefault, options)
-    IOHIDManagerSetDeviceMatching(manager, nil)
-    let result = IOHIDManagerOpen(manager, options)
+    let matching =
+      NSDictionary(object: 0x046D, forKey: kIOHIDVendorIDKey as NSString)
+      as CFDictionary
+    IOHIDManagerSetDeviceMatching(manager, matching)
+    let managerResult = IOHIDManagerOpen(manager, options)
+    var deviceOpened = false
+
+    if let devices = IOHIDManagerCopyDevices(manager) {
+      var references = [UnsafeRawPointer?](repeating: nil, count: CFSetGetCount(devices))
+      CFSetGetValues(devices, &references)
+      for reference in references {
+        guard let reference else { continue }
+        let device = Unmanaged<IOHIDDevice>.fromOpaque(reference).takeUnretainedValue()
+        if IOHIDDeviceOpen(device, options) == kIOReturnSuccess {
+          deviceOpened = true
+          _ = IOHIDDeviceClose(device, options)
+          break
+        }
+      }
+    }
     _ = IOHIDManagerClose(manager, options)
-    return result == kIOReturnSuccess
+    return managerResult == kIOReturnSuccess || deviceOpened
   }
 
   private func openInputMonitoringSettingsPane() {
