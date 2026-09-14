@@ -256,9 +256,14 @@ extension AppModel {
       publishDevices(availableDevices)
       selectedDeviceIndex = 0
       currentDeviceName = ""
-      deviceSummary = "No editable Logitech mouse found"
+      deviceSummary =
+        availableDevices.isEmpty
+        ? "No editable Logitech mouse found"
+        : "Choose a Logitech mouse to continue"
       status =
-        "A wired Logitech mouse needs Input Monitoring. Select the wired mouse to continue."
+        availableDevices.isEmpty
+        ? "A wired Logitech mouse needs Input Monitoring. Select the wired mouse to continue."
+        : "Choose a Logitech mouse to continue."
       return
     }
     busy = false
@@ -273,8 +278,11 @@ extension AppModel {
     // is being polled.
     status = knownDeviceRefreshStatus(for: device, expired: false)
     if availableDevices.isEmpty {
-      publishDevices([])
-      selectedDeviceIndex = 0
+      // Keep the cached entry in the picker while the wake modal is shown.
+      // HID enumeration can briefly return no rows for a sleeping mouse;
+      // removing the only row makes the picker appear to have vanished.
+      publishDevices([device])
+      selectedDeviceIndex = device.id
     } else {
       publishDevices(availableDevices)
       // Keep other detected mice selectable while the known target is

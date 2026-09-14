@@ -259,10 +259,15 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
 
     await withFakeEngineDirectory(tempDir.path) {
       model.startInitialRefresh(cachedDevice: cached)
+      // The cached row is published synchronously, before HID enumeration or
+      // the slower profile read finishes, so the picker never disappears.
+      XCTAssertEqual(model.devices, [cached])
+      XCTAssertEqual(model.selectedDeviceIndex, cached.id)
       await waitUntil(timeout: 5) { model.waitingForKnownDevice }
     }
 
     XCTAssertEqual(model.knownDisconnectedDevice, cached)
+    XCTAssertEqual(model.devices, [cached])
     XCTAssertNotNil(model.knownDevicePollTask)
     model.knownDevicePollTask?.cancel()
     model.knownDevicePollTask = nil

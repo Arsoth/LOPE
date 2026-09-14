@@ -6,80 +6,18 @@ import Foundation
 @MainActor
 extension AppModel {
   func startInitialRefresh(cachedDevice: DeviceChoice) {
-    if cachedDevice.isWiredDevice && !inputMonitoringAuthorized {
-      // The cached device is still useful for the initial picker state, but
-      // do not let a profile read implicitly ask for Input Monitoring. The
-      // normal enumeration path can show the real device without opening its
-      // vendor interface, and an explicit selection opens the permission UI.
-      startRefresh(preferredDeviceIndex: cachedDevice.id, preferredProfileNumber: profileNumber)
-      return
-    }
-    refreshTask?.cancel()
-    stopLiveDPIPolling()
-    refreshGeneration += 1
-    let generation = refreshGeneration
-    let currentDirectory = backupDirectory
-    let preferredProfileNumber = profileNumber
-
-    busy = true
-    loadingProfile = true
+    // Keep the cached device visible while enumeration is in flight. The
+    // normal refresh path enumerates first, so the picker can be replaced by
+    // the current device list before any profile read or wake flow starts.
+    devices = [cachedDevice]
+    selectedDeviceIndex = cachedDevice.id
     currentDeviceName = cachedDevice.name
     deviceSummary = cachedDevice.title
-    status = "Reading \(cachedDevice.name)…"
-    guard let engine else {
-      busy = false
-      loadingProfile = false
-      status = EngineError.unavailable.localizedDescription
-      return
-    }
-
-    // The cached device remains the targeted read identity, but it is not
-    // placed in the picker until discovery proves that it is present.
-    devices = []
-    selectedDeviceIndex = cachedDevice.id
-    prepareLoadingEditor(profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
-    let profileReadProgress = profileReadProgressHandler(generation: generation)
-
-    refreshTask = Task { [weak self] in
-      let snapshot = await Task.detached(priority: .userInitiated) {
-        Self.makeProfileSnapshot(
-          executable: engine,
-          currentDirectory: currentDirectory,
-          devices: [cachedDevice],
-          selectedDeviceKey: cachedDevice.deviceKey,
-          selectedDeviceIndex: cachedDevice.id,
-          preferredProfileNumber: preferredProfileNumber,
-          onLine: profileReadProgress
-        )
-      }.value
-
-      guard !Task.isCancelled, let self,
-        self.refreshGeneration == generation
-      else { return }
-
-      // A stale cached key should not prevent the normal discovery path
-      // from finding a newly connected mouse.
-      guard snapshot.profileText != nil else {
-        if cachedDevice.isNonWiredDevice {
-          self.beginKnownDeviceRefresh(cachedDevice)
-        } else {
-          self.startRefresh(
-            preferredDeviceIndex: -1,
-            preferredProfileNumber: preferredProfileNumber
-          )
-        }
-        return
-      }
-
-      self.applyRefreshSnapshot(snapshot)
-      self.startBackgroundDeviceEnumeration(
-        executable: engine,
-        currentDirectory: currentDirectory,
-        cachedDevice: self.devices.first(where: { $0.deviceKey == cachedDevice.deviceKey })
-          ?? cachedDevice,
-        generation: generation
-      )
-    }
+    startRefresh(
+      preferredDeviceIndex: cachedDevice.id,
+      preferredProfileNumber: profileNumber,
+      expectedDevice: cachedDevice
+    )
   }
 
   func startRefresh(

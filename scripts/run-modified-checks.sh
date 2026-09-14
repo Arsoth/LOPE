@@ -236,7 +236,7 @@ if [[ "$run_swift_coverage" -eq 1 ]]; then
     make coverage-check-swift
   else
     make coverage-check-swift \
-      SWIFT_TEST_ARGS="--filter $swift_filters" \
+      SWIFT_TEST_ARGS="--filter '$swift_filters'" \
       COVERAGE_SWIFT_SOURCES_PATTERN="$swift_coverage_pattern"
   fi
 fi
