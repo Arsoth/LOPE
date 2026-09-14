@@ -137,7 +137,7 @@ struct EmptyStateView: View {
   var body: some View {
     VStack(spacing: 12) {
       Spacer()
-      Image(systemName: "computermouse")
+      Image(systemName: emptyStateIcon)
         .font(.system(size: 42))
         .foregroundStyle(.secondary)
       Text(emptyStateTitle)
@@ -146,7 +146,7 @@ struct EmptyStateView: View {
         .multilineTextAlignment(.center)
         .foregroundStyle(.secondary)
         .frame(maxWidth: 560)
-      if !model.inputMonitoringAuthorized {
+      if !engineUnavailable && !model.inputMonitoringAuthorized {
         Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
       }
       Spacer()
@@ -154,7 +154,16 @@ struct EmptyStateView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
+  private var engineUnavailable: Bool {
+    model.engine == nil
+  }
+
+  private var emptyStateIcon: String {
+    engineUnavailable ? "exclamationmark.triangle" : "computermouse"
+  }
+
   private var emptyStateTitle: String {
+    if engineUnavailable { return "LOPE needs to be reinstalled" }
     if model.devices.isEmpty { return "No editable Logitech mouse detected" }
     if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
       return "No MX mouse profile descriptor"
@@ -163,6 +172,10 @@ struct EmptyStateView: View {
   }
 
   private var emptyStateMessage: String {
+    if engineUnavailable {
+      return
+        "The bundled HID++ engine is missing, so LOPE cannot access your mouse. Please reinstall LOPE to restore it. Your preferences and data are stored separately and will not be lost."
+    }
     if model.devices.isEmpty {
       return
         "The app lists Logitech mice. macOS may also be blocking access even when the mouse is connected."
