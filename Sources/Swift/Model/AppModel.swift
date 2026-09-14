@@ -82,6 +82,10 @@ final class AppModel: ObservableObject {
   var reconnectMonitorTask: Task<Void, Never>?
   var knownDevicePollTask: Task<Void, Never>?
   var liveDPIPollTask: Task<Void, Never>?
+  // Prevent helper processes from re-entering HID while the GUI registers
+  // itself with Input Monitoring. Refresh/selection clears this gate after
+  // the user returns from System Settings.
+  var inputMonitoringRequestInProgress = false
   var knownDisconnectedDevice: DeviceChoice?
   var initialBackupKeys = Set<String>()
 
