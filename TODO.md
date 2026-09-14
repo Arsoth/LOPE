@@ -9,10 +9,6 @@
 
 # LOPE TODO Ingest:
 
-- make the C tests report total quantity of tests passed/failed, not just a rolled up yes/no. this will require a refactor of testing.
-- try and push all testing to 95% or better, focus on anything <92% for that.
-- a "Retry" button should appear in the mouse asleep dialog that restarts the 60s clock/retry system if the mouse times out after 60s.
-
 # LOPE todo list
 
 ### 1: Report C self-test totals
