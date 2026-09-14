@@ -40,6 +40,33 @@ struct SettingsPane: View {
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
+        GroupBox("Input Monitoring") {
+          VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+              Image(
+                systemName: model.inputMonitoringAuthorized
+                  ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+              )
+              .foregroundStyle(
+                model.inputMonitoringAuthorized ? theme.success : theme.warning
+              )
+              Text(
+                model.inputMonitoringAuthorized
+                  ? "Allowed for this app"
+                  : "Required to edit wired mice"
+              )
+              .font(.callout.weight(.medium))
+            }
+            Text(
+              "Input Monitoring lets LOPE read wired Logitech mice. Wireless and receiver-connected mice do not need this permission."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+          }
+          .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
+        }
         GroupBox("Mouse profiles") {
           VStack(alignment: .leading, spacing: 8) {
             Text(
@@ -188,6 +215,9 @@ struct SettingsPane: View {
       .padding(.top, 4)
       .padding(.horizontal, 20)
       .frame(width: geometry.size.width, alignment: .leading)
+    }
+    .onAppear {
+      model.updateInputMonitoringAuthorization()
     }
   }
 

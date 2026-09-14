@@ -265,7 +265,7 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     XCTAssertEqual(model.selectedDeviceIndex, cachedDevice.id)
   }
 
-  func testStartBackgroundDeviceEnumerationPresentsWiredAccessWarning() async {
+  func testStartBackgroundDeviceEnumerationKeepsWiredAccessWarningPassive() async {
     let cachedDevice = DeviceChoice(
       id: 1, name: "Missing Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-9999")
@@ -284,15 +284,10 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
       generation: model.refreshGeneration)
     await model.refreshTask?.value
 
-    XCTAssertTrue(model.wiredAccessInstructionsPresented)
-    XCTAssertEqual(model.wiredAccessDeviceName, "Wired Mouse")
-    XCTAssertFalse(model.devices.contains(where: { $0.name == "Wired Mouse" }))
+    XCTAssertFalse(model.wiredAccessInstructionsPresented)
+    XCTAssertTrue(model.devices.contains(where: { $0.name == "Wired Mouse" }))
     XCTAssertEqual(model.selectedDeviceIndex, 0)
     XCTAssertTrue(model.status.contains("Input Monitoring"))
-
-    model.wiredAccessInstructionsPresented = false
-
-    XCTAssertTrue(model.devices.contains(where: { $0.name == "Wired Mouse" }))
   }
 
   func testStartBackgroundDeviceEnumerationDoesNotSelectAnotherMouseWhenCachedDeviceIsGone() async {

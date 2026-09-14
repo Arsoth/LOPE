@@ -70,12 +70,14 @@ receiver pairing record. The receiver's USB product ID remains transport-only:
 it selects the receiver interface and routing path, but it is not a mouse
 identity and is never serialized into new backup metadata.
 
-LOPE does not request access during enumeration. If macOS reports that a wired
-HID interface needs Input Monitoring, the picker adds a non-device entry,
-**Allow wired mice — Input Monitoring**. Selecting it explains the permission
-and opens the matching System Settings page. Wireless and receiver devices stay
-usable without this wired-access entry. The entry is UI-only and is never sent
-to the HID engine as a device selector.
+LOPE does not request access or show a modal during enumeration. If macOS
+reports that a wired HID interface needs Input Monitoring, the picker keeps the
+wired mouse visible and adds a non-device entry, **Allow wired mice — Input
+Monitoring**. Selecting the blocked wired mouse or this helper explains the
+permission in the same centered modal used for wake guidance and opens the
+matching System Settings page. Wireless and receiver devices stay usable
+without this wired-access entry. The entry is UI-only and is never sent to the
+HID engine as a device selector.
 
 Input Monitoring state is refreshed when the app becomes active and after the
 settings link is opened. A permission change is followed by an explicit

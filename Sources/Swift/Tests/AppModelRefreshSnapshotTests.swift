@@ -73,18 +73,17 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(makeSnapshot(selectedDeviceIndex: nil, accessWarning: true))
 
-    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertFalse(model.wiredAccessInstructionsPresented)
     XCTAssertTrue(model.status.contains("System Settings"))
     XCTAssertFalse(model.status.contains("No Logitech mouse was found"))
 
-    // Dismissing the app-owned prompt and refreshing again must not create a
-    // second permission flow until authorization changes.
-    model.wiredAccessInstructionsPresented = false
+    // Discovery remains passive. Selecting the wired device is what starts
+    // the permission flow.
     model.applyRefreshSnapshot(makeSnapshot(selectedDeviceIndex: nil, accessWarning: true))
     XCTAssertFalse(model.wiredAccessInstructionsPresented)
   }
 
-  func testApplyRefreshSnapshotHidesUnauthorizedWiredDeviceUntilPopupDismisses() {
+  func testApplyRefreshSnapshotKeepsWiredDeviceVisibleUntilSelected() {
     let model = AppModel(startInitialRefresh: false)
     let wired = DeviceChoice(
       id: 1, name: "Wired Mouse", connection: "Wired", productID: "0xCCCC", deviceKey: "cccc")
@@ -97,13 +96,15 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
         devices: [wired, wireless, .wiredAccessPrompt], selectedDeviceIndex: wireless.id,
         accessWarning: true))
 
+    XCTAssertFalse(model.wiredAccessInstructionsPresented)
+    XCTAssertTrue(model.devices.contains(where: { $0.deviceKey == wired.deviceKey }))
+    XCTAssertEqual(model.devices, [wired, wireless, .wiredAccessPrompt])
+
+    model.inputMonitoringAuthorized = false
+    model.selectDevice(wired.id)
+
     XCTAssertTrue(model.wiredAccessInstructionsPresented)
-    XCTAssertFalse(model.devices.contains(where: { $0.deviceKey == wired.deviceKey }))
-    XCTAssertEqual(model.devices, [wireless, .wiredAccessPrompt])
-
-    model.wiredAccessInstructionsPresented = false
-
-    XCTAssertEqual(model.devices, [wireless, wired, .wiredAccessPrompt])
+    XCTAssertEqual(model.wiredAccessDeviceName, wired.name)
   }
 
   // MARK: - Selected device, no profile text

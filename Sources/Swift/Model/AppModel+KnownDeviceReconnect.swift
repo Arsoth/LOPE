@@ -133,8 +133,7 @@ extension AppModel {
       let remainingDevices = self.devices.filter {
         !$0.isWiredAccessPrompt && !$0.matchesReconnectIdentity(device)
       }
-      self.publishDevices(
-        remainingDevices + (prompt.map { [$0] } ?? []), preservingSuppressedWired: true)
+      self.publishDevices(remainingDevices + (prompt.map { [$0] } ?? []))
       if remainingDevices.isEmpty {
         self.selectedDeviceIndex = 0
         self.currentDeviceName = ""
@@ -252,7 +251,15 @@ extension AppModel {
     availableDevices: [DeviceChoice] = []
   ) {
     guard device.isNonWiredDevice else {
-      presentWiredAccessInstructions(for: device)
+      busy = false
+      loadingProfile = false
+      refreshTask = nil
+      publishDevices(availableDevices)
+      selectedDeviceIndex = 0
+      currentDeviceName = ""
+      deviceSummary = "No editable Logitech mouse found"
+      status =
+        "A wired Logitech mouse needs Input Monitoring. Select the wired mouse or the Input Monitoring entry to continue."
       return
     }
     busy = false

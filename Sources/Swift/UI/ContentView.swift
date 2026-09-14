@@ -102,6 +102,9 @@ struct ContentView: View {
         )
 
       }
+      if model.wiredAccessInstructionsPresented {
+        wiredAccessInstructionsModal
+      }
     }
     .padding(.top, selectedTab == .settings ? 20 : 0)
     .frame(minWidth: 960, minHeight: 520)
@@ -134,17 +137,6 @@ struct ContentView: View {
       if phase == .active {
         model.updateInputMonitoringAuthorization()
       }
-    }
-    .alert(
-      model.wiredAccessDeviceName.map { "Allow \($0)" } ?? "Allow wired mice",
-      isPresented: $model.wiredAccessInstructionsPresented
-    ) {
-      Button("Open System Settings", action: model.openInputMonitoringSettings)
-      Button("Cancel", role: .cancel) {}
-    } message: {
-      Text(
-        "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, enable LOPE in System Settings > Privacy & Security > Input Monitoring, then return and choose Refresh."
-      )
     }
     .alert("Restore this backup?", isPresented: $confirmRestore) {
       Button("Cancel", role: .cancel) { restoreURL = nil }
@@ -206,6 +198,47 @@ struct ContentView: View {
     } else {
       model.applyAll()
     }
+  }
+
+  private var wiredAccessInstructionsModal: some View {
+    ZStack {
+      theme.shadow
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .accessibilityHidden(true)
+
+      CenteredAppModal(
+        title: model.wiredAccessDeviceName.map { "Allow \($0)" } ?? "Allow wired mice",
+        message: wiredAccessInstructionsMessage,
+        symbol: "lock.shield",
+        onDefaultAction: openWiredAccessSettings,
+        onCancel: dismissWiredAccessInstructions
+      ) {
+        Button("Cancel", role: .cancel, action: dismissWiredAccessInstructions)
+        Button("Open System Settings", action: openWiredAccessSettings)
+          .buttonStyle(.borderedProminent)
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .contain)
+    .accessibilityAddTraits(.isModal)
+    .transition(.opacity)
+    .zIndex(20)
+  }
+
+  private var wiredAccessInstructionsMessage: String {
+    "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, enable LOPE in System Settings > Privacy & Security > Input Monitoring, then return and choose Refresh."
+  }
+
+  private func dismissWiredAccessInstructions() {
+    model.wiredAccessInstructionsPresented = false
+    model.wiredAccessDeviceName = nil
+  }
+
+  private func openWiredAccessSettings() {
+    model.openInputMonitoringSettings()
+    dismissWiredAccessInstructions()
   }
 
 }

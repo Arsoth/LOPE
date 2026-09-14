@@ -180,6 +180,18 @@ final class AppModelRefreshTests: XCTestCase {
     XCTAssertEqual(model.selectedDeviceIndex, previousIndex)
   }
 
+  func testSelectDevicePresentsWiredAccessInstructionsForBlockedWiredDevice() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.inputMonitoringAuthorized = false
+
+    model.selectDevice(model.selectedDeviceIndex)
+
+    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertEqual(model.wiredAccessDeviceName, "G502 X")
+    XCTAssertEqual(model.selectedDeviceIndex, 1)
+  }
+
   func testSelectDeviceIgnoresReselectingTheCurrentDevice() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)

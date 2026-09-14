@@ -26,11 +26,7 @@ extension AppModel {
     let selectedSnapshotDevice = snapshot.selectedDeviceIndex.flatMap { selectedIndex in
       snapshot.devices.first(where: { $0.id == selectedIndex })
     }
-    let accessWarningDevice = snapshot.devices.first(where: { $0.isWiredDevice })
     publishDevices(snapshot.devices)
-    if snapshot.accessWarning {
-      presentWiredAccessInstructions(for: accessWarningDevice)
-    }
     guard let selected = selectedSnapshotDevice
     else {
       selectedDeviceIndex = 0

@@ -485,16 +485,17 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     XCTAssertNotNil(model.knownDevicePollTask)
   }
 
-  func testShowKnownDeviceUnavailablePresentsInstructionsForWiredDevice() {
+  func testShowKnownDeviceUnavailableKeepsWiredPermissionFlowPassive() {
     let model = makeModel()
     let device = DeviceChoice(
       id: 1, name: "G502 X", connection: "Wired", productID: "0x0000", deviceKey: "wired")
 
     model.showKnownDeviceUnavailable(device)
 
-    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertFalse(model.wiredAccessInstructionsPresented)
     XCTAssertFalse(model.waitingForKnownDevice)
     XCTAssertNil(model.knownDevicePollTask)
+    XCTAssertTrue(model.status.contains("Input Monitoring"))
   }
 
   // MARK: - startKnownDeviceProbe

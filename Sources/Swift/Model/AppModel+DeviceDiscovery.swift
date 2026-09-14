@@ -33,11 +33,6 @@ extension AppModel {
           "Loaded \(cachedDevice.name). The device list could not be refreshed: \(errorMessage)"
         return
       }
-      if enumeration.accessWarning {
-        self.presentWiredAccessInstructions(
-          for: enumeration.devices.first(where: { $0.isWiredDevice }))
-      }
-
       guard
         let selected = enumeration.devices.first(where: {
           $0.matchesReconnectIdentity(cachedDevice)

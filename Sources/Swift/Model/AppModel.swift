@@ -37,16 +37,8 @@ final class AppModel: ObservableObject {
   @Published var busy = false
   @Published var loadingProfile = false
   @Published var inputMonitoringAuthorized = false
-  @Published var wiredAccessInstructionsPresented = false {
-    didSet {
-      if oldValue && !wiredAccessInstructionsPresented {
-        restoreWiredAccessDevices()
-      }
-    }
-  }
-  var wiredAccessInstructionsShown = false
+  @Published var wiredAccessInstructionsPresented = false
   var wiredAccessDeviceName: String?
-  var wiredAccessSuppressedDevices: [DeviceChoice] = []
   @Published var backups: [BackupEntry] = []
   @Published var showAllBackups = false
   @Published var recoveryBackups: [URL] = []
