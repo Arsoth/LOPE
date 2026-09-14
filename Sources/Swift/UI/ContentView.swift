@@ -85,7 +85,7 @@ struct ContentView: View {
               .tabItem { Label("Settings", systemImage: "gearshape") }
               .tag(AppTab.settings)
           }
-          .padding(.top, selectedTab == .settings ? 0 : 20)
+          .padding(.top, selectedTab == .settings || selectedTab == .configure ? 0 : 20)
         }
         .simultaneousGesture(
           TapGesture().onEnded {
