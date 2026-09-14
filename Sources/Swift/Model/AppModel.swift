@@ -51,6 +51,9 @@ final class AppModel: ObservableObject {
   @Published var knownDevicePollAttempts = 0
   @Published var appearancePreference: AppearancePreference
   @Published var isDarkAppearance = false
+  @Published var selectedLightThemeID = "light"
+  @Published var selectedDarkThemeID = "dark"
+  @Published var enabledKeyboardKeyGroups: Set<KeyboardKeyGroup> = [.standard]
 
   /// The editor can remain visible while discovery/profile reads are in
   /// flight. Its controls are then catalog-derived or preserved from the
@@ -253,6 +256,9 @@ final class AppModel: ObservableObject {
     try? FileManager.default.createDirectory(
       at: selectedDirectory, withIntermediateDirectories: true)
     try? FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+    reloadThemes()
+    loadThemePreferences()
+    loadKeyboardKeyPreferences()
     MouseProfileCatalog.reload(customProfilesDirectory: customProfilesDirectory)
     refreshBackups()
     if startInitialRefresh {

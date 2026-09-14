@@ -8,6 +8,7 @@ struct RGBEditorView: View {
   @ObservedObject var model: AppModel
   @Binding var presentedZoneID: Int?
   @State private var hoveredZoneID: Int?
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -32,7 +33,7 @@ struct RGBEditorView: View {
     }
     .padding(8)
     .background(
-      .quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+      theme.card.opacity(0.75), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
   }
 
   private func rgbZoneRow(_ zone: RGBZoneState) -> some View {
@@ -48,14 +49,14 @@ struct RGBEditorView: View {
           .frame(width: 28, height: 24)
           .overlay {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-              .stroke(Color.primary.opacity(0.28), lineWidth: 0.75)
+              .stroke(theme.controlBorder, lineWidth: 0.75)
           }
         Text(zone.name)
           .font(.callout.weight(.medium))
         Spacer()
         Text(zone.draft.hex)
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(theme.secondaryText)
       }
       .padding(.horizontal, 9)
       .padding(.vertical, 7)
@@ -63,12 +64,12 @@ struct RGBEditorView: View {
     }
     .buttonStyle(.plain)
     .background(
-      Color.primary.opacity(hoverVisible ? 0.09 : 0.045),
+      hoverVisible ? theme.hover : theme.controlBackground,
       in: RoundedRectangle(cornerRadius: 8, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
-        .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
+        .stroke(theme.cardBorder, lineWidth: 0.5)
     }
     .pointingHandCursor()
     .onHover { isHovering in

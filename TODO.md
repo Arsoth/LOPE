@@ -9,34 +9,14 @@
 
 # LOPE TODO Ingest:
 
-- Organize the keyboard keys better in the full size, arrows go together, numpad keys, etc.
+- area beside status drawer button shows a text select cursor even when nothing is there
+- why is `Recon Mouse - Wireless` showing
+- Switching from Light to system breaks the UI for a little while, fades in color wise later. this is a regression. Light to dark and dark to light work fine.
+- put the light theme and dark theme dropdown selectors horizontally, and make them longer.
+- settings cards should be full width (like mouse profiles)
+- put the key categories in a 2x2 grid
 
 # LOPE todo list
-
-### 0: Define JSON-driven themes
-
-- [ ] Define theme JSON files using hex colors for the header, footer, recent-events header, button and checkbox active/inactive states, main background, primary and secondary text, drag handles and their shapes, cards, the DPI bar and DPI background, plus other app colors; support light-mode and dark-mode themes.
-
-**Done when:** The theme format documents and controls all app-wide color and drag-handle surfaces, and the bundled light and dark themes load with valid hex color values.
-
-### 1: Add a custom themes directory
-
-- [ ] Add a custom themes directory in the configuration directory that is automatically loaded, can be opened and moved like the backups directory, and is pre-populated with an underscore-named empty theme; recreate that theme if it is removed or renamed.
-
-**Done when:** The directory is created and discovered automatically, users can manage it through the same workflow as backups, and the required underscore-named empty theme is restored on the next check when missing.
-
-### 2: Add light-mode and dark-mode theme selection
-
-- [ ] Let users choose separate light-mode and dark-mode themes, with a system setting determining which selected theme is active; default both selections to the included themes.
-- [ ] Keep the current system/light/dark picker, add light/dark selectors below to choose theme
-
-**Done when:** Settings expose independent light and dark theme choices, system appearance selects the corresponding theme, and the included themes are used by default.
-
-### 3: Filter non-standard keyboard keys by category
-
-- [ ] Make the “Show non standard Keyboard keys” setting expose checkboxes for the four key categories in its settings card, with only “Standard Full size Keyboard” selected by default; keep keys available in the visual picker even when their category checkbox is disabled, while omitting disabled categories from the list.
-
-**Done when:** The four category filters control only the length of the displayed key list, the standard full-size category is enabled initially, and disabling a category never prevents a key from that category from appearing when selected in the visual picker.
 
 # Ignore below item(s):
 

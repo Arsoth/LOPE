@@ -33,6 +33,14 @@ bundled one replaces it, and there is no index file to keep in sync. The
 descriptor keeps physical button labels separate from the current output
 assignment.
 
+App-wide colors and DPI drag-handle shapes are JSON theme definitions in
+`Themes/`. `ThemeCatalog` loads the bundled `light.json` and `dark.json` files,
+then overlays valid themes from the `Custom Themes` folder inside the selected
+configuration directory. A custom theme with the same `id` replaces its bundled
+counterpart. The custom folder is created automatically and contains the
+underscore-prefixed `_empty.json` format template; underscore-prefixed files
+are ignored by the loader, and the template is recreated when missing.
+
 A descriptor can also be `generated`: written by LOPE itself, for a device
 neither the bundle nor the user recognized, with real button records under
 placeholder `"Button N"` names (see "Unrecognized mice" below). Catalog
@@ -202,8 +210,8 @@ The default configuration directory is:
 ~/Library/Application Support/LOPE
 ```
 
-The configuration directory contains separate `Backups` and `Custom Profiles`
-subdirectories. The user can choose another configuration directory from
+The configuration directory contains separate `Backups`, `Custom Profiles`, and
+`Custom Themes` subdirectories. The user can choose another configuration directory from
 Settings; existing files are not moved. The Backups tab can open the active
 backup folder in Finder, and Settings can open the active custom profiles folder.
 

@@ -5,6 +5,7 @@ import SwiftUI
 
 struct DPIEditorView: View {
   @ObservedObject var model: AppModel
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -121,7 +122,9 @@ struct DPIEditorView: View {
       }
       .padding(8)
       .background(
-        .quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        theme.dpiBackground.opacity(0.28),
+        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+      )
     }
     .padding(.top, 4)
   }

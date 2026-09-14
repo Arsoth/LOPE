@@ -5,6 +5,7 @@ import SwiftUI
 
 struct SettingsPane: View {
   @ObservedObject var model: AppModel
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -51,6 +52,17 @@ struct SettingsPane: View {
         }
         .padding(4)
       }
+      GroupBox("Themes") {
+        VStack(alignment: .leading, spacing: 8) {
+          Text(
+            "Light and dark themes are loaded from the bundled themes and Custom Themes folders."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          Button("Open custom themes folder", action: model.openCustomThemesDirectoryInFinder)
+        }
+        .padding(4)
+      }
       GroupBox("Advanced display") {
         VStack(alignment: .leading, spacing: 6) {
           Toggle(
@@ -60,6 +72,7 @@ struct SettingsPane: View {
               set: { model.setShowAdvancedFields($0) })
           )
           .toggleStyle(.checkbox)
+          .tint(theme.checkboxActive)
           Text(
             "Shows the 8-digit button records and profile sector numbers. Leave this off for the normal editing view."
           )
@@ -77,11 +90,29 @@ struct SettingsPane: View {
               set: { model.setShowNonStandardKeyboardKeys($0) })
           )
           .toggleStyle(.checkbox)
+          .tint(theme.checkboxActive)
           Text(
             "Shows the optional extended-key override for usages such as Insert, F13–F24, and Sleep. Recording captures modifiers automatically."
           )
           .font(.caption)
           .foregroundStyle(.secondary)
+          VStack(alignment: .leading, spacing: 4) {
+            Text("Key categories")
+              .font(.callout.weight(.medium))
+            ForEach(KeyboardKeyGroup.allCases, id: \.self) { group in
+              Toggle(
+                group.rawValue,
+                isOn: Binding(
+                  get: { model.isKeyboardKeyGroupEnabled(group) },
+                  set: { model.setKeyboardKeyGroup(group, enabled: $0) }
+                )
+              )
+              .toggleStyle(.checkbox)
+              .controlSize(.small)
+              .tint(theme.checkboxActive)
+            }
+          }
+          .padding(.top, 2)
         }
         .padding(4)
       }
@@ -99,8 +130,30 @@ struct SettingsPane: View {
             }
           }
           .pickerStyle(.segmented)
+          Picker(
+            "Light theme",
+            selection: Binding(
+              get: { model.selectedLightThemeID },
+              set: { model.setLightThemeID($0) }
+            )
+          ) {
+            ForEach(model.lightThemes) { theme in
+              Text(theme.name).tag(theme.id)
+            }
+          }
+          Picker(
+            "Dark theme",
+            selection: Binding(
+              get: { model.selectedDarkThemeID },
+              set: { model.setDarkThemeID($0) }
+            )
+          ) {
+            ForEach(model.darkThemes) { theme in
+              Text(theme.name).tag(theme.id)
+            }
+          }
           Text(
-            "System follows macOS. Light mode uses a soft off-white background; the DPI colors remain unchanged."
+            "System follows macOS and selects the matching theme. Light and dark modes use the theme selected below."
           )
           .font(.caption)
           .foregroundStyle(.secondary)

@@ -28,16 +28,16 @@ struct ContentView: View {
   @Environment(\.scenePhase) private var scenePhase
 
   private let statusFadeDelayNanoseconds: UInt64 = 30_000_000_000
+  private var theme: ThemePalette {
+    ThemePalette(theme: model.activeTheme, isDarkAppearance: model.isDarkAppearance)
+  }
+
   private var preferredColorScheme: ColorScheme {
     model.isDarkAppearance ? .dark : .light
   }
 
-  private static let darkAppBackground = Color(nsColor: .windowBackgroundColor)
-
   private var appBackground: Color {
-    model.isDarkAppearance
-      ? Self.darkAppBackground
-      : Color(red: 0.965, green: 0.965, blue: 0.95)
+    theme.mainBackground
   }
 
   var body: some View {
@@ -97,7 +97,7 @@ struct ContentView: View {
           status: model.statusFooterText,
           events: statusHistory.events,
           messageOpacity: statusMessageOpacity,
-          background: appBackground,
+          background: theme.footer,
           historyPresented: $statusHistoryPresented
         )
 
@@ -106,6 +106,7 @@ struct ContentView: View {
     .padding(.top, selectedTab == .settings ? 20 : 0)
     .frame(minWidth: 960, minHeight: 520)
     .background(appBackground)
+    .environment(\.lopeTheme, theme)
     .preferredColorScheme(preferredColorScheme)
     .animation(.easeInOut(duration: 0.2), value: statusHistoryPresented)
     .task(id: model.status) {
@@ -187,8 +188,8 @@ struct ContentView: View {
     }
     .padding(.top, 20)
     .frame(maxWidth: .infinity)
-    .background(appBackground)
-    .shadow(color: .black.opacity(0.24), radius: 8, y: 3)
+    .background(theme.header)
+    .shadow(color: theme.shadow, radius: 8, y: 3)
   }
 
   private func saveToMouse() {

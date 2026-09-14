@@ -7,6 +7,7 @@ struct ConfigureSurfaceView: View {
   @ObservedObject var model: AppModel
   @Binding var confirmRecoveryRestore: Bool
   @Binding var presentedRGBZoneID: Int?
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     ZStack {
@@ -73,7 +74,7 @@ struct ConfigureSurfaceView: View {
 
   private var knownDeviceWakeModal: some View {
     ZStack {
-      Color.black.opacity(0.24)
+      theme.shadow
         .ignoresSafeArea()
         .contentShape(Rectangle())
         .accessibilityHidden(true)

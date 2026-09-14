@@ -31,6 +31,7 @@ struct DPIStageBar: View {
   @State var popoverContentOpacity = 1.0
   @FocusState var focusedStageIndex: Int?
   @Environment(\.colorScheme) var colorScheme
+  @Environment(\.lopeTheme) var theme
 
   let stageSwitchDuration: TimeInterval = 0.08
   // Reserve symmetric space for localized endpoint values up to 999,999.

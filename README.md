@@ -46,7 +46,7 @@ backup folder in Finder. **Save to mouse** is the only action that writes to the
 mouse.
 
 Settings controls the configuration directory, which contains separate
-`Backups` and `Custom Profiles` folders, along with advanced raw HID++ fields,
+`Backups`, `Custom Profiles`, and `Custom Themes` folders, along with advanced raw HID++ fields,
 non-standard keyboard keys, and the color mode. Color mode defaults to
 **System**; Light is a soft off-white theme and Dark keeps the colorblind-safe
 DPI palette. Settings also shows how many mice are built in and can open the

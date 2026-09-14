@@ -13,6 +13,8 @@ extension AppModel {
       url.path, forKey: "\(AppConstants.defaultsPrefix).configurationDirectory")
     try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     try? FileManager.default.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
+    reloadThemes()
+    loadThemePreferences()
     MouseProfileCatalog.reload(customProfilesDirectory: customProfilesDirectory)
     refreshBackups()
     status = "LOPE configuration will be saved in \(url.path)."

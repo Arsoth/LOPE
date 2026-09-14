@@ -11,6 +11,10 @@ extension DPIStageBar {
     let isDefault = defaultStage == index + 1
     let isShift = shiftStage == index + 1
     let isHovered = hoveredStageIndex == index && draggingStage == nil && editingStage == nil
+    let handleTextColor =
+      isDefault
+      ? theme.defaultStageText
+      : (isShift ? theme.shiftStageText : theme.otherStageText)
     let x =
       draggingStage == index
       ? (activeDragX ?? position(for: positionValue, width: width))
@@ -26,13 +30,13 @@ extension DPIStageBar {
             .frame(width: 30, height: 30)
           Text("\(index + 1)")
             .font(.callout.weight(.bold))
-            .foregroundStyle(.black)
+            .foregroundStyle(handleTextColor)
         }
         .frame(width: 30, height: 30)
         .position(x: 42, y: 16)
         Text(displayValue)
           .font(.caption2.monospacedDigit())
-          .foregroundStyle(parsedValue == nil ? .orange : .primary)
+          .foregroundStyle(parsedValue == nil ? theme.warning : theme.primaryText)
           .lineLimit(1)
           .frame(width: 84)
           .position(x: 42, y: 45)
@@ -64,38 +68,29 @@ extension DPIStageBar {
   @ViewBuilder
   func stageShape(isDefault: Bool, isShift: Bool, isHovered: Bool = false) -> some View {
     if isDefault {
-      RoundedRectangle(cornerRadius: 4, style: .continuous)
-        .fill(DPIStagePalette.defaultStage)
-        .overlay {
-          if isHovered {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-              .stroke(
-                colorScheme == .light ? .black.opacity(0.42) : .white.opacity(0.42), lineWidth: 2
-              )
-          }
-        }
+      themedRoleShape(
+        shape: theme.defaultStageShape,
+        fill: theme.defaultStage,
+        outline: theme.defaultStageOutline,
+        filled: true,
+        hovered: isHovered
+      )
     } else if isShift {
-      DPIStagePentagon()
-        .fill(DPIStagePalette.shift)
-        .overlay {
-          if isHovered {
-            DPIStagePentagon()
-              .stroke(
-                colorScheme == .light ? .black.opacity(0.42) : .white.opacity(0.42), lineWidth: 2
-              )
-          }
-        }
+      themedRoleShape(
+        shape: theme.shiftStageShape,
+        fill: theme.shiftStage,
+        outline: theme.shiftStageOutline,
+        filled: true,
+        hovered: isHovered
+      )
     } else {
-      Circle()
-        .fill(DPIStagePalette.other)
-        .overlay {
-          if isHovered {
-            Circle()
-              .stroke(
-                colorScheme == .light ? .black.opacity(0.42) : .white.opacity(0.42), lineWidth: 2
-              )
-          }
-        }
+      themedRoleShape(
+        shape: theme.otherStageShape,
+        fill: theme.otherStage,
+        outline: theme.otherStageOutline,
+        filled: true,
+        hovered: isHovered
+      )
     }
   }
 }

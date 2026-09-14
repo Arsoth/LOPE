@@ -11,6 +11,7 @@ struct StatusArea: View {
   let messageOpacity: Double
   let background: Color
   @Binding var historyPresented: Bool
+  @Environment(\.lopeTheme) private var theme
 
   private let panelHeight: CGFloat = 270
   private let historyHeaderHeight: CGFloat = 48
@@ -55,15 +56,15 @@ struct StatusArea: View {
         if showsHistoryHeader {
           Text("Recent events")
             .font(.headline)
-            .foregroundStyle(.primary)
+            .foregroundStyle(theme.primaryText)
           Spacer()
           Text("Last \(events.count)")
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
         } else {
           Text(status)
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             .textSelection(.enabled)
             .opacity(messageOpacity)
           Spacer()
@@ -80,8 +81,7 @@ struct StatusArea: View {
     .frame(maxWidth: .infinity)
     .background {
       if showsHistoryHeader {
-        background
-          .overlay(Color.primary.opacity(0.05))
+        theme.recentEventsHeader
       } else {
         background
       }
@@ -107,10 +107,10 @@ struct StatusArea: View {
         .frame(maxWidth: .infinity)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background(Color(nsColor: .controlBackgroundColor))
+      .background(theme.controlBackground)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(Color(nsColor: .controlBackgroundColor))
+    .background(theme.controlBackground)
     .overlay {
       EscapeKeyMonitor(onEscape: { historyPresented = false })
         .frame(width: 0, height: 0)
@@ -125,7 +125,7 @@ struct StatusArea: View {
     HStack(alignment: .center, spacing: eventColumnSpacing) {
       Text(event.timestamp.formatted(date: .omitted, time: .shortened))
         .font(.caption.monospacedDigit())
-        .foregroundStyle(.primary.opacity(0.58))
+        .foregroundStyle(theme.primaryText.opacity(0.58))
         .frame(width: timestampColumnWidth, alignment: .leading)
         .textSelection(.enabled)
       Text(event.message)

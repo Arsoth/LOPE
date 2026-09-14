@@ -15,18 +15,18 @@ extension DPIStageBar {
         }
 
         Capsule()
-          .fill(DPIStagePalette.bar)
+          .fill(theme.dpiBar)
           .frame(height: 4)
           .overlay {
             Capsule()
-              .stroke(.white.opacity(0.12), lineWidth: 0.5)
+              .stroke(theme.controlBorder.opacity(0.6), lineWidth: 0.5)
           }
           .frame(width: max(proxy.size.width - trackInset * 2, 1))
           .position(x: proxy.size.width / 2, y: 43)
 
         ForEach(tickValues, id: \.self) { value in
           Rectangle()
-            .fill(.secondary.opacity(0.52))
+            .fill(theme.secondaryText.opacity(0.52))
             .frame(width: 1, height: 10)
             .position(x: position(for: value, width: proxy.size.width), y: 43)
         }
@@ -82,7 +82,7 @@ extension DPIStageBar {
               .offset(x: endpointCenterAdjustment)
           }
           .font(.caption2.monospacedDigit())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(theme.secondaryText)
           .frame(width: proxy.size.width)
           .position(x: proxy.size.width / 2, y: 43)
         }
@@ -99,7 +99,7 @@ extension DPIStageBar {
               .truncationMode(.tail)
           }
           .font(.body)
-          .foregroundStyle(.orange)
+          .foregroundStyle(theme.warning)
           .frame(
             width: max(proxy.size.width - validationLeadingInset, 1),
             alignment: .leading

@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ButtonAssignmentsView: View {
   @ObservedObject var model: AppModel
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     VStack(spacing: 8) {
@@ -86,7 +87,7 @@ struct ButtonAssignmentsView: View {
         .padding(.vertical, 10)
         .background(
           RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color.white.opacity(0.045))
+            .fill(theme.card)
         )
         .overlay(alignment: .leading) {
           Capsule(style: .continuous)
@@ -97,7 +98,7 @@ struct ButtonAssignmentsView: View {
         .overlay {
           RoundedRectangle(cornerRadius: 10, style: .continuous)
             .stroke(
-              Color.white.opacity(0.055),
+              theme.cardBorder,
               lineWidth: 0.5
             )
         }
@@ -183,7 +184,7 @@ struct ButtonAssignmentsView: View {
           model.cancelKeyboardRecording()
         } label: {
           Image(systemName: "xmark.circle.fill")
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             .frame(width: 26, height: 26)
         }
         .buttonStyle(.plain)
@@ -194,14 +195,14 @@ struct ButtonAssignmentsView: View {
     .frame(width: 190, height: 26, alignment: .leading)
     .background(
       isRecording
-        ? Color.accentColor.opacity(0.18)
-        : Color.primary.opacity(0.08),
+        ? theme.buttonActive.opacity(0.18)
+        : theme.buttonInactive.opacity(0.18),
       in: RoundedRectangle(cornerRadius: 5)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 5)
         .stroke(
-          isRecording ? Color.accentColor : Color.primary.opacity(0.14),
+          isRecording ? theme.accent : theme.controlBorder,
           lineWidth: isRecording ? 1.5 : 0.75
         )
     }
@@ -222,7 +223,14 @@ struct ButtonAssignmentsView: View {
         })
     ) {
       Text("Use Recorded Key").tag(0)
-      ForEach(model.extendedKeyboardKeyGroups) { group in
+      ForEach(model.filteredExtendedKeyboardKeyLayoutGroups) { group in
+        Section(group.label) {
+          ForEach(group.keys) { key in
+            Text(key.label).tag(Int(key.id))
+          }
+        }
+      }
+      ForEach(model.filteredExtendedKeyboardKeyGroups.filter { $0.group != .standard }) { group in
         Section(group.label) {
           ForEach(group.keys) { key in
             Text(key.label).tag(Int(key.id))

@@ -5,11 +5,11 @@ import SwiftUI
 
 extension DPIStageBar {
   var stagePopoverBackground: Color {
-    colorScheme == .light ? .white : Color.black.opacity(0.86)
+    theme.controlBackground
   }
 
   var stagePopoverBorder: Color {
-    colorScheme == .light ? Color.black.opacity(0.16) : Color.white.opacity(0.16)
+    theme.controlBorder
   }
 
   func stagePopover(index: Int, isInteractive: Bool) -> some View {
@@ -29,7 +29,7 @@ extension DPIStageBar {
       } label: {
         HStack(spacing: 7) {
           roleIcon(
-            isDefault: true, isShift: false, filled: isDefault, tint: DPIStagePalette.defaultStage)
+            isDefault: true, isShift: false, filled: isDefault, tint: theme.defaultStage)
           Text(isDefault ? "Default" : "Make Default")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -46,7 +46,7 @@ extension DPIStageBar {
         dismissStageEditor()
       } label: {
         HStack(spacing: 7) {
-          roleIcon(isDefault: false, isShift: true, filled: isShift, tint: DPIStagePalette.shift)
+          roleIcon(isDefault: false, isShift: true, filled: isShift, tint: theme.shiftStage)
           Text(isShift ? "DPI Shift" : "Make DPI Shift")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -73,7 +73,7 @@ extension DPIStageBar {
 
       Text("Dragging snaps to the mouse’s supported DPI values.")
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(theme.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
     }
     .padding(14)
@@ -85,7 +85,7 @@ extension DPIStageBar {
       RoundedRectangle(cornerRadius: 14, style: .continuous)
         .stroke(stagePopoverBorder, lineWidth: 0.75)
     }
-    .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
+    .shadow(color: theme.shadow, radius: 8, y: 3)
   }
 
   @ViewBuilder
@@ -127,17 +127,17 @@ extension DPIStageBar {
       label = "Default"
       isDefault = true
       isShift = false
-      tint = DPIStagePalette.defaultStage
+      tint = theme.defaultStage
     case .shift:
       label = "DPI Shift"
       isDefault = false
       isShift = true
-      tint = DPIStagePalette.shift
+      tint = theme.shiftStage
     case .other:
       label = "Other"
       isDefault = false
       isShift = false
-      tint = DPIStagePalette.other
+      tint = theme.otherStage
     }
 
     return HStack(spacing: 3) {

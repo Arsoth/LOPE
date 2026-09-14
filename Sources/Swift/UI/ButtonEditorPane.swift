@@ -7,6 +7,7 @@ struct ButtonEditorPane: View {
   @ObservedObject var model: AppModel
   @Binding var confirmRecoveryRestore: Bool
   @Binding var presentedRGBZoneID: Int?
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -61,7 +62,7 @@ struct ButtonEditorPane: View {
     if !model.isProvisionalMouseData && !model.recoveryBackups.isEmpty {
       HStack(spacing: 8) {
         Image(systemName: "exclamationmark.triangle.fill")
-          .foregroundStyle(.orange)
+          .foregroundStyle(theme.warning)
         Text(
           "The last save was only partially completed. Exact pre-save backups are available for recovery."
         )
@@ -73,7 +74,7 @@ struct ButtonEditorPane: View {
         .buttonStyle(.bordered)
       }
       .padding(8)
-      .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+      .background(theme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
       .padding(.horizontal, 20)
     }
   }
@@ -85,7 +86,7 @@ struct ButtonEditorPane: View {
         "This device is cataloged for read-only inspection until its profile-specific save format is validated."
       )
       .font(.caption)
-      .foregroundStyle(.orange)
+      .foregroundStyle(theme.warning)
       .padding(.horizontal, 20)
     }
   }
@@ -103,7 +104,7 @@ struct ButtonEditorPane: View {
           .buttonStyle(.bordered)
       }
       .padding(8)
-      .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+      .background(theme.card.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
       .padding(.horizontal, 20)
     }
   }
@@ -111,6 +112,7 @@ struct ButtonEditorPane: View {
 
 struct ProfileControlsView: View {
   @ObservedObject var model: AppModel
+  @Environment(\.lopeTheme) private var theme
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -171,13 +173,13 @@ struct ProfileControlsView: View {
     .frame(minHeight: 36)
     .background(
       RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .fill(Color.white.opacity(0.045))
+        .fill(theme.card)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
-        .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
+        .stroke(theme.cardBorder, lineWidth: 0.5)
     }
-    .padding(.top, 13)
+    .padding(.top, 20)
   }
 
   private func profileEnableControl(_ profile: ProfileChoice) -> some View {

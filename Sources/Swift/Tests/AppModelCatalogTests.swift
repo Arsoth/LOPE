@@ -178,9 +178,76 @@ final class AppModelCatalogTests: XCTestCase {
     model.showNonStandardKeyboardKeys = true
     XCTAssertFalse(model.keyboardOutputKeys.isEmpty)
     XCTAssertEqual(model.keyboardOutputKeys, model.extendedKeyboardKeys)
+    XCTAssertFalse(model.keyboardOutputKeys.contains { $0.id == 0x04 && $0.label == "A" })
   }
 
-  func testExtendedKeyboardKeyGroupsAreOrderedAndAlphabetized() {
+  func testKeyboardKeyLayoutGroupsFollowFullSizePhysicalOrder() {
+    let model = AppModel(startInitialRefresh: false)
+    let groups = model.keyboardKeyLayoutGroups
+
+    XCTAssertEqual(
+      groups.map(\.label),
+      ["Main typing block", "Navigation and arrow cluster", "Numpad"])
+
+    let navigationLabels = groups.first { $0.group == .navigation }?.keys.map(\.label) ?? []
+    XCTAssertEqual(
+      navigationLabels,
+      [
+        "Print Screen", "Scroll Lock", "Pause", "Insert", "Home", "Page Up", "Delete", "End",
+        "Page Down", "Up Arrow", "Left Arrow", "Down Arrow", "Right Arrow", "Locking Scroll Lock",
+      ])
+
+    let numpadLabels = groups.first { $0.group == .numpad }?.keys.map(\.label) ?? []
+    XCTAssertEqual(
+      numpadLabels,
+      [
+        "Num Lock", "Keypad /", "Keypad *", "Keypad -", "Keypad 7 / Home",
+        "Keypad 8 / Up Arrow", "Keypad 9 / Page Up", "Keypad +", "Keypad 4 / Left Arrow",
+        "Keypad 5", "Keypad 6 / Right Arrow", "Keypad 1 / End", "Keypad 2 / Down Arrow",
+        "Keypad 3 / Page Down", "Keypad Enter", "Keypad 0 / Insert", "Keypad . / Delete",
+        "Keypad =", "Locking Num Lock", "Keypad Comma", "Keypad Equal Sign",
+      ])
+
+    let mainTypingLabels = groups.first { $0.group == .mainTyping }?.keys.map(\.label) ?? []
+    XCTAssertEqual(
+      mainTypingLabels.prefix(14),
+      [
+        "Escape", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+        "`",
+      ])
+    XCTAssertEqual(
+      mainTypingLabels.suffix(5),
+      ["Space", "Non-US \\", "Application", "Power", "Locking Caps Lock"])
+  }
+
+  func testExtendedKeyboardKeyPickerGroupsKeepPhysicalStandardKeysTogether() {
+    let model = AppModel(startInitialRefresh: false)
+    let groups = model.extendedKeyboardKeyLayoutGroups
+
+    XCTAssertEqual(
+      groups.map(\.label),
+      ["Main typing block", "Navigation and arrow cluster", "Numpad"])
+    XCTAssertEqual(
+      groups[0].keys.map(\.label),
+      ["Non-US \\", "Application", "Power", "Locking Caps Lock"])
+    XCTAssertEqual(
+      groups[1].keys.map(\.label),
+      [
+        "Print Screen", "Scroll Lock", "Pause", "Insert", "Home", "Page Up", "Delete", "End",
+        "Page Down", "Up Arrow", "Left Arrow", "Down Arrow", "Right Arrow", "Locking Scroll Lock",
+      ])
+    XCTAssertEqual(
+      groups[2].keys.map(\.label),
+      [
+        "Num Lock", "Keypad /", "Keypad *", "Keypad -", "Keypad 7 / Home",
+        "Keypad 8 / Up Arrow", "Keypad 9 / Page Up", "Keypad +", "Keypad 4 / Left Arrow",
+        "Keypad 5", "Keypad 6 / Right Arrow", "Keypad 1 / End", "Keypad 2 / Down Arrow",
+        "Keypad 3 / Page Down", "Keypad Enter", "Keypad 0 / Insert", "Keypad . / Delete",
+        "Keypad =", "Locking Num Lock", "Keypad Comma", "Keypad Equal Sign",
+      ])
+  }
+
+  func testExtendedKeyboardKeyGroupsAreCategoryOrdered() {
     let model = AppModel(startInitialRefresh: false)
     let groups = model.extendedKeyboardKeyGroups
 
@@ -194,7 +261,12 @@ final class AppModelCatalogTests: XCTestCase {
       ])
     XCTAssertEqual(model.extendedKeyboardKeys, groups.flatMap(\.keys))
 
-    for group in groups {
+    let standardLabels = groups.first { $0.group == .standard }?.keys.map(\.label) ?? []
+    XCTAssertEqual(
+      standardLabels,
+      model.extendedKeyboardKeyLayoutGroups.flatMap(\.keys).map(\.label))
+
+    for group in groups where group.group != .standard {
       XCTAssertEqual(
         group.keys,
         group.keys.sorted {
@@ -223,6 +295,17 @@ final class AppModelCatalogTests: XCTestCase {
 
     XCTAssertEqual(choices.map(\.id), KeyboardKeyGroup.allCases)
     XCTAssertEqual(choices.map(\.label), KeyboardKeyGroup.allCases.map(\.rawValue))
+    XCTAssertEqual(choices.map(\.keys), Array(repeating: [key], count: choices.count))
+  }
+
+  func testKeyboardKeyLayoutGroupChoiceExposesStableIdentityAndLabel() {
+    let key = KeyboardKeyChoice(id: 0x04, label: "A")
+    let choices = KeyboardKeyLayoutGroup.allCases.map {
+      KeyboardKeyLayoutGroupChoice(group: $0, keys: [key])
+    }
+
+    XCTAssertEqual(choices.map(\.id), KeyboardKeyLayoutGroup.allCases)
+    XCTAssertEqual(choices.map(\.label), KeyboardKeyLayoutGroup.allCases.map(\.rawValue))
     XCTAssertEqual(choices.map(\.keys), Array(repeating: [key], count: choices.count))
   }
 

@@ -54,28 +54,64 @@ extension DPIStageBar {
 
   @ViewBuilder
   func roleIcon(isDefault: Bool, isShift: Bool, filled: Bool, tint: Color) -> some View {
-    Group {
-      if isDefault {
-        if filled {
-          RoundedRectangle(cornerRadius: 3, style: .continuous).fill(tint)
-        } else {
-          RoundedRectangle(cornerRadius: 3, style: .continuous).stroke(tint, lineWidth: 1.25)
-        }
-      } else if isShift {
-        if filled {
-          DPIStagePentagon().fill(tint)
-        } else {
-          DPIStagePentagon().stroke(tint, lineWidth: 1.25)
+    let shape =
+      isDefault
+      ? theme.defaultStageShape
+      : (isShift ? theme.shiftStageShape : theme.otherStageShape)
+    let outline =
+      isDefault
+      ? theme.defaultStageOutline
+      : (isShift ? theme.shiftStageOutline : theme.otherStageOutline)
+    themedRoleShape(shape: shape, fill: tint, outline: outline, filled: filled)
+      .frame(width: 14, height: 14)
+  }
+
+  @ViewBuilder
+  func themedRoleShape(
+    shape: ThemeDragHandleShape,
+    fill: Color,
+    outline: Color,
+    filled: Bool,
+    hovered: Bool = false
+  ) -> some View {
+    switch shape {
+    case .circle:
+      if filled {
+        Circle().fill(fill).overlay {
+          if hovered { Circle().stroke(outline, lineWidth: 2) }
         }
       } else {
-        if filled {
-          Circle().fill(tint)
-        } else {
-          Circle().stroke(tint, lineWidth: 1.25)
+        Circle().stroke(outline, lineWidth: 1.25)
+      }
+    case .triangle:
+      if filled {
+        DPIStageTriangle().fill(fill).overlay {
+          if hovered { DPIStageTriangle().stroke(outline, lineWidth: 2) }
         }
+      } else {
+        DPIStageTriangle().stroke(outline, lineWidth: 1.25)
+      }
+    case .pentagon:
+      if filled {
+        DPIStagePentagon().fill(fill).overlay {
+          if hovered { DPIStagePentagon().stroke(outline, lineWidth: 2) }
+        }
+      } else {
+        DPIStagePentagon().stroke(outline, lineWidth: 1.25)
+      }
+    case .roundedRectangle:
+      if filled {
+        RoundedRectangle(cornerRadius: 4, style: .continuous).fill(fill).overlay {
+          if hovered {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+              .stroke(outline, lineWidth: 2)
+          }
+        }
+      } else {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+          .stroke(outline, lineWidth: 1.25)
       }
     }
-    .frame(width: 14, height: 14)
   }
 
   var tickValues: [Int] {
