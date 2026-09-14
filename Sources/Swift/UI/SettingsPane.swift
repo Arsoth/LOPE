@@ -9,6 +9,8 @@ struct SettingsPane: View {
 
   var body: some View {
     GeometryReader { geometry in
+      let contentWidth = max(geometry.size.width - 40, 0)
+
       VStack(alignment: .leading, spacing: 12) {
         Text("Settings")
           .font(.headline)
@@ -37,7 +39,7 @@ struct SettingsPane: View {
           }
           .padding(4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Mouse profiles") {
           VStack(alignment: .leading, spacing: 8) {
             Text(
@@ -55,7 +57,7 @@ struct SettingsPane: View {
           }
           .padding(4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Advanced display") {
           VStack(alignment: .leading, spacing: 6) {
             Toggle(
@@ -74,7 +76,7 @@ struct SettingsPane: View {
           }
           .padding(4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Keyboard outputs") {
           VStack(alignment: .leading, spacing: 6) {
             Toggle(
@@ -122,7 +124,7 @@ struct SettingsPane: View {
           }
           .padding(4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: contentWidth, alignment: .leading)
         GroupBox("Appearance") {
           VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 12) {
@@ -180,7 +182,7 @@ struct SettingsPane: View {
           }
           .padding(4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: contentWidth, alignment: .leading)
         Spacer()
       }
       .padding(.top, 4)
@@ -194,15 +196,18 @@ struct SettingsPane: View {
     selection: Binding<String>,
     themes: [ThemeDefinition]
   ) -> some View {
-    GeometryReader { geometry in
-      Picker(title, selection: selection) {
+    HStack(alignment: .center, spacing: 8) {
+      Text(title)
+        .font(.callout.weight(.medium))
+      Picker("", selection: selection) {
         ForEach(themes) { theme in
           Text(theme.name).tag(theme.id)
         }
       }
+      .labelsHidden()
       .pickerStyle(.menu)
-      .frame(width: geometry.size.width, alignment: .leading)
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .frame(minHeight: 22)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
