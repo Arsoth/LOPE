@@ -229,7 +229,7 @@ struct ContentView: View {
   }
 
   private var wiredAccessInstructionsMessage: String {
-    "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, use the button below. macOS will register LOPE in Input Monitoring, then enable it in System Settings and return to choose Refresh."
+    "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, use the button below. On first use, macOS asks to receive keystrokes while it registers LOPE; choose Open System Settings, enable LOPE there, then return and choose Refresh."
   }
 
   private func dismissWiredAccessInstructions() {

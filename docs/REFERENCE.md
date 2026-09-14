@@ -79,8 +79,13 @@ the Input Monitoring privacy pane before the user enables it. Both buttons
 request access from the GUI process and then open the pane, including on
 repeated clicks after denial. They do not wait for the CLI or open extra HID
 interfaces to trigger registration. macOS owns the permission prompt and list;
-a successful settings URL launch alone does not verify registration. Wireless
-and receiver devices stay usable without this permission.
+the first registration displays macOS's Keystroke Receiving dialog. That
+dialog's **Open System Settings** action opens the privacy pane; LOPE does not
+also open a second copy of the pane behind it. Once a TCC record exists, later
+clicks open Input Monitoring directly. No public API can silently accept or
+bypass the first consent step. A successful settings URL launch alone does not
+verify registration. Wireless and receiver devices stay usable without this
+permission.
 
 Before access is granted, discovery reads only passive HID properties. It does
 not inspect parsed HID elements because macOS may open the protected device as

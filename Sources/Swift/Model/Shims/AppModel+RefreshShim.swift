@@ -4,6 +4,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import IOKit.hidsystem
 
 // See the note in AppModel+JSONEditableBackupsShim.swift: everything under
 // Sources/Swift/Model/Shims/ wraps a real, unmockable AppKit modal dialog
@@ -13,16 +14,24 @@ import Foundation
 extension AppModel {
   func openInputMonitoringSettings() {
     updateInputMonitoringAuthorization()
+    let access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
     openInputMonitoringSettings(
       requestAccess: {
-        // Request the Input Monitoring prompt from the GUI (macOS 10.15+).
-        // On macOS 26.6, IOHIDRequestAccess can return a service-policy denial
-        // without registering a client. CoreGraphics provides the explicit
-        // event-listening prompt; HID access is still checked with IOHID.
-        _ = CGRequestListenEventAccess()
+        if access == kIOHIDAccessTypeUnknown {
+          // First use: this registers LOPE and presents macOS's consent dialog.
+          // Its Open System Settings action owns the transition to the privacy
+          // pane; opening the pane ourselves would put it behind the dialog.
+          _ = CGRequestListenEventAccess()
+        }
         updateInputMonitoringAuthorization()
       },
-      openSettings: { openInputMonitoringSettingsPane() }
+      openSettings: {
+        // After the first request, macOS has a record for LOPE and does not
+        // present the consent dialog again. Open the existing row directly.
+        if access != kIOHIDAccessTypeUnknown {
+          openInputMonitoringSettingsPane()
+        }
+      }
     )
   }
 
