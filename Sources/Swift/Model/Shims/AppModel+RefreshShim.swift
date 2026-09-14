@@ -2,8 +2,8 @@
 // Copyright (C) 2026
 
 import AppKit
+import CoreGraphics
 import Foundation
-import IOKit.hidsystem
 
 // See the note in AppModel+JSONEditableBackupsShim.swift: everything under
 // Sources/Swift/Model/Shims/ wraps a real, unmockable AppKit modal dialog
@@ -15,10 +15,11 @@ extension AppModel {
     updateInputMonitoringAuthorization()
     openInputMonitoringSettings(
       requestAccess: {
-        // Apple documents this explicit request for IOHIDManager/IOHIDDevice
-        // access (macOS 10.15+). Run it in the GUI process, without opening
-        // unrelated HID interfaces or waiting for a helper invocation.
-        _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+        // Request the Input Monitoring prompt from the GUI (macOS 10.15+).
+        // On macOS 26.6, IOHIDRequestAccess can return a service-policy denial
+        // without registering a client. CoreGraphics provides the explicit
+        // event-listening prompt; HID access is still checked with IOHID.
+        _ = CGRequestListenEventAccess()
         updateInputMonitoringAuthorization()
       },
       openSettings: { openInputMonitoringSettingsPane() }

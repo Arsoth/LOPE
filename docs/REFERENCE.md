@@ -74,13 +74,18 @@ LOPE does not request access or show a modal during enumeration. If macOS
 reports that a wired HID interface needs Input Monitoring, the picker keeps the
 real wired mouse visible. Selecting it explains the permission and opens the
 matching System Settings page. The explicit permission action calls
-`IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)`, which registers LOPE with
+`CGRequestListenEventAccess()` in LOPE.app to request registration with
 the Input Monitoring privacy pane before the user enables it. Both buttons
 request access from the GUI process and then open the pane, including on
 repeated clicks after denial. They do not wait for the CLI or open extra HID
 interfaces to trigger registration. macOS owns the permission prompt and list;
 a successful settings URL launch alone does not verify registration. Wireless
 and receiver devices stay usable without this permission.
+
+Before access is granted, discovery reads only passive HID properties. It does
+not inspect parsed HID elements because macOS may open the protected device as
+part of that operation and show a Keystroke Receiving prompt during launch.
+That protected fallback is available only after Input Monitoring is enabled.
 
 For development testing, removing the Input Monitoring row does not clear
 an old Accessibility permission tied to a different signing certificate.

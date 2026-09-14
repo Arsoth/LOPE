@@ -106,7 +106,7 @@ void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t o
     CFStringGetCString((CFStringRef)value, out, (CFIndex)out_size, kCFStringEncodingUTF8);
 }
 
-bool device_has_hidpp_reports(IOHIDDeviceRef device) {
+bool device_has_hidpp_reports(IOHIDDeviceRef device, bool inspect_protected_elements) {
     CFTypeRef descriptor_value =
         hid_device_get_property_impl(device, CFSTR(kIOHIDReportDescriptorKey));
     if (descriptor_value != NULL && CFGetTypeID(descriptor_value) == CFDataGetTypeID()) {
@@ -135,8 +135,16 @@ bool device_has_hidpp_reports(IOHIDDeviceRef device) {
         }
     }
 
-    // Keep an element-based fallback for devices whose driver does not expose
-    // the raw report descriptor as an IOHIDDevice property.
+    // IOHIDDeviceCopyMatchingElements initializes a connection to the device.
+    // For a protected wired interface, that connection can show macOS's
+    // Keystroke Receiving prompt. Enumeration must stay passive until the user
+    // explicitly requests Input Monitoring from the GUI.
+    if (!inspect_protected_elements) {
+        return false;
+    }
+
+    // Keep an element-based fallback for authorized devices whose driver does
+    // not expose the raw report descriptor as an IOHIDDevice property.
     CFArrayRef elements =
         hid_device_copy_matching_elements_impl(device, NULL, kIOHIDOptionsTypeNone);
     if (elements == NULL) {

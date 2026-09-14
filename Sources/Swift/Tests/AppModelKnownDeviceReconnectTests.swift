@@ -756,7 +756,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     XCTAssertTrue(model.devices.isEmpty)
 
     model.startReconnectMonitor()
-    try? await Task.sleep(nanoseconds: 2_300_000_000)
+    await waitUntil(timeout: 5) {
+      model.refreshTask != nil || model.devices.contains(where: { $0.name == "Recon Mouse" })
+    }
     // The reconnect monitor's discovery hands off to startRefresh(), which
     // runs its own background task; let it settle before asserting.
     await model.refreshTask?.value

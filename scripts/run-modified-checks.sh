@@ -142,6 +142,11 @@ while IFS= read -r path; do
   changed_count=$((changed_count + 1))
 
   case "$path" in
+    Sources/C/Testing/*.c|Sources/C/Testing/*.h)
+      # Test sources select the C self-test suite but are never production
+      # coverage targets.
+      run_c_tests=1
+      ;;
     Sources/C/*.c|Sources/C/*.h|Sources/C/*/*.c|Sources/C/*/*.h|Sources/C/Core/main.m)
       run_c_tests=1
       if [[ "$path" == *.c ]]; then

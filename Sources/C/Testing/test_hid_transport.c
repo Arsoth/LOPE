@@ -345,7 +345,7 @@ int test_hid_transport(void) {
         CFDataCreate(kCFAllocatorDefault, valid_descriptor, (CFIndex)sizeof(valid_descriptor));
     g_property_value = descriptor;
     hid_device_copy_matching_elements_impl = transport_elements_double;
-    property_ok = property_ok && device_has_hidpp_reports(fake_device);
+    property_ok = property_ok && device_has_hidpp_reports(fake_device, true);
     uint8_t partial_descriptor[] = {0x06, 0x00, 0xFF, 0x85, REPORT_SHORT};
     CFDataRef partial =
         CFDataCreate(kCFAllocatorDefault, partial_descriptor, (CFIndex)sizeof(partial_descriptor));
@@ -356,18 +356,19 @@ int test_hid_transport(void) {
                                     (const void *)(uintptr_t)3, (const void *)(uintptr_t)4};
     g_elements = CFArrayCreate(kCFAllocatorDefault, element_values, 5, NULL);
     g_element_usage_page = 0x0001;
-    property_ok = property_ok && device_has_hidpp_reports(fake_device);
+    property_ok = property_ok && device_has_hidpp_reports(fake_device, true);
     const void *no_element_values[] = {(const void *)(uintptr_t)1};
     CFArrayRef no_elements = CFArrayCreate(kCFAllocatorDefault, no_element_values, 1, NULL);
     g_elements = no_elements;
-    property_ok = property_ok && !device_has_hidpp_reports(fake_device);
+    property_ok = property_ok && !device_has_hidpp_reports(fake_device, true);
     const void *long_element_values[] = {(const void *)(uintptr_t)4};
     CFArrayRef long_elements = CFArrayCreate(kCFAllocatorDefault, long_element_values, 1, NULL);
     g_elements = long_elements;
     g_element_usage_page = HIDPP_USAGE_PAGE;
-    property_ok = property_ok && device_has_hidpp_reports(fake_device);
+    property_ok = property_ok && !device_has_hidpp_reports(fake_device, false);
+    property_ok = property_ok && device_has_hidpp_reports(fake_device, true);
     g_elements = NULL;
-    property_ok = property_ok && !device_has_hidpp_reports(fake_device);
+    property_ok = property_ok && !device_has_hidpp_reports(fake_device, true);
     g_property_value = NULL;
 
     hid_device_open_impl = transport_open_double;

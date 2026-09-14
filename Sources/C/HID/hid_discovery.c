@@ -396,8 +396,10 @@ int hid_context_create_hardware(HidContext *context) {
             uint32_t product_id = number_property(device, CFSTR(kIOHIDProductIDKey));
             // Some Logitech mice combine keyboard/mouse collections and
             // HID++ collections in one interface; the primary usage is not
-            // always the vendor page. Inspect all parsed elements as well.
-            bool hidpp_reports = device_has_hidpp_reports(device);
+            // always the vendor page. Element inspection opens a protected
+            // connection, so use that fallback only after access is granted.
+            bool hidpp_reports =
+                device_has_hidpp_reports(device, hid_access == kIOHIDAccessTypeGranted);
             // A receiver exposes separate mouse, keyboard, and vendor HID
             // interfaces with the same product ID. Do not let the known
             // receiver PID fallback turn the first two into HID++ channels;

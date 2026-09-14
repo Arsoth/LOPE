@@ -73,7 +73,7 @@ uint32_t number_property(IOHIDDeviceRef device, CFStringRef key);
 uint64_t location_property(IOHIDDeviceRef device);
 uint64_t registry_id_property(IOHIDDeviceRef device);
 void string_property(IOHIDDeviceRef device, CFStringRef key, char *out, size_t out_size);
-bool device_has_hidpp_reports(IOHIDDeviceRef device);
+bool device_has_hidpp_reports(IOHIDDeviceRef device, bool inspect_protected_elements);
 
 bool is_wireless_device_product(uint32_t product_id);
 bool is_receiver_product(uint32_t product_id);
