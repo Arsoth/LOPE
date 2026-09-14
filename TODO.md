@@ -9,79 +9,9 @@
 
 # LOPE TODO Ingest:
 
+- Selecting a wired mouse that is unavailable due to permissions should pop up the request permissions window (which should be styled/function same as the wake window). In fact that should probably be the only time the permissions window auto appears - assuming we are always able to see a wired mouse exists, just not access the HID without permissions. Add a permissions checker/notification in the settings pane that lets you open system preferences from it as well.
+
 # LOPE todo list
-
-### 1: Remove the stray text-selection cursor
-
-- [x] Remove the text-select cursor from the area beside the status drawer button when that area is empty.
-
-**Done when:** The pointer uses the normal cursor over the empty area beside the status drawer button.
-
-### 2: Investigate the unexpected Recon Mouse entry
-
-- [x] Determine why `Recon Mouse - Wireless` appears intermittently and fix the underlying device-list behavior. I do not own that mouse, and it is only used in tests. Was this due to having the C backend missing?
-
-**Done when:** The device picker only shows `Recon Mouse - Wireless` when the corresponding device is actually present and eligible to display.
-
-### 3: Fix the Light-to-System theme transition
-
-- [x] Fix the regression where switching from Light to System leaves the UI visually delayed before the colors fade in.
-
-**Done when:** Light-to-System updates cleanly and promptly, matching the already-working Light-to-Dark and Dark-to-Light transitions.
-
-### 4: Arrange theme selectors horizontally
-
-- [x] Place the light-theme and dark-theme dropdown selectors side by side and make them longer.
-
-**Done when:** Both selectors appear in one horizontal row with increased usable width and remain usable at supported window sizes.
-
-### 5: Make settings cards full width
-
-- [x] Make the settings cards span the full available width, like the mouse profile cards.
-
-**Done when:** Settings cards align to the same full-width layout behavior as mouse profile cards.
-
-### 6: Arrange key categories in a 2x2 grid
-
-- [x] Replace the vertical key-category stack with a 2x2 grid.
-
-**Done when:** The key categories display in two columns and two rows without overlap or clipped content.
-
-### 7: Move the Themes button into Appearance
-
-- [x] Move the Themes button into the Appearance section instead of keeping it in its own card.
-
-**Done when:** The Themes button is available within Appearance and no standalone Themes card remains.
-
-### 8: Add a theme-folder refresh button
-
-- [x] Add a refresh button that reloads themes from the themes folder.
-
-**Done when:** Activating refresh rereads the themes folder and updates the available themes in the UI.
-
-### 9: Manage system themes with hash validation
-
-- [x] Automatically build and load Light and Dark as hash-validated system themes in the themes folder, replacing the need for an empty theme. If a system theme is modified, restore the system version and rename the modified copy.
-
-**Done when:** The canonical Light and Dark system themes are present, validated, restored when modified, and modified copies are preserved under renamed files.
-
-### 10: Load themes from JSON when switching or refreshing
-
-- [x] Make theme switching and theme-folder refreshing load theme data from the themes JSON so color changes do not require rebuilding the app during development.
-
-**Done when:** Both actions reflect the current themes JSON contents without an application rebuild.
-
-### 11: Hide the unauthorized wired device during its popup
-
-- [x] Hide the unauthorized wired device from the device picker while the wired-device popup is active.
-
-**Done when:** The unauthorized wired device is absent from the picker for the full duration of the popup and returns afterward when appropriate.
-
-### 12: Simplify the wake-wireless-mouse popup
-
-- [x] Remove the refresh button and loading spinner from the wake wireless mouse popup.
-
-**Done when:** The popup no longer displays either control and its remaining content still presents correctly.
 
 # Ignore below item(s):
 
