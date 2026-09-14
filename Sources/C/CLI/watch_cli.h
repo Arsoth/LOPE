@@ -1,7 +1,7 @@
 #ifndef LOPE_LOGITECH_ONBOARD_WATCH_CLI_H
 #define LOPE_LOGITECH_ONBOARD_WATCH_CLI_H
 
-#include "types.h"
+#include "hid_types.h"
 
 typedef IOReturn (*WatchDeviceOpenFn)(IOHIDDeviceRef device, IOOptionBits options);
 typedef IOReturn (*WatchDeviceCloseFn)(IOHIDDeviceRef device, IOOptionBits options);

@@ -8,28 +8,9 @@
 #ifndef LOPE_LOGITECH_ONBOARD_TYPES_H
 #define LOPE_LOGITECH_ONBOARD_TYPES_H
 
-#include <CoreFoundation/CoreFoundation.h>
-#include <IOKit/hid/IOHIDElement.h>
-#include <IOKit/hid/IOHIDKeys.h>
-#include <IOKit/hid/IOHIDManager.h>
-#include <IOKit/hid/IOHIDLib.h>
-#include <IOKit/hidsystem/IOHIDLib.h>
-#include <IOKit/IOKitLib.h>
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <time.h>
-#include <unistd.h>
 
 #define LOGITECH_VID 0x046D
 #define HIDPP_USAGE_PAGE 0xFF00
@@ -93,50 +74,12 @@
 #define RGB_PROFILE_COLOR_OFFSET 1
 #define RGB_PROFILE_RECORD_COUNT 4
 
-typedef struct HidReportNode {
-    uint32_t report_id;
-    size_t length;
-    uint8_t bytes[MAX_REPORT_BYTES];
-    struct HidReportNode *next;
-} HidReportNode;
-
-typedef struct {
-    IOHIDDeviceRef device;
-    uint8_t *callback_buffer;
-    CFRunLoopRef run_loop;
-    pthread_mutex_t lock;
-    HidReportNode *head;
-    HidReportNode *tail;
-    bool opened;
-} HidChannel;
-
-typedef struct {
-    IOHIDDeviceRef device;
-    uint32_t vendor_id;
-    uint32_t product_id;
-    uint32_t usage_page;
-    uint32_t usage;
-    uint64_t location_id;
-    uint64_t registry_id;
-    char product[256];
-    char transport[128];
-    bool is_vendor;
-    bool is_mouse;
-    // Receiver-backed HID++ devices may require the long report even when
-    // the request payload would fit in a short report. This is detected from
-    // the interface descriptor (or a known Logitech HID++ product ID).
-    bool prefer_long_reports;
-    HidChannel channel;
-    bool channel_open;
-} HidInterface;
-
-typedef struct {
-    IOHIDManagerRef manager;
-    CFSetRef device_set;
-    HidInterface *items;
-    size_t count;
-    bool manager_open;
-} HidContext;
+// HID objects are defined in hid_types.h. Keeping this pointer opaque lets
+// protocol, profile, backup, and command declarations use Device without
+// importing CoreFoundation or IOKit.
+typedef struct HidChannel HidChannel;
+typedef struct HidContext HidContext;
+typedef struct HidInterface HidInterface;
 
 typedef struct {
     uint16_t id;
@@ -254,6 +197,10 @@ typedef struct {
     bool sensor_only;
     bool include_dpi;
     bool include_report_rate;
+    // `--format json` selects the versioned process boundary. It is kept in
+    // the command options so the CLI can choose presentation without changing
+    // the typed engine operation inputs.
+    bool structured_output;
     int button;
     int dpi_default;
     int dpi_shift;

@@ -1,4 +1,14 @@
-#include "internal.h"
+#include "commands_backup_bind.h"
+#include "backup.h"
+#include "commands_read.h"
+#include "g600.h"
+#include "hid_discovery.h"
+#include "profile_io.h"
+#include "profile_rendering.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int run_dump(const Options *options) {
     if (options->path == NULL) {

@@ -187,6 +187,30 @@ final class AppModelEditingKeyboardTests: XCTestCase {
     XCTAssertEqual(model.keyboardKeyChoice(buttonIndex: 0), 0x49)
   }
 
+  func testCapturedExtendedKeyRemainsTheRecordedChoice() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.showNonStandardKeyboardKeys = true
+    model.beginKeyboardRecording(buttonIndex: 0)
+
+    model.recordKeyboardEvent(buttonIndex: 0, keyCode: 0x49, modifier: 0x02)
+
+    XCTAssertEqual(model.keyboardKeyChoice(buttonIndex: 0), 0)
+    XCTAssertEqual(model.keyboardChordText(buttonIndex: 0), "Shift+Insert")
+    XCTAssertTrue(model.extendedKeyboardKeys.contains { $0.id == 0x49 })
+  }
+
+  func testDirectExtendedKeyChoiceStillUsesExtendedChoiceControls() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.showNonStandardKeyboardKeys = true
+
+    model.setKeyboardKeyChoice(buttonIndex: 0, key: 0x49)
+
+    XCTAssertEqual(model.keyboardKeyChoice(buttonIndex: 0), 0x49)
+    XCTAssertEqual(model.keyboardChordText(buttonIndex: 0), "Insert")
+  }
+
   func testSpecialKeyChoiceIsZeroForOrdinaryKeyEvenWhenShown() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)

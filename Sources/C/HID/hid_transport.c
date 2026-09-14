@@ -1,4 +1,12 @@
-#include "internal.h"
+#include "hid_transport.h"
+
+#include <IOKit/hid/IOHIDKeys.h>
+#include <ctype.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 HidDeviceOpenFn hid_device_open_impl = IOHIDDeviceOpen;
 HidDeviceCloseFn hid_device_close_impl = IOHIDDeviceClose;

@@ -4,6 +4,64 @@
 import AppKit
 import SwiftUI
 
+private struct PointingHandCursorModifier: ViewModifier {
+  let enabled: Bool
+
+  func body(content: Content) -> some View {
+    content.overlay {
+      CursorRectView(cursor: enabled ? .pointingHand : .arrow)
+        .allowsHitTesting(false)
+    }
+  }
+}
+
+extension View {
+  /// Adds a view-owned pointing-hand cursor region without changing layout or
+  /// competing with cursor regions belonging to neighboring controls.
+  func pointingHandCursor(enabled: Bool = true) -> some View {
+    modifier(PointingHandCursorModifier(enabled: enabled))
+  }
+}
+
+private struct CursorRectView: NSViewRepresentable {
+  let cursor: NSCursor
+
+  func makeNSView(context: Context) -> CursorNSView {
+    CursorNSView(cursor: cursor)
+  }
+
+  func updateNSView(_ nsView: CursorNSView, context: Context) {
+    nsView.cursor = cursor
+  }
+
+  final class CursorNSView: NSView {
+    var cursor: NSCursor {
+      didSet {
+        window?.invalidateCursorRects(for: self)
+      }
+    }
+
+    init(cursor: NSCursor) {
+      self.cursor = cursor
+      super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+      cursor = .arrow
+      super.init(coder: coder)
+    }
+
+    override func resetCursorRects() {
+      super.resetCursorRects()
+      addCursorRect(bounds, cursor: cursor)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+      nil
+    }
+  }
+}
+
 struct ScrollViewScrollerInset: NSViewRepresentable {
   let rightInset: CGFloat
 

@@ -34,10 +34,11 @@ to build or test a change locally.
 make install-hooks
 ```
 
-Installs `scripts/git-hooks/pre-commit` into `.git/hooks/pre-commit`. It runs
-formatting checks and the changed-files test/coverage gate before every
-commit. This does not happen automatically per clone/worktree, so run it
-again after a fresh clone.
+Installs `scripts/git-hooks/pre-commit` into `.git/hooks/pre-commit`. Before
+each commit it formats Swift and C code, re-stages only paths that were already
+staged, then runs the formatting checks and changed-files test/coverage gate.
+This does not happen automatically per clone/worktree, so run it again after a
+fresh clone.
 
 The coverage gate defaults to 90% per file (see `docs/development-standards.md`).
 

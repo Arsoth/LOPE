@@ -1,5 +1,14 @@
-#include "internal.h"
+#include "commands_backup_bind.h"
+#include "backup.h"
+#include "g600.h"
+#include "profile_io.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static int create_empty_hid_context_for_backup_bind(HidContext *context) {
     memset(context, 0, sizeof(*context));

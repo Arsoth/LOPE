@@ -52,11 +52,11 @@ extension AppModel {
       // A stale cached key should not prevent the normal discovery path
       // from finding a newly connected mouse.
       guard snapshot.profileText != nil else {
-        if self.hasKnownOnboardProfileCapability(cachedDevice) {
+        if cachedDevice.isNonWiredDevice {
           self.beginKnownDeviceRefresh(cachedDevice)
         } else {
           self.startRefresh(
-            preferredDeviceIndex: cachedDevice.id,
+            preferredDeviceIndex: -1,
             preferredProfileNumber: preferredProfileNumber
           )
         }
@@ -67,7 +67,8 @@ extension AppModel {
       self.startBackgroundDeviceEnumeration(
         executable: engine,
         currentDirectory: currentDirectory,
-        cachedDevice: cachedDevice,
+        cachedDevice: self.devices.first(where: { $0.deviceKey == cachedDevice.deviceKey })
+          ?? cachedDevice,
         generation: generation
       )
     }
@@ -106,7 +107,8 @@ extension AppModel {
           executable: engine,
           currentDirectory: currentDirectory,
           preferredDeviceIndex: preferredDeviceIndex,
-          preferredDeviceKey: expectedDevice?.deviceKey
+          preferredDeviceKey: expectedDevice?.deviceKey,
+          preferredDevice: expectedDevice
         )
       }.value
 
@@ -118,7 +120,9 @@ extension AppModel {
         let selectedIndex = enumeration.selectedDeviceIndex,
         let selected = enumeration.devices.first(where: { $0.id == selectedIndex })
       else {
-        if let expectedDevice, enumeration.errorMessage == nil {
+        if let expectedDevice, enumeration.errorMessage == nil,
+          expectedDevice.isNonWiredDevice
+        {
           self.showKnownDeviceUnavailable(expectedDevice, availableDevices: enumeration.devices)
           return
         }
@@ -140,7 +144,7 @@ extension AppModel {
       // When the refresh is watching a previously known mouse, another
       // connected device must not satisfy the poll. Keep waiting for the
       // requested device until its stable HID identity is enumerable.
-      if let expectedDevice, selected.deviceKey != expectedDevice.deviceKey {
+      if let expectedDevice, !selected.matchesReconnectIdentity(expectedDevice) {
         self.showKnownDeviceUnavailable(expectedDevice, availableDevices: enumeration.devices)
         return
       }
@@ -148,24 +152,33 @@ extension AppModel {
       // Publish the device list as soon as enumeration completes. The
       // profile read is slower, but the picker can now populate while
       // the button editor remains in its explicit loading state.
+      let previousName = self.devices.first(where: { $0.deviceKey == selected.deviceKey })?.name
       self.devices = enumeration.devices
       self.selectedDeviceIndex = selected.id
-      self.currentDeviceName = selected.name
-      self.deviceSummary = selected.title
+      let resolvedSelected = selected.replacingName(
+        DeviceChoice.preferredName(
+          reported: selected.name,
+          fallback: previousName ?? self.currentDeviceName))
+      self.devices = self.devices.map {
+        $0.deviceKey == resolvedSelected.deviceKey ? resolvedSelected : $0
+      }
+      self.currentDeviceName = resolvedSelected.name
+      self.deviceSummary = resolvedSelected.title
       if expectedDevice != nil {
         self.stopKnownDevicePolling(clearDevice: false)
       }
-      self.rememberSelectedDevice(selected)
+      self.rememberSelectedDevice(resolvedSelected)
       self.prepareLoadingEditor(
         profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
       self.status = "Found \(selected.name). Reading onboard profile…"
       let profileReadProgress = self.profileReadProgressHandler(generation: generation)
 
+      let resolvedDevices = self.devices
       let snapshot = await Task.detached(priority: .userInitiated) {
         Self.makeProfileSnapshot(
           executable: engine,
           currentDirectory: currentDirectory,
-          devices: enumeration.devices,
+          devices: resolvedDevices,
           selectedDeviceKey: selected.deviceKey,
           selectedDeviceIndex: selected.id,
           preferredProfileNumber: preferredProfileNumber,
@@ -231,8 +244,15 @@ extension AppModel {
         onLine: onLine
       )
       let selectedProfileNumber = Self.selectedProfileNumber(in: profileText)
+      let resolvedDevices = devices.map { device in
+        guard device.deviceKey == selectedDeviceKey,
+          let reportedName = Self.reportedDeviceName(in: profileText)
+        else { return device }
+        return device.replacingName(
+          DeviceChoice.preferredName(reported: reportedName, fallback: device.name))
+      }
       return RefreshSnapshot(
-        devices: devices, selectedDeviceIndex: selectedDeviceIndex,
+        devices: resolvedDevices, selectedDeviceIndex: selectedDeviceIndex,
         profileText: profileText, profileError: nil, dpiText: nil,
         dpiError: nil, selectedProfileNumber: selectedProfileNumber,
         errorMessage: nil, accessWarning: accessWarning

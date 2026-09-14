@@ -140,6 +140,31 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     XCTAssertFalse(loggedArgs.contains("--profile"), loggedArgs)
   }
 
+  func testMakeProfileSnapshotUsesSpecificPairedModelNameFromProfileOutput() {
+    let tempDir = TestTempDirectory.make()
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    let engine = FakeEngine.write(to: tempDir)
+    FakeEngineEnvironment.set(
+      "LOPE_TEST_PROFILES_OUTPUT",
+      "Onboard profiles for Paired Logitech Mouse - Lightspeed:\nDevice: G604\n"
+        + fakeProfilesOutput())
+    defer { FakeEngineEnvironment.clearAll() }
+
+    let generic = DeviceChoice(
+      id: 1, name: "Paired Logitech Mouse - Lightspeed", connection: "Wireless",
+      productID: "0x4085", deviceKey: "abc123ef")
+    let snapshot = AppModel.makeProfileSnapshot(
+      executable: engine,
+      currentDirectory: tempDir,
+      devices: [generic],
+      selectedDeviceKey: generic.deviceKey,
+      selectedDeviceIndex: generic.id,
+      preferredProfileNumber: 1
+    )
+
+    XCTAssertEqual(snapshot.devices.first?.name, "G604")
+  }
+
   // MARK: - startInitialRefresh
 
   func testStartInitialRefreshReportsEngineUnavailable() {
@@ -198,30 +223,28 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
-    // "Unrecognized Mouse" has no catalog entry, so the stale-key fallback
-    // takes the full-discovery branch instead of beginKnownDeviceRefresh.
+    // The wired stale-key fallback takes the full-discovery branch instead
+    // of sleeping-mouse recovery.
     let cached = DeviceChoice(
       id: 1, name: "Unrecognized Mouse", connection: "Wired", productID: "0x9999",
       deviceKey: "stale-key")
 
     await withFakeEngineDirectory(tempDir.path) {
       model.startInitialRefresh(cachedDevice: cached)
-      await waitUntil(timeout: 5) { !model.profiles.isEmpty }
       await waitUntil(timeout: 5) { !model.busy }
     }
 
-    XCTAssertEqual(model.status, "Onboard Profile read successfully.")
-    model.stopLiveDPIPolling()
+    XCTAssertEqual(model.status, "Choose a Logitech mouse to continue.")
+    XCTAssertEqual(model.currentDeviceName, "")
+    XCTAssertTrue(model.devices.contains(where: { $0.name == "G502 X" }))
   }
 
   func testStartInitialRefreshBeginsKnownDevicePollingWhenCachedKeyIsStaleForACatalogedDevice()
     async
   {
-    // The inverse of FallsBackToFullDiscoveryWhenCachedKeyIsStale above:
-    // "G502 X" *is* cataloged with onboard-profile support, so a
-    // permanently-failing read on the stale cached key must hand off to
-    // beginKnownDeviceRefresh() (the "wait for it to wake up" path)
-    // instead of a full device re-discovery.
+    // A non-wired cached mouse must hand off to beginKnownDeviceRefresh()
+    // (the "wait for it to wake up" path) instead of silently selecting
+    // another device during full discovery.
     let tempDir = TestTempDirectory.make()
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
@@ -230,7 +253,9 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
-    let cached = fixtureDevice()
+    let cached = DeviceChoice(
+      id: 1, name: "G603", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "abc123ef")
 
     await withFakeEngineDirectory(tempDir.path) {
       model.startInitialRefresh(cachedDevice: cached)
@@ -364,7 +389,8 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
-    let expected = fixtureDevice(deviceKey: "deadbeef")
+    let expected = DeviceChoice(
+      id: 1, name: "G603", connection: "Wireless", productID: "0xB01C", deviceKey: "deadbeef")
 
     await withFakeEngineDirectory(tempDir.path) {
       model.startRefresh(
@@ -388,7 +414,8 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
-    let expected = fixtureDevice(deviceKey: "deadbeef")
+    let expected = DeviceChoice(
+      id: 1, name: "G603", connection: "Wireless", productID: "0xB01C", deviceKey: "deadbeef")
 
     await withFakeEngineDirectory(tempDir.path) {
       model.startRefresh(

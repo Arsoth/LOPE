@@ -177,6 +177,7 @@ struct ProfileControlsView: View {
       RoundedRectangle(cornerRadius: 10, style: .continuous)
         .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
     }
+    .padding(.top, 20)
   }
 
   private func profileEnableControl(_ profile: ProfileChoice) -> some View {

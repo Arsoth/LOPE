@@ -3,11 +3,25 @@
 
 #include "internal.h"
 
+#include <stdio.h>
+#include <string.h>
+
 int main(int argc, char **argv) {
     Options options;
     if (!parse_options(argc, argv, &options)) {
+        if (options.structured_output) {
+            EngineBoundaryError error;
+            engine_boundary_error_set(&error, ENGINE_BOUNDARY_ERROR_INVALID_REQUEST,
+                                      "the structured command or one of its options was malformed; "
+                                      "see stderr for details");
+            engine_boundary_print_error(stdout, &error);
+            return 2;
+        }
         print_usage(argv[0]);
         return 2;
+    }
+    if (options.structured_output) {
+        return engine_boundary_run(&options);
     }
     if (strcmp(options.command, "self-test") == 0) {
         return run_self_test();

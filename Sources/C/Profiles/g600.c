@@ -4,7 +4,14 @@
 // other writable mice in this project. Its three profile reports are fixed
 // 154-byte feature reports with 20 three-byte button records in two banks.
 
-#include "internal.h"
+#include "g600.h"
+#include "backup.h"
+#include "hid_discovery.h"
+#include "profile_io.h"
+#include "hid_transport.h"
+
+#include <stdio.h>
+#include <string.h>
 
 G600FeatureReportGetFn g600_get_feature_report_impl = channel_get_feature_report;
 G600FeatureReportSetFn g600_set_feature_report_impl = channel_set_feature_report;

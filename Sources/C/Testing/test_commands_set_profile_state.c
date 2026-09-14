@@ -1,5 +1,12 @@
-#include "internal.h"
+#include "commands_set_profile_state.h"
+#include "profile_io.h"
 #include "test_doubles.h"
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static int profile_state_context_create_failure(HidContext *context) {
     (void)context;

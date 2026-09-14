@@ -103,6 +103,27 @@ extension AppModel {
     return result.sorted { $0.id < $1.id }
   }
 
+  nonisolated static func reportedDeviceName(in text: String) -> String? {
+    let prefixes = ["Onboard profiles for ", "Device: "]
+    var genericCandidate: String?
+    for rawLine in text.split(separator: "\n").map(String.init) {
+      let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      for prefix in prefixes where line.hasPrefix(prefix) {
+        var name = String(line.dropFirst(prefix.count))
+        if prefix == "Onboard profiles for ", name.hasSuffix(":") {
+          name.removeLast()
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { continue }
+        if !DeviceChoice.isGenericPairedName(trimmed) {
+          return trimmed
+        }
+        genericCandidate = trimmed
+      }
+    }
+    return genericCandidate
+  }
+
   nonisolated static func profileNumbers(in text: String) -> [Int] {
     let pattern = try! NSRegularExpression(pattern: #"^Profile\s+(\d+)\s+\("#)
     var result: [Int] = []

@@ -38,6 +38,7 @@ extension AppModel {
 
   func setRaw(buttonIndex: Int, raw: String) {
     guard buttons.indices.contains(buttonIndex) else { return }
+    capturedKeyboardButtonIndices.remove(buttonIndex)
     let normalized = normalize(raw)
     buttons[buttonIndex].draftRaw = normalized
     buttons[buttonIndex].draftChoice =

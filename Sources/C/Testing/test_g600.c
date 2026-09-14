@@ -1,4 +1,11 @@
-#include "internal.h"
+#include "backup.h"
+#include "g600.h"
+#include "hid_transport.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static uint8_t g600_fixture_report[G600_REPORT_BYTES];
 static bool g600_fixture_get_fails;

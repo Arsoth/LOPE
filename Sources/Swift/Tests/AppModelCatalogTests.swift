@@ -180,6 +180,60 @@ final class AppModelCatalogTests: XCTestCase {
     XCTAssertEqual(model.keyboardOutputKeys, model.extendedKeyboardKeys)
   }
 
+  func testExtendedKeyboardKeyGroupsAreOrderedAndAlphabetized() {
+    let model = AppModel(startInitialRefresh: false)
+    let groups = model.extendedKeyboardKeyGroups
+
+    XCTAssertEqual(
+      groups.map(\.label),
+      [
+        "Standard full-size keyboard keys",
+        "F13 and later keys",
+        "Media keys",
+        "Other unusual keys",
+      ])
+    XCTAssertEqual(model.extendedKeyboardKeys, groups.flatMap(\.keys))
+
+    for group in groups {
+      XCTAssertEqual(
+        group.keys,
+        group.keys.sorted {
+          let leftLabel = $0.label.lowercased()
+          let rightLabel = $1.label.lowercased()
+          return leftLabel == rightLabel ? $0.id < $1.id : leftLabel < rightLabel
+        },
+        "\(group.label) is not alphabetized"
+      )
+    }
+
+    let mediaLabels = groups.first { $0.group == .media }?.keys.map(\.label) ?? []
+    XCTAssertEqual(
+      mediaLabels,
+      [
+        "Eject", "Fast Forward", "Mute", "Pause", "Play", "Record", "Rewind",
+        "Scan Next Track", "Scan Previous Track", "Stop", "Volume Down", "Volume Up",
+      ])
+  }
+
+  func testKeyboardKeyGroupChoiceExposesStableIdentityAndLabel() {
+    let key = KeyboardKeyChoice(id: 0x04, label: "A")
+    let choices = KeyboardKeyGroup.allCases.map {
+      KeyboardKeyGroupChoice(group: $0, keys: [key])
+    }
+
+    XCTAssertEqual(choices.map(\.id), KeyboardKeyGroup.allCases)
+    XCTAssertEqual(choices.map(\.label), KeyboardKeyGroup.allCases.map(\.rawValue))
+    XCTAssertEqual(choices.map(\.keys), Array(repeating: [key], count: choices.count))
+  }
+
+  func testExpandedKeyboardCatalogIncludesSupportedMediaKeys() {
+    let model = AppModel(startInitialRefresh: false)
+    let media = model.keyboardKeys.filter { $0.id == 0xB0 || $0.id == 0xB5 }
+
+    XCTAssertEqual(media.map(\.label), ["Play", "Scan Next Track"])
+    XCTAssertTrue(media.allSatisfy(model.isExtendedKeyboardKey))
+  }
+
   func testPresetsContainsEveryKnownRawOutput() {
     let model = AppModel(startInitialRefresh: false)
     let rawValues = Set(model.presets.map(\.raw))

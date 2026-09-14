@@ -26,6 +26,7 @@ struct DPIStageBar: View {
   @State var draggingStage: Int?
   @State var activeDragX: CGFloat?
   @State var lastDragUpdate: DPIStageDragUpdate?
+  @State var hoveredStageIndex: Int?
   @State var popupFrame: CGRect?
   @State var popoverContentOpacity = 1.0
   @FocusState var focusedStageIndex: Int?

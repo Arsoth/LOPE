@@ -165,24 +165,30 @@ extension AppModel {
 
     if count > oldCount {
       let activeValues = dpiStages.prefix(oldCount).compactMap(Int.init)
-      if activeValues.count == oldCount, let last = activeValues.last {
+      if activeValues.count == oldCount, !activeValues.isEmpty {
         let maximum = dpiCapabilities.maximum ?? Int(UInt16.max)
-        let insertBeforeLast = maximum - last <= 2_000
-        let insertionIndex = insertBeforeLast ? max(activeValues.count - 1, 0) : activeValues.count
-        let target = insertBeforeLast ? last - 1_000 : last + 1_000
-        let lowerBound = insertionIndex > 0 ? activeValues[insertionIndex - 1] + 1 : nil
-        let upperBound =
-          insertionIndex < activeValues.count ? activeValues[insertionIndex] - 1 : nil
+        var updatedValues = activeValues
+        while updatedValues.count < count {
+          guard let currentLast = updatedValues.last else { break }
+          let insertBeforeLast = maximum - currentLast <= 2_000
+          let insertionIndex =
+            insertBeforeLast ? max(updatedValues.count - 1, 0) : updatedValues.count
+          let target = insertBeforeLast ? currentLast - 1_000 : currentLast + 1_000
+          let lowerBound = insertionIndex > 0 ? updatedValues[insertionIndex - 1] + 1 : nil
+          let upperBound =
+            insertionIndex < updatedValues.count ? updatedValues[insertionIndex] - 1 : nil
 
-        if let suggested = dpiCapabilities.snappedValue(
-          for: target,
-          lowerBound: lowerBound,
-          upperBound: upperBound
-        ) {
-          var updatedValues = activeValues
+          guard
+            let suggested = dpiCapabilities.snappedValue(
+              for: target,
+              lowerBound: lowerBound,
+              upperBound: upperBound
+            )
+          else {
+            break
+          }
+
           updatedValues.insert(suggested, at: insertionIndex)
-          dpiStages = updatedValues.map(String.init) + Array(repeating: "", count: 5 - count)
-          dpiCount = count
 
           if defaultStage > insertionIndex {
             defaultStage += 1
@@ -190,10 +196,16 @@ extension AppModel {
           if shiftStage > insertionIndex {
             shiftStage += 1
           }
-          if oldCount == 1, defaultStage == shiftStage {
+
+          if oldCount == 1, updatedValues.count == 2, defaultStage == shiftStage {
             shiftStage = defaultStage == 1 ? 2 : 1
           }
         }
+
+        dpiStages =
+          updatedValues.map(String.init)
+          + Array(repeating: "", count: 5 - updatedValues.count)
+        dpiCount = updatedValues.count
       } else {
         // Keep the active-stage affordance usable while a text field is
         // incomplete; the validation message will request the value.

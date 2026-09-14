@@ -1,4 +1,30 @@
-#include "internal.h"
+#include "commands_apply.h"
+#include "backup.h"
+#include "commands_read.h"
+#include "commands_set_dpi.h"
+#include "engine_boundary.h"
+#include "g600.h"
+#include "hid_discovery.h"
+#include "profile_io.h"
+#include "report_rate.h"
+
+#include <ctype.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+static void apply_print(EngineBoundaryWriteResult *boundary_result, const char *format, ...) {
+    if (boundary_result != NULL) {
+        return;
+    }
+    va_list arguments;
+    va_start(arguments, format);
+    vprintf(format, arguments);
+    va_end(arguments);
+}
 
 bool parse_batch_raw_record(const char *text, uint8_t spec[4]) {
     if (text == NULL || strlen(text) != 8) {
@@ -180,8 +206,9 @@ void print_batch_recovery(const char *operation_id, size_t verified_count, const
 }
 
 static bool write_batch_sector_and_verify(Device *device, uint16_t sector, const uint8_t *data,
-                                          size_t length, const char *kind) {
-    printf("Writing %s sector 0x%04X\n", kind, sector);
+                                          size_t length, const char *kind,
+                                          EngineBoundaryWriteResult *boundary_result) {
+    apply_print(boundary_result, "Writing %s sector 0x%04X\n", kind, sector);
     if (!write_sector(device, sector, data, length)) {
         return false;
     }
@@ -189,17 +216,40 @@ static bool write_batch_sector_and_verify(Device *device, uint16_t sector, const
     if (!verified) {
         return false;
     }
-    printf("Verified sector 0x%04X (%s): CRC is OK and the complete sector matches.\n", sector,
-           kind);
+    apply_print(boundary_result,
+                "Verified sector 0x%04X (%s): CRC is OK and the complete sector matches.\n", sector,
+                kind);
+    if (boundary_result != NULL) {
+        boundary_result->verified_count++;
+    }
     return true;
 }
 
+typedef struct {
+    Device *device;
+    EngineBoundaryWriteResult *boundary_result;
+} BatchWriteContext;
+
 static bool write_batch_sector_with_device(void *context, const BatchSector *sector) {
-    return write_batch_sector_and_verify((Device *)context, sector->sector, sector->data,
-                                         sector->length, sector->kind);
+    BatchWriteContext *write_context = (BatchWriteContext *)context;
+    return write_batch_sector_and_verify(write_context->device, sector->sector, sector->data,
+                                         sector->length, sector->kind,
+                                         write_context->boundary_result);
 }
 
-int run_apply(const Options *options) {
+int engine_apply(const Options *options, EngineBoundaryWriteResult *boundary_result,
+                 EngineBoundaryError *error) {
+    if (boundary_result != NULL) {
+        memset(boundary_result, 0, sizeof(*boundary_result));
+        snprintf(boundary_result->operation, sizeof(boundary_result->operation), "apply");
+        boundary_result->profile = options == NULL ? 0 : options->profile;
+        boundary_result->dry_run = options == NULL || !options->yes;
+    }
+    engine_boundary_error_set(error, ENGINE_BOUNDARY_ERROR_OPERATION,
+                              "apply failed; see stderr for the operation diagnostic");
+    if (options == NULL) {
+        return 1;
+    }
     if (options->profile < 1) {
         fprintf(stderr, "apply requires an explicit --profile N selection\n");
         return 1;
@@ -315,6 +365,10 @@ int run_apply(const Options *options) {
         fprintf(stderr, "invalid --operation-id; use only letters, numbers, '.', '-' or '_'\n");
         return 1;
     }
+    if (boundary_result != NULL) {
+        snprintf(boundary_result->operation_id, sizeof(boundary_result->operation_id), "%s",
+                 operation_id);
+    }
 
     HidContext context;
     bool context_ready = false;
@@ -355,7 +409,22 @@ int run_apply(const Options *options) {
     if (!select_device(devices, device_count, options, &device)) {
         goto done;
     }
+    if (boundary_result != NULL) {
+        size_t device_index = (size_t)(device - devices);
+        if (!engine_boundary_device_from_device(device, device_index, &boundary_result->device)) {
+            engine_boundary_error_set(error, ENGINE_BOUNDARY_ERROR_DEVICE_NOT_FOUND,
+                                      "the selected device did not contain a stable HID identity");
+            goto done;
+        }
+        boundary_result->has_device = true;
+    }
     if (is_g600_device(device)) {
+        if (boundary_result != NULL) {
+            engine_boundary_error_set(
+                error, ENGINE_BOUNDARY_ERROR_UNSUPPORTED,
+                "structured apply output does not support legacy G600 feature-report writes");
+            goto done;
+        }
         if (options->report_rate != NULL) {
             fprintf(stderr, "refusing to apply: G600 profile reports do not support saved "
                             "polling-rate edits\n");
@@ -422,8 +491,8 @@ int run_apply(const Options *options) {
                 goto done;
             }
             new_profile[0] = report_rate_interval;
-            printf("Planned profile polling rate: %u Hz (%u ms interval)\n", requested_report_rate,
-                   report_rate_interval);
+            apply_print(boundary_result, "Planned profile polling rate: %u Hz (%u ms interval)\n",
+                        requested_report_rate, report_rate_interval);
         }
 
         for (size_t i = 0; i < options->button_change_count; i++) {
@@ -447,8 +516,7 @@ int run_apply(const Options *options) {
         if (options->rgb_change_count > 0) {
             uint8_t zones[MAX_BATCH_RGB_CHANGES];
             for (size_t i = 0; i < options->rgb_change_count; i++) {
-                if (requested_rgb_zones[i] < 1 ||
-                    requested_rgb_zones[i] > (int)profile.rgb_zone_count) {
+                if (requested_rgb_zones[i] > (int)profile.rgb_zone_count) {
                     fprintf(stderr,
                             "refusing to apply: RGB zone %d is not advertised by the validated "
                             "profile (1..%zu)\n",
@@ -467,9 +535,9 @@ int run_apply(const Options *options) {
         }
 
         if (options->dpi_values != NULL) {
-            if (!profile.dpi_layout_supported || !profile.crc_ok) {
-                fprintf(stderr, "refusing to apply: the selected profile's CRC or DPI layout was "
-                                "not validated\n");
+            if (!profile.dpi_layout_supported) {
+                fprintf(stderr,
+                        "refusing to apply: the selected profile's DPI layout was not validated\n");
                 goto done;
             }
             uint16_t supported[MAX_DPI_VALUES];
@@ -566,20 +634,44 @@ int run_apply(const Options *options) {
     }
 
     if (!profile_affected && !control_affected) {
-        printf("Save operation %s has no effective changes; no sectors were written.\n",
-               operation_id);
+        apply_print(boundary_result,
+                    "Save operation %s has no effective changes; no sectors were written.\n",
+                    operation_id);
+        if (boundary_result != NULL) {
+            boundary_result->changed = false;
+            boundary_result->completed = true;
+        }
         result = 0;
         goto done;
     }
 
-    printf("Save operation: %s\n", operation_id);
-    printf("Preflight complete: %zu sector(s) will be written at most once.\n",
-           batch_affected_sector_count(profile_affected, control_affected));
+    apply_print(boundary_result, "Save operation: %s\n", operation_id);
+    apply_print(boundary_result,
+                "Preflight complete: %zu sector(s) will be written at most once.\n",
+                batch_affected_sector_count(profile_affected, control_affected));
     if (profile_affected) {
-        printf("Planned profile sector: 0x%04X\n", profile.headers[profile.selected_header].sector);
+        apply_print(boundary_result, "Planned profile sector: 0x%04X\n",
+                    profile.headers[profile.selected_header].sector);
     }
     if (control_affected) {
-        printf("Planned control sector: 0x%04X\n", control_sector);
+        apply_print(boundary_result, "Planned control sector: 0x%04X\n", control_sector);
+    }
+    if (boundary_result != NULL) {
+        boundary_result->changed = true;
+        if (profile_affected && boundary_result->planned_count < ENGINE_BOUNDARY_MAX_SECTORS) {
+            EngineBoundaryWriteSector *sector =
+                &boundary_result->planned_sectors[boundary_result->planned_count++];
+            snprintf(sector->kind, sizeof(sector->kind), "profile");
+            sector->sector = profile.headers[profile.selected_header].sector;
+            sector->length = profile.data_length;
+        }
+        if (control_affected && boundary_result->planned_count < ENGINE_BOUNDARY_MAX_SECTORS) {
+            EngineBoundaryWriteSector *sector =
+                &boundary_result->planned_sectors[boundary_result->planned_count++];
+            snprintf(sector->kind, sizeof(sector->kind), "control");
+            sector->sector = control_sector;
+            sector->length = info.sector_size;
+        }
     }
     if (!options->yes) {
         result = ensure_write_confirmation("apply");
@@ -612,7 +704,13 @@ int run_apply(const Options *options) {
         goto done;
     }
     has_backup = true;
-    printf("Backup saved: %s (%zu exact sector snapshot(s))\n", backup_path, backup_sector_count);
+    if (boundary_result != NULL) {
+        boundary_result->has_backup = true;
+        snprintf(boundary_result->backup_path, sizeof(boundary_result->backup_path), "%s",
+                 backup_path);
+    }
+    apply_print(boundary_result, "Backup saved: %s (%zu exact sector snapshot(s))\n", backup_path,
+                backup_sector_count);
 
     if (profile_affected) {
         plan[plan_count++] =
@@ -627,7 +725,11 @@ int run_apply(const Options *options) {
                                            .length = info.sector_size,
                                            .kind = "control"};
     }
-    if (!execute_batch_sector_plan(plan, plan_count, write_batch_sector_with_device, device,
+    BatchWriteContext write_context = {
+        .device = device,
+        .boundary_result = boundary_result,
+    };
+    if (!execute_batch_sector_plan(plan, plan_count, write_batch_sector_with_device, &write_context,
                                    &verified_count, &failed_index)) {
         print_batch_recovery(operation_id, verified_count, plan[failed_index].kind,
                              plan[failed_index].sector, backup_path, has_backup);
@@ -637,9 +739,13 @@ int run_apply(const Options *options) {
         sync_active_profile_default_dpi(device, options->profile, dpi_default_stage,
                                         dpi_default_value);
     }
-    printf("Save operation %s complete: wrote %zu sector(s); every write was read back and "
-           "verified.\n",
-           operation_id, verified_count);
+    apply_print(boundary_result,
+                "Save operation %s complete: wrote %zu sector(s); every write was read back and "
+                "verified.\n",
+                operation_id, verified_count);
+    if (boundary_result != NULL) {
+        boundary_result->completed = true;
+    }
     result = 0;
 
 done:
@@ -650,5 +756,15 @@ done:
     if (context_ready) {
         hid_context_release(&context);
     }
+    if (boundary_result != NULL) {
+        if (boundary_result->verified_count < verified_count) {
+            boundary_result->verified_count = verified_count;
+        }
+        if (result == 0) {
+            engine_boundary_error_clear(error);
+        }
+    }
     return result;
 }
+
+int run_apply(const Options *options) { return engine_apply(options, NULL, NULL); }

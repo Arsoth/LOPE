@@ -1,5 +1,10 @@
-#include "internal.h"
+#include "report_rate.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static int report_rate_context_create_empty(HidContext *context) {
     memset(context, 0, sizeof(*context));

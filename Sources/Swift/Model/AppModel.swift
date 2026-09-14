@@ -10,6 +10,10 @@ import IOKit.hidsystem
 final class AppModel: ObservableObject {
   @Published var deviceSummary = "No Logitech HID++ device loaded"
   @Published var status = "Connect a Logitech mouse, then choose Refresh."
+
+  var statusFooterText: String {
+    waitingForKnownDevice ? "" : status
+  }
   @Published var devices: [DeviceChoice] = []
   @Published var selectedDeviceIndex = 0
   @Published var profiles: [ProfileChoice] = []
@@ -34,6 +38,8 @@ final class AppModel: ObservableObject {
   @Published var loadingProfile = false
   @Published var inputMonitoringAuthorized = false
   @Published var wiredAccessInstructionsPresented = false
+  var wiredAccessInstructionsShown = false
+  var wiredAccessDeviceName: String?
   @Published var backups: [BackupEntry] = []
   @Published var showAllBackups = false
   @Published var recoveryBackups: [URL] = []
@@ -55,6 +61,7 @@ final class AppModel: ObservableObject {
   }
 
   var keyInputDrafts: [Int: String] = [:]
+  var capturedKeyboardButtonIndices = Set<Int>()
   @Published var recordingKeyboardButtonID: Int?
   var baselineProfileEnabled: [Int: Bool] = [:]
   var baselineDPIStages = [String]()
@@ -293,7 +300,7 @@ final class AppModel: ObservableObject {
     }
 
     // preferredColorScheme updates SwiftUI's controls, but clearing that
-    // preference does not always make an existing WindowGroup re-adopt
+    // preference does not always make an existing window re-adopt
     // the system appearance until the app loses focus. Apply the same
     // choice directly to the window so the effective appearance changes
     // while the app is still active.
@@ -376,6 +383,7 @@ final class AppModel: ObservableObject {
     buttonLayer = .normal
     buttons = normal
     keyInputDrafts.removeAll()
+    capturedKeyboardButtonIndices.removeAll()
     recordingKeyboardButtonID = nil
     resetProfileEditorDraft()
   }
@@ -392,6 +400,7 @@ final class AppModel: ObservableObject {
     buttonLayer = layer
     buttons = layer == .normal ? normalButtonRows : gShiftButtonRows
     keyInputDrafts.removeAll()
+    capturedKeyboardButtonIndices.removeAll()
     recordingKeyboardButtonID = nil
   }
 

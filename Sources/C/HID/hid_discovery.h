@@ -1,7 +1,9 @@
 #ifndef LOPE_LOGITECH_ONBOARD_HID_DISCOVERY_H
 #define LOPE_LOGITECH_ONBOARD_HID_DISCOVERY_H
 
-#include "types.h"
+#include "hid_types.h"
+
+#include <IOKit/hidsystem/IOHIDLib.h>
 
 typedef IOHIDAccessType (*HidCheckAccessFn)(IOHIDRequestType request_type);
 typedef IOHIDManagerRef (*HidManagerCreateFn)(CFAllocatorRef allocator, IOOptionBits options);

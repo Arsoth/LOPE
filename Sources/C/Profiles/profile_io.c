@@ -1,32 +1,22 @@
-#include "internal.h"
+#include "profile_io.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+#include "profile_codec.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 uint16_t crc16_ccitt_false(const uint8_t *bytes, size_t length) {
-    uint16_t crc = 0xFFFF;
-    for (size_t i = 0; i < length; i++) {
-        crc ^= (uint16_t)bytes[i] << 8;
-        for (int bit = 0; bit < 8; bit++) {
-            crc = (crc & 0x8000) ? (uint16_t)((crc << 1) ^ 0x1021) : (uint16_t)(crc << 1);
-        }
-    }
-    return crc;
+    return profile_codec_crc16_ccitt_false(bytes, length);
 }
 
 bool sector_crc_ok(const uint8_t *bytes, size_t length) {
-    if (bytes == NULL || length < 2) {
-        return false;
-    }
-    uint16_t stored = (uint16_t)(((uint16_t)bytes[length - 2] << 8) | bytes[length - 1]);
-    return crc16_ccitt_false(bytes, length - 2) == stored;
+    return profile_codec_sector_crc_ok(bytes, length);
 }
 
-void sector_put_crc(uint8_t *bytes, size_t length) {
-    if (bytes == NULL || length < 2) {
-        return;
-    }
-    uint16_t crc = crc16_ccitt_false(bytes, length - 2);
-    bytes[length - 2] = (uint8_t)(crc >> 8);
-    bytes[length - 1] = (uint8_t)(crc & 0xFF);
-}
+void sector_put_crc(uint8_t *bytes, size_t length) { profile_codec_sector_put_crc(bytes, length); }
 
 int get_profile_info(Device *device, ProfileInfo *info) {
     if (device == NULL || info == NULL) {
@@ -37,28 +27,32 @@ int get_profile_info(Device *device, ProfileInfo *info) {
         print_reply_error("ONBOARD_PROFILES.getInfo", reply);
         return 0;
     }
-    if (reply.length < 10) {
+    if (reply.length < PROFILE_CODEC_INFO_BYTES) {
         fprintf(stderr, "ONBOARD_PROFILES.getInfo returned only %zu bytes\n", reply.length);
         return 0;
     }
+    ProfileCodecInfo parsed;
+    if (!profile_codec_parse_info(reply.bytes, reply.length, &parsed)) {
+        uint16_t sector_size = (uint16_t)(((uint16_t)reply.bytes[7] << 8) | reply.bytes[8]);
+        if (sector_size < 32 || sector_size > MAX_SECTOR_BYTES) {
+            fprintf(stderr, "device reported implausible onboard sector size %u\n", sector_size);
+        } else if (reply.bytes[5] == 0 || reply.bytes[5] > 64) {
+            fprintf(stderr, "device reported implausible button count %u\n", reply.bytes[5]);
+        } else {
+            fprintf(stderr, "device reported implausible onboard profile metadata\n");
+        }
+        return 0;
+    }
     memset(info, 0, sizeof(*info));
-    info->memory = reply.bytes[0];
-    info->profile_format = reply.bytes[1];
-    info->macro_format = reply.bytes[2];
-    info->profile_count = reply.bytes[3];
-    info->out_of_band = reply.bytes[4];
-    info->button_count = reply.bytes[5];
-    info->sector_count = reply.bytes[6];
-    info->sector_size = (uint16_t)(((uint16_t)reply.bytes[7] << 8) | reply.bytes[8]);
-    info->shift_flags = reply.bytes[9];
-    if (info->sector_size < 32 || info->sector_size > MAX_SECTOR_BYTES || info->sector_size < 2) {
-        fprintf(stderr, "device reported implausible onboard sector size %u\n", info->sector_size);
-        return 0;
-    }
-    if (info->button_count == 0 || info->button_count > 64) {
-        fprintf(stderr, "device reported implausible button count %u\n", info->button_count);
-        return 0;
-    }
+    info->memory = parsed.memory;
+    info->profile_format = parsed.profile_format;
+    info->macro_format = parsed.macro_format;
+    info->profile_count = parsed.profile_count;
+    info->out_of_band = parsed.out_of_band;
+    info->button_count = parsed.button_count;
+    info->sector_count = parsed.sector_count;
+    info->sector_size = parsed.sector_size;
+    info->shift_flags = parsed.shift_flags;
     return 1;
 }
 
@@ -212,7 +206,8 @@ bool ensure_onboard_mode_for_write(Device *device) {
     if (mode == ONBOARD_MODE_ONBOARD) {
         return true;
     }
-    printf("Device is in host-controlled mode; switching to onboard mode before writing.\n");
+    fprintf(stderr,
+            "Device is in host-controlled mode; switching to onboard mode before writing.\n");
     if (!set_onboard_mode(device, ONBOARD_MODE_ONBOARD) || !get_onboard_mode(device, &mode) ||
         mode != ONBOARD_MODE_ONBOARD) {
         fprintf(stderr,
@@ -355,7 +350,8 @@ void sync_active_profile_default_dpi(Device *device, int profile_number, int def
     }
     int active_profile_number = current_onboard_profile_number(device, active_profile);
     if (active_profile_number != profile_number) {
-        printf(
+        fprintf(
+            stderr,
             "Live DPI unchanged: active onboard profile is %u; saved profile %d is not active.\n",
             (unsigned)active_profile_number, profile_number);
         return;
@@ -368,7 +364,8 @@ void sync_active_profile_default_dpi(Device *device, int profile_number, int def
                 default_dpi);
         return;
     }
-    printf("Live default DPI: %u (stage %d; sensor value verified).\n", default_dpi, default_stage);
+    fprintf(stderr, "Live default DPI: %u (stage %d; sensor value verified).\n", default_dpi,
+            default_stage);
 }
 
 bool recover_live_dpi_if_needed(Device *device, int profile_number, const uint16_t *stages,
@@ -386,15 +383,15 @@ bool recover_live_dpi_if_needed(Device *device, int profile_number, const uint16
     }
 
     uint16_t default_dpi = stages[default_stage - 1];
-    printf("Live DPI %u is not an active stage; restoring profile %d default %u.\n", current_dpi,
-           profile_number, default_dpi);
+    fprintf(stderr, "Live DPI %u is not an active stage; restoring profile %d default %u.\n",
+            current_dpi, profile_number, default_dpi);
     if (!set_live_dpi_index_and_verify(device, (uint8_t)(default_stage - 1), default_dpi)) {
         fprintf(stderr, "warning: could not repair the live DPI after reconnect; stored profile "
                         "data was left unchanged\n");
         return false;
     }
-    printf("Recovered live DPI: %u (stage %d; sensor value verified).\n", default_dpi,
-           default_stage);
+    fprintf(stderr, "Recovered live DPI: %u (stage %d; sensor value verified).\n", default_dpi,
+            default_stage);
     return true;
 }
 
@@ -430,24 +427,19 @@ int parse_profile_headers(const ProfileInfo *info, const uint8_t *control, size_
     if (info == NULL || control == NULL || headers == NULL || header_count == NULL) {
         return 0;
     }
-    *header_count = 0;
-    size_t limit = control_length;
-    if (control_length >= info->sector_size && limit >= 2) {
-        limit -= 2;
+    ProfileCodecHeader parsed[MAX_HEADERS];
+    size_t parsed_count = 0;
+    if (!profile_codec_parse_headers(info->sector_size, control, control_length, parsed,
+                                     &parsed_count)) {
+        *header_count = parsed_count;
+        return 0;
     }
-    for (size_t offset = 0; offset + 3 < limit && *header_count < MAX_HEADERS; offset += 4) {
-        if (control[offset] == 0xFF && control[offset + 1] == 0xFF) {
-            break;
-        }
-        uint16_t sector = (uint16_t)(((uint16_t)control[offset] << 8) | control[offset + 1]);
-        if (sector == 0) {
-            break;
-        }
-        headers[*header_count].sector = sector;
-        headers[*header_count].enabled = control[offset + 2];
-        (*header_count)++;
+    for (size_t i = 0; i < parsed_count; i++) {
+        headers[i].sector = parsed[i].sector;
+        headers[i].enabled = parsed[i].enabled;
     }
-    return *header_count > 0;
+    *header_count = parsed_count;
+    return 1;
 }
 
 int read_profile_headers(Device *device, const ProfileInfo *info, ProfileHeader *headers,
@@ -467,98 +459,26 @@ int read_profile_headers(Device *device, const ProfileInfo *info, ProfileHeader 
     return ok;
 }
 
-bool spec_is_disabled(const uint8_t spec[4]) {
-    return spec[0] == 0xFF && spec[1] == 0xFF && spec[2] == 0xFF && spec[3] == 0xFF;
-}
+bool spec_is_disabled(const uint8_t spec[4]) { return profile_codec_spec_is_disabled(spec); }
 
 bool spec_structurally_valid(const uint8_t spec[4]) {
-    if (spec_is_disabled(spec)) {
-        return true;
-    }
-    uint8_t behavior = spec[0] >> 4;
-    if (behavior <= 0x02) {
-        return true; // macro records are preserved but not edited by this tool
-    }
-    if (behavior == 0x08) {
-        return spec[1] <= 0x03;
-    }
-    if (behavior == 0x09) {
-        return spec[1] <= 0x11;
-    }
-    return false;
+    return profile_codec_spec_structurally_valid(spec);
 }
 
-bool spec_known(const uint8_t spec[4]) {
-    if (spec_is_disabled(spec)) {
-        return true;
-    }
-    uint8_t behavior = spec[0] >> 4;
-    return behavior == 0x08 || behavior == 0x09;
-}
+bool spec_known(const uint8_t spec[4]) { return profile_codec_spec_known(spec); }
 
 void detect_button_layout(Profile *profile) {
     if (profile == NULL) {
         return;
     }
-    profile->button_offset = 0;
-    profile->valid_specs = 0;
-    profile->known_specs = 0;
-    profile->layout_supported = false;
-    size_t count = profile->info.button_count;
-    if (profile->data == NULL || profile->data_length < 2 || count == 0) {
-        return;
-    }
-    size_t expected = profile->info.profile_format >= 6 ? 48 : 32;
-    size_t candidates[2] = {expected, expected == 32 ? 48 : 32};
-    for (size_t c = 0; c < 2; c++) {
-        size_t offset = candidates[c];
-        if (offset + count * 4 > profile->data_length - 2) {
-            continue;
-        }
-        size_t valid = 0;
-        size_t known = 0;
-        for (size_t i = 0; i < count; i++) {
-            const uint8_t *spec = profile->data + offset + i * 4;
-            valid += spec_structurally_valid(spec) ? 1 : 0;
-            known += spec_known(spec) ? 1 : 0;
-        }
-        if (valid >= count - 1 && known >= 1) {
-            profile->button_offset = offset;
-            profile->valid_specs = valid;
-            profile->known_specs = known;
-            profile->layout_supported = c == 0;
-            return;
-        }
-    }
-
-    // Diagnostic-only scan. It helps explain a new device format in a dump,
-    // but it is deliberately not enough to authorize a write.
-    size_t best_offset = 0;
-    size_t best_valid = 0;
-    size_t best_known = 0;
-    size_t best_count = 0;
-    for (size_t offset = 0; offset + count * 4 <= profile->data_length - 2; offset++) {
-        size_t valid = 0;
-        size_t known = 0;
-        for (size_t i = 0; i < count; i++) {
-            const uint8_t *spec = profile->data + offset + i * 4;
-            valid += spec_structurally_valid(spec) ? 1 : 0;
-            known += spec_known(spec) ? 1 : 0;
-        }
-        if (known > best_known || (known == best_known && valid > best_valid)) {
-            best_offset = offset;
-            best_valid = valid;
-            best_known = known;
-            best_count = 1;
-        } else if (known == best_known && valid == best_valid) {
-            best_count++;
-        }
-    }
-    if (best_count == 1 && best_valid >= count - 1 && best_known >= 1) {
-        profile->button_offset = best_offset;
-        profile->valid_specs = best_valid;
-        profile->known_specs = best_known;
-    }
+    ProfileCodecButtonLayout layout;
+    profile_codec_detect_button_layout(profile->data, profile->data_length,
+                                       profile->info.profile_format, profile->info.button_count,
+                                       &layout);
+    profile->button_offset = layout.offset;
+    profile->valid_specs = layout.valid_specs;
+    profile->known_specs = layout.known_specs;
+    profile->layout_supported = layout.supported;
 }
 
 bool is_g603_device(const Device *device) {
@@ -594,42 +514,19 @@ void detect_gshift_button_layout(Profile *profile, const Device *device) {
     if (profile == NULL) {
         return;
     }
-    profile->gshift_button_offset = 0;
-    profile->gshift_valid_specs = 0;
-    profile->gshift_known_specs = 0;
-    profile->gshift_layout_supported = false;
-    if (!profile->layout_supported || profile->data == NULL || profile->data_length < 2 ||
-        profile->info.button_count == 0 || !profile_reports_gshift(profile, device)) {
-        return;
-    }
-    size_t count = profile->info.button_count;
-    size_t offset = profile->button_offset + 64;
-    if (offset + count * 4 > profile->data_length - 2) {
-        return;
-    }
-    size_t valid = 0;
-    size_t known = 0;
-    for (size_t i = 0; i < count; i++) {
-        const uint8_t *spec = profile->data + offset + i * 4;
-        valid += spec_structurally_valid(spec) ? 1 : 0;
-        known += spec_known(spec) ? 1 : 0;
-    }
-    if (valid >= count - 1 && known >= 1) {
-        profile->gshift_button_offset = offset;
-        profile->gshift_valid_specs = valid;
-        profile->gshift_known_specs = known;
-        profile->gshift_layout_supported = true;
-    }
+    ProfileCodecButtonLayout layout;
+    profile_codec_detect_gshift_button_layout(
+        profile->data, profile->data_length, profile->info.button_count, profile->button_offset,
+        profile->layout_supported && profile_reports_gshift(profile, device), &layout);
+    profile->gshift_button_offset = layout.offset;
+    profile->gshift_valid_specs = layout.valid_specs;
+    profile->gshift_known_specs = layout.known_specs;
+    profile->gshift_layout_supported = layout.supported;
 }
 
-uint16_t read_le16(const uint8_t *bytes) {
-    return (uint16_t)((uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8));
-}
+uint16_t read_le16(const uint8_t *bytes) { return profile_codec_read_le16(bytes); }
 
-void write_le16(uint8_t *bytes, uint16_t value) {
-    bytes[0] = (uint8_t)(value & 0xFF);
-    bytes[1] = (uint8_t)(value >> 8);
-}
+void write_le16(uint8_t *bytes, uint16_t value) { profile_codec_write_le16(bytes, value); }
 
 static bool device_uses_zero_terminated_dpi(const Device *device) {
     if (device == NULL || device->iface == NULL) {
@@ -653,155 +550,47 @@ void detect_dpi_layout(Profile *profile, const Device *device) {
         return;
     }
     bool zero_terminated = device_uses_zero_terminated_dpi(device);
-    profile->dpi_offset = 0;
-    profile->dpi_count = 0;
-    profile->dpi_default_index = 0;
-    profile->dpi_shift_index = 0;
-    profile->dpi_unused_value = zero_terminated ? 0 : UINT16_MAX;
-    profile->dpi_layout_supported = false;
-
-    // Known format-3/4/5 sectors store one to five little-endian DPI stages at
-    // offsets 3..12; unused stage slots are 0 or 0xFFFF. Bytes 1 and 2 select
-    // the default and shift stages. Treat this as a validated format
-    // candidate, never as a universal offset.
-    if (profile->data == NULL || profile->info.profile_format > 5 || profile->data_length < 15 ||
-        profile->data_length - 2 < 13) {
-        return;
-    }
-    uint16_t previous = 0;
-    size_t count = 0;
-    bool inactive = false;
-    bool saw_unused_value = false;
-    for (size_t i = 0; i < 5; i++) {
-        uint16_t dpi = read_le16(profile->data + 3 + i * 2);
-        // G603 format-3 firmware uses zero for unused stages, while newer
-        // gaming mice commonly use 0xFFFF. Both values terminate the active
-        // ascending DPI list.
-        if (dpi == 0 || dpi == UINT16_MAX) {
-            if (!saw_unused_value && !zero_terminated) {
-                profile->dpi_unused_value = dpi;
-            }
-            saw_unused_value = true;
-            inactive = true;
-            continue;
-        }
-        if (inactive || dpi < 100 || (i > 0 && dpi <= previous)) {
-            return;
-        }
-        previous = dpi;
-        count++;
-    }
-    if (count == 0 || profile->data[1] >= count || profile->data[2] >= count) {
-        return;
-    }
-    profile->dpi_offset = 3;
-    profile->dpi_count = count;
-    profile->dpi_default_index = profile->data[1];
-    profile->dpi_shift_index = profile->data[2];
-    profile->dpi_layout_supported = true;
-}
-
-static bool rgb_mode_is_known(uint8_t mode) {
-    // Legacy onboard RGB records use off, solid, cycling, and breathing.
-    return mode == 0x00 || mode == 0x01 || mode == 0x03 || mode == 0x0A;
-}
-
-static bool rgb_record_is_disabled(const uint8_t record[RGB_PROFILE_RECORD_BYTES]) {
-    for (size_t i = 0; i < RGB_PROFILE_RECORD_BYTES; i++) {
-        if (record[i] != 0xFF) {
-            return false;
-        }
-    }
-    return true;
+    ProfileCodecDpiLayout layout;
+    profile_codec_detect_dpi_layout(profile->data, profile->data_length,
+                                    profile->info.profile_format, zero_terminated, &layout);
+    profile->dpi_offset = layout.offset;
+    profile->dpi_count = layout.count;
+    profile->dpi_default_index = layout.default_index;
+    profile->dpi_shift_index = layout.shift_index;
+    profile->dpi_unused_value = layout.unused_value;
+    profile->dpi_layout_supported = layout.supported;
 }
 
 void detect_rgb_layout(Profile *profile) {
     if (profile == NULL) {
         return;
     }
-    profile->rgb_offset = 0;
-    profile->rgb_zone_count = 0;
-    memset(profile->rgb_zone_present, 0, sizeof(profile->rgb_zone_present));
-    profile->rgb_layout_supported = false;
-
-    // The 208..251 RGB area is part of the validated format-4/5 layout.
-    // Newer formats may move or repurpose these bytes, so they stay read-only.
-    if (profile->data == NULL || profile->info.profile_format < 4 ||
-        profile->info.profile_format > 5 ||
-        profile->data_length <
-            RGB_PROFILE_BASE_OFFSET + RGB_PROFILE_RECORD_BYTES * RGB_PROFILE_RECORD_COUNT + 2) {
-        return;
-    }
-
-    size_t last_present = 0;
-    bool found = false;
-    for (size_t index = 0; index < RGB_PROFILE_RECORD_COUNT; index++) {
-        const uint8_t *record =
-            profile->data + RGB_PROFILE_BASE_OFFSET + index * RGB_PROFILE_RECORD_BYTES;
-        if (rgb_record_is_disabled(record)) {
-            continue;
-        }
-        if (!rgb_mode_is_known(record[0])) {
-            // Do not expose a partial layout when any populated record is not
-            // proven; a later firmware variant may use a different layout.
-            return;
-        }
-        profile->rgb_zone_present[index] = true;
-        last_present = index;
-        found = true;
-    }
-    if (!found) {
-        return;
-    }
-    profile->rgb_offset = RGB_PROFILE_BASE_OFFSET;
-    // G502 X PLUS stores its controllable LIGHTSYNC cluster in the second
-    // lighting slot, leaving the first slot disabled. Keep the record index
-    // stable so the UI and write path can address sparse layouts.
-    profile->rgb_zone_count = last_present + 1;
-    profile->rgb_layout_supported = true;
+    ProfileCodecRgbLayout layout;
+    profile_codec_detect_rgb_layout(profile->data, profile->data_length,
+                                    profile->info.profile_format, &layout);
+    profile->rgb_offset = layout.offset;
+    profile->rgb_zone_count = layout.zone_count;
+    memcpy(profile->rgb_zone_present, layout.zone_present, sizeof(profile->rgb_zone_present));
+    profile->rgb_layout_supported = layout.supported;
 }
 
 bool write_rgb_zone_colors(uint8_t *data, const Profile *profile, const uint8_t zones[],
                            const uint8_t colors[][3], size_t count) {
-    if (data == NULL || profile == NULL || zones == NULL || colors == NULL ||
-        !profile->rgb_layout_supported || count == 0 || count > RGB_PROFILE_RECORD_COUNT ||
-        profile->rgb_zone_count == 0 || profile->rgb_zone_count > RGB_PROFILE_RECORD_COUNT ||
-        profile->rgb_offset > profile->data_length ||
-        profile->data_length - profile->rgb_offset <
-            RGB_PROFILE_RECORD_BYTES * profile->rgb_zone_count + 2) {
+    if (profile == NULL || !profile->rgb_layout_supported) {
         return false;
     }
-    bool seen[RGB_PROFILE_RECORD_COUNT] = {false};
-    for (size_t i = 0; i < count; i++) {
-        size_t zone = zones[i];
-        if (zone >= profile->rgb_zone_count || zone >= RGB_PROFILE_RECORD_COUNT || seen[zone]) {
-            return false;
-        }
-        if (!profile->rgb_zone_present[zone]) {
-            return false;
-        }
-        seen[zone] = true;
-        size_t offset =
-            profile->rgb_offset + zone * RGB_PROFILE_RECORD_BYTES + RGB_PROFILE_COLOR_OFFSET;
-        memcpy(data + offset, colors[i], 3);
-    }
-    return true;
+    return profile_codec_write_rgb_zone_colors(data, profile->data_length, profile->rgb_offset,
+                                               profile->rgb_zone_count, profile->rgb_zone_present,
+                                               zones, colors, count);
 }
 
 bool write_dpi_stage_table(uint8_t *data, const Profile *profile, const uint16_t *stages,
                            size_t count) {
-    if (data == NULL || profile == NULL || stages == NULL || !profile->dpi_layout_supported ||
-        count == 0 || count > 5 || profile->dpi_offset > profile->data_length ||
-        profile->data_length - profile->dpi_offset < 5 * sizeof(uint16_t)) {
+    if (profile == NULL || !profile->dpi_layout_supported) {
         return false;
     }
-    for (size_t i = 0; i < count; i++) {
-        write_le16(data + profile->dpi_offset + i * 2, stages[i]);
-    }
-    for (size_t i = count; i < 5; i++) {
-        write_le16(data + profile->dpi_offset + i * 2, profile->dpi_unused_value);
-    }
-    return true;
+    return profile_codec_write_dpi_stage_table(data, profile->data_length, profile->dpi_offset,
+                                               profile->dpi_unused_value, stages, count);
 }
 
 int adjustable_dpi_values(Device *device, uint16_t *values, size_t *value_count,

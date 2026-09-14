@@ -259,6 +259,10 @@ the device-reported format, backs up before writing, writes HID++ chunks, and
 verifies readback. The GUI uses the same engine but supplies a stable device
 key and keeps low-level diagnostics out of the status bar.
 
+The GUI-facing structured process contract is documented in
+[ENGINE-BOUNDARY.md](ENGINE-BOUNDARY.md). Human CLI output remains the default
+for diagnostics.
+
 ## Development checks
 
 Run the repository checks from its root:
@@ -282,9 +286,9 @@ in `AppModel`.
 `make install-hooks` installs a pre-commit hook (from
 `scripts/git-hooks/pre-commit`) that runs formatting plus the changed-file
 `make test-modified` test and coverage gate before every commit; run it once
-per clone. Automated pull-request checks run the full `make test` and
-`make coverage-check` gates. The coverage gate is deliberately strict (90% per
-file by default) — see
+per clone. Automated pull requests require four separate checks: `PR Title`,
+`Formatting`, `Tests`, and `Coverage`. The coverage gate is deliberately
+strict (90% per file by default) — see
 [development-standards.md](development-standards.md#coverage).
 
 For descriptor additions, follow [Profiles/README.md](../Profiles/README.md)

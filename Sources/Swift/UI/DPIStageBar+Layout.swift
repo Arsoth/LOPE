@@ -60,6 +60,9 @@ extension DPIStageBar {
           onDragEnded: { x in
             updateDrag(at: x, width: proxy.size.width)
             finishDrag()
+          },
+          onHover: { index in
+            hoveredStageIndex = index
           }
         )
         .frame(width: proxy.size.width, height: 86)

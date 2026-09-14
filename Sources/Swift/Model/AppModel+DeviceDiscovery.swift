@@ -18,7 +18,8 @@ extension AppModel {
           executable: executable,
           currentDirectory: currentDirectory,
           preferredDeviceIndex: cachedDevice.id,
-          preferredDeviceKey: cachedDevice.deviceKey
+          preferredDeviceKey: cachedDevice.deviceKey,
+          preferredDevice: cachedDevice
         )
       }.value
 
@@ -32,37 +33,52 @@ extension AppModel {
           "Loaded \(cachedDevice.name). The device list could not be refreshed: \(errorMessage)"
         return
       }
+      if enumeration.accessWarning {
+        self.presentWiredAccessInstructions(
+          for: enumeration.devices.first(where: { $0.isWiredDevice }))
+      }
 
       guard
-        let selected = enumeration.devices.first(where: { $0.deviceKey == cachedDevice.deviceKey })
+        let selected = enumeration.devices.first(where: {
+          $0.matchesReconnectIdentity(cachedDevice)
+        })
       else {
-        guard let fallback = enumeration.devices.first(where: { !$0.isWiredAccessPrompt }) else {
-          self.devices = []
-          self.selectedDeviceIndex = 0
-          self.currentDeviceName = ""
-          self.deviceSummary = "No editable Logitech mouse found"
-          self.resetEditorState()
-          self.status =
-            enumeration.accessWarning
-            ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then choose Refresh."
-            : "No Logitech mouse was found."
-          return
-        }
-
-        // The cached mouse disappeared while the list was refreshed.
-        // Hand the newly selected device through the normal full read
-        // so the editor never shows one mouse's profile for another.
+        // The cached mouse disappeared while the list was refreshed. Keep
+        // every other device visible, but wait for an explicit selection so
+        // the old profile cannot be silently applied to the first new mouse.
         self.devices = enumeration.devices
-        self.selectedDeviceIndex = fallback.id
-        self.startRefresh(preferredDeviceIndex: fallback.id, preferredProfileNumber: 0)
+        self.selectedDeviceIndex = 0
+        self.currentDeviceName = ""
+        let hasSelectableDevice = enumeration.devices.contains(where: { !$0.isWiredAccessPrompt })
+        self.deviceSummary =
+          hasSelectableDevice
+          ? "Choose a Logitech mouse to continue"
+          : "No editable Logitech mouse found"
+        self.resetEditorState()
+        if enumeration.accessWarning {
+          self.status =
+            "A wired Logitech mouse needs Input Monitoring. Choose a wireless mouse, or enable access in System Settings."
+        } else if hasSelectableDevice {
+          self.status = "Choose a Logitech mouse to continue."
+        } else {
+          self.status = "No Logitech mouse was found."
+        }
         return
       }
 
+      let preservedName =
+        self.devices
+        .first(where: { $0.deviceKey == cachedDevice.deviceKey })?.name ?? cachedDevice.name
       self.devices = enumeration.devices
       self.selectedDeviceIndex = selected.id
-      self.currentDeviceName = selected.name
-      self.deviceSummary = selected.title
-      self.rememberSelectedDevice(selected)
+      let resolvedSelected = selected.replacingName(
+        DeviceChoice.preferredName(reported: selected.name, fallback: preservedName))
+      self.devices = self.devices.map {
+        $0.deviceKey == resolvedSelected.deviceKey ? resolvedSelected : $0
+      }
+      self.currentDeviceName = resolvedSelected.name
+      self.deviceSummary = resolvedSelected.title
+      self.rememberSelectedDevice(resolvedSelected)
       self.refreshBackups()
     }
   }
@@ -73,7 +89,8 @@ extension AppModel {
     executable: URL,
     currentDirectory: URL,
     preferredDeviceIndex: Int,
-    preferredDeviceKey: String?
+    preferredDeviceKey: String?,
+    preferredDevice: DeviceChoice? = nil
   ) -> DeviceEnumerationSnapshot {
     do {
       let list = try runDeviceListWithRetry(
@@ -81,17 +98,32 @@ extension AppModel {
         currentDirectory: currentDirectory
       )
       let discovered = parseDeviceChoices(list)
+      let accessWarning = list.localizedCaseInsensitiveContains("macOS denied HID access")
       let accessAuthorized =
         IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
       let displayedDevices = DeviceChoice.addingWiredAccessPrompt(
         to: discovered,
-        accessAuthorized: accessAuthorized
+        accessAuthorized: accessAuthorized,
+        accessWarning: accessWarning
       )
-      let accessWarning = list.contains("macOS denied HID access")
-      let selectedIndex =
-        (preferredDeviceKey.flatMap { key in
-          discovered.first(where: { $0.deviceKey == key })
-        } ?? discovered.first(where: { $0.id == preferredDeviceIndex }) ?? discovered.first)?.id
+      let selectedIndex: Int?
+      if let preferredDeviceKey,
+        let keyMatch = discovered.first(where: { $0.deviceKey == preferredDeviceKey })
+      {
+        selectedIndex = keyMatch.id
+      } else if let preferredDevice,
+        let identityMatch = discovered.first(where: { $0.matchesReconnectIdentity(preferredDevice) }
+        )
+      {
+        // Receiver/KVM reconnects can recreate the HID key. If the paired
+        // model identity still matches, use it even when its list position
+        // changed.
+        selectedIndex = identityMatch.id
+      } else if preferredDeviceIndex >= 0 {
+        selectedIndex = discovered.first(where: { $0.id == preferredDeviceIndex })?.id
+      } else {
+        selectedIndex = nil
+      }
       return DeviceEnumerationSnapshot(
         devices: displayedDevices,
         selectedDeviceIndex: selectedIndex,

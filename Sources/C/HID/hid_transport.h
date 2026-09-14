@@ -1,7 +1,12 @@
 #ifndef LOPE_LOGITECH_ONBOARD_HID_TRANSPORT_H
 #define LOPE_LOGITECH_ONBOARD_HID_TRANSPORT_H
 
-#include "types.h"
+#include "hid_types.h"
+
+#include <signal.h>
+#include <stdio.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/hid/IOHIDElement.h>
 
 extern volatile sig_atomic_t g_stop_watch;
 

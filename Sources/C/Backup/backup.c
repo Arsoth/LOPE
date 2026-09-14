@@ -1,4 +1,16 @@
-#include "internal.h"
+#include "backup.h"
+#include "backup_codec.h"
+#include "hid_types.h"
+#include "profile_codec.h"
+#include "profile_io.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 BackupReadFn backup_read_impl = (BackupReadFn)read;
 BackupWriteFn backup_write_impl = (BackupWriteFn)write;
@@ -35,19 +47,6 @@ static int read_all(int fd, uint8_t *bytes, size_t length) {
     return 1;
 }
 
-static void put_be16(uint8_t *bytes, uint16_t value) {
-    bytes[0] = (uint8_t)(value >> 8);
-    bytes[1] = (uint8_t)(value & 0xFF);
-}
-
-static uint16_t get_be16(const uint8_t *bytes) {
-    return (uint16_t)(((uint16_t)bytes[0] << 8) | bytes[1]);
-}
-
-int package_write_multi(const char *path, const Device *device, uint8_t profile_format,
-                        const BackupSectorSource *sectors, size_t sector_count,
-                        bool refuse_overwrite);
-
 int package_write(const char *path, const Device *device, const Profile *profile,
                   const uint8_t *data, bool refuse_overwrite) {
     BackupSectorSource sector = {.sector = profile->headers[profile->selected_header].sector,
@@ -64,42 +63,48 @@ int package_write_multi(const char *path, const Device *device, uint8_t profile_
         fprintf(stderr, "cannot create a backup package with %zu sectors\n", sector_count);
         return 0;
     }
-    uint8_t header[BACKUP_HEADER_BYTES];
-    memset(header, 0, sizeof(header));
-    memcpy(header, BACKUP_MAGIC, 8);
-    header[8] = 2;
-    put_be16(header + 10, (uint16_t)device->iface->vendor_id);
-    put_be16(header + 12, (uint16_t)device->iface->product_id);
-    header[14] = device->request_device_number;
-    header[15] = profile_format;
-    put_be16(header + 16, (uint16_t)sector_count);
-
-    uint8_t table[MAX_BACKUP_SECTORS * 4];
-    memset(table, 0, sizeof(table));
-    size_t table_length = sector_count * 4;
+    BackupCodecHeader codec_header = {
+        .vendor_id = (uint16_t)device->iface->vendor_id,
+        .product_id = (uint16_t)device->iface->product_id,
+        .device_number = device->request_device_number,
+        .profile_format = profile_format,
+        .sector_count = sector_count,
+    };
+    BackupCodecSector codec_sectors[MAX_BACKUP_SECTORS];
+    size_t encoded_length = BACKUP_CODEC_HEADER_BYTES + sector_count * 4;
     for (size_t i = 0; i < sector_count; i++) {
         if (sectors[i].data == NULL || sectors[i].size < 32 || sectors[i].size > MAX_SECTOR_BYTES) {
             fprintf(stderr, "cannot create a backup package with invalid sector %zu metadata\n",
                     i + 1);
             return 0;
         }
-        put_be16(table + i * 4, sectors[i].sector);
-        put_be16(table + i * 4 + 2, (uint16_t)sectors[i].size);
+        codec_sectors[i] = (BackupCodecSector){
+            .sector = sectors[i].sector,
+            .size = sectors[i].size,
+            .data = sectors[i].data,
+        };
+        encoded_length += sectors[i].size;
+    }
+    uint8_t *encoded = (uint8_t *)malloc(encoded_length);
+    if (encoded == NULL || !backup_codec_encode(&codec_header, codec_sectors, sector_count, encoded,
+                                                encoded_length, &encoded_length)) {
+        free(encoded);
+        fprintf(stderr, "could not encode backup package\n");
+        return 0;
     }
 
     int flags = O_WRONLY | O_CREAT | (refuse_overwrite ? O_EXCL : O_TRUNC);
     int fd = open(path, flags, 0600);
     if (fd < 0) {
         fprintf(stderr, "could not create %s: %s\n", path, strerror(errno));
+        free(encoded);
         return 0;
     }
-    int ok = write_all(fd, header, sizeof(header)) && write_all(fd, table, table_length);
-    for (size_t i = 0; ok && i < sector_count; i++) {
-        ok = write_all(fd, sectors[i].data, sectors[i].size);
-    }
+    int ok = write_all(fd, encoded, encoded_length);
     if (backup_close_impl(fd) != 0) {
         ok = 0;
     }
+    free(encoded);
     if (!ok) {
         fprintf(stderr, "could not finish writing %s: %s\n", path, strerror(errno));
         return 0;
@@ -122,63 +127,41 @@ int package_read(const char *path, BackupPackage *package) {
         backup_close_impl(fd);
         return 0;
     }
-    if (memcmp(header, BACKUP_MAGIC, 8) != 0 || header[8] != 2) {
+    BackupCodecHeader codec_header;
+    if (!backup_codec_parse_header(header, &codec_header)) {
         fprintf(stderr, "backup %s is not a recognized Logitech onboard package\n", path);
         backup_close_impl(fd);
         return 0;
     }
-    package->vendor_id = get_be16(header + 10);
-    package->product_id = get_be16(header + 12);
-    package->device_number = header[14];
-    package->profile_format = header[15];
-    if (package->vendor_id != LOGITECH_VID) {
-        fprintf(stderr, "backup %s has invalid device or sector metadata\n", path);
-        backup_close_impl(fd);
-        return 0;
-    }
     struct stat st;
-    size_t sector_count = get_be16(header + 16);
-    if (sector_count == 0 || sector_count > MAX_BACKUP_SECTORS) {
-        fprintf(stderr, "backup %s has an invalid sector count\n", path);
-        backup_close_impl(fd);
-        return 0;
-    }
     uint8_t table[MAX_BACKUP_SECTORS * 4];
-    size_t table_length = sector_count * 4;
+    size_t table_length = codec_header.sector_count * 4;
     if (!read_all(fd, table, table_length)) {
         fprintf(stderr, "backup %s is shorter than its sector table\n", path);
         backup_close_impl(fd);
         return 0;
     }
-    off_t expected_length = BACKUP_HEADER_BYTES + (off_t)table_length;
-    for (size_t i = 0; i < sector_count; i++) {
-        package->sectors[i].sector = get_be16(table + i * 4);
-        package->sectors[i].size = get_be16(table + i * 4 + 2);
-        if (package->sectors[i].size < 32 || package->sectors[i].size > MAX_SECTOR_BYTES) {
-            fprintf(stderr, "backup %s has invalid sector %zu metadata\n", path, i + 1);
-            backup_close_impl(fd);
-            package_release(package);
-            return 0;
-        }
-        for (size_t previous = 0; previous < i; previous++) {
-            if (package->sectors[previous].sector == package->sectors[i].sector) {
-                fprintf(stderr, "backup %s contains duplicate sector 0x%04X\n", path,
-                        package->sectors[i].sector);
-                backup_close_impl(fd);
-                package_release(package);
-                return 0;
-            }
-        }
-        expected_length += package->sectors[i].size;
-    }
-    if (backup_fstat_impl(fd, &st) != 0 || st.st_size != expected_length) {
-        fprintf(stderr, "backup %s has an unexpected file length\n", path);
+    BackupCodecSector codec_sectors[MAX_BACKUP_SECTORS];
+    size_t expected_length = 0;
+    if (!backup_codec_parse_sector_table(table, table_length, codec_header.sector_count,
+                                         codec_sectors, &expected_length)) {
+        fprintf(stderr, "backup %s has invalid sector metadata\n", path);
         backup_close_impl(fd);
-        package_release(package);
         return 0;
     }
-    package->sector_count = sector_count;
-    for (size_t i = 0; i < sector_count; i++) {
+    if (backup_fstat_impl(fd, &st) != 0 || st.st_size != (off_t)expected_length) {
+        fprintf(stderr, "backup %s has an unexpected file length\n", path);
+        backup_close_impl(fd);
+        return 0;
+    }
+    package->vendor_id = codec_header.vendor_id;
+    package->product_id = codec_header.product_id;
+    package->device_number = codec_header.device_number;
+    package->profile_format = codec_header.profile_format;
+    package->sector_count = codec_header.sector_count;
+    for (size_t i = 0; i < package->sector_count; i++) {
+        package->sectors[i].sector = codec_sectors[i].sector;
+        package->sectors[i].size = codec_sectors[i].size;
         package->sectors[i].data = (uint8_t *)malloc(package->sectors[i].size);
         if (package->sectors[i].data == NULL ||
             !read_all(fd, package->sectors[i].data, package->sectors[i].size)) {
@@ -187,8 +170,12 @@ int package_read(const char *path, BackupPackage *package) {
             package_release(package);
             return 0;
         }
-        bool legacy_g600 = package->profile_format == 0xFF && package->product_id == 0xC24A;
-        if (!legacy_g600 && !sector_crc_ok(package->sectors[i].data, package->sectors[i].size)) {
+        BackupCodecSector sector = {
+            .sector = package->sectors[i].sector,
+            .size = package->sectors[i].size,
+            .data = package->sectors[i].data,
+        };
+        if (!backup_codec_sector_crc_ok(&codec_header, &sector)) {
             fprintf(stderr, "backup %s has an invalid CRC in sector %zu\n", path, i + 1);
             backup_close_impl(fd);
             package_release(package);
@@ -235,13 +222,15 @@ int validate_profile_for_write(const Profile *profile) {
                 "refusing to write: the reported profile format/layout was not validated\n");
         return 0;
     }
-    if (profile->button_offset + (size_t)profile->info.button_count * 4 >
-        profile->data_length - 2) {
-        fprintf(stderr, "refusing to write: validated button array would exceed the sector\n");
-        return 0;
-    }
-    if (profile->valid_specs < profile->info.button_count - 1) {
-        fprintf(stderr, "refusing to write: too many unrecognized button records\n");
+    if (!profile_codec_validate_profile_for_write(
+            true, true, profile->data_length, profile->button_offset, profile->info.button_count,
+            profile->valid_specs)) {
+        if (profile->data_length < 2 || profile->button_offset > profile->data_length - 2 ||
+            profile->info.button_count > (profile->data_length - 2 - profile->button_offset) / 4) {
+            fprintf(stderr, "refusing to write: validated button array would exceed the sector\n");
+        } else {
+            fprintf(stderr, "refusing to write: too many unrecognized button records\n");
+        }
         return 0;
     }
     return 1;

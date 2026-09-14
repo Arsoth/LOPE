@@ -7,6 +7,7 @@ import SwiftUI
 struct RGBEditorView: View {
   @ObservedObject var model: AppModel
   @Binding var presentedZoneID: Int?
+  @State private var hoveredZoneID: Int?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
@@ -35,7 +36,8 @@ struct RGBEditorView: View {
   }
 
   private func rgbZoneRow(_ zone: RGBZoneState) -> some View {
-    Button {
+    let hoverVisible = hoveredZoneID == zone.id && presentedZoneID == nil
+    return Button {
       let allZones = NSEvent.modifierFlags.contains(.shift)
       model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
       presentedZoneID = zone.id
@@ -61,12 +63,22 @@ struct RGBEditorView: View {
     }
     .buttonStyle(.plain)
     .background(
-      Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+      Color.primary.opacity(hoverVisible ? 0.09 : 0.045),
+      in: RoundedRectangle(cornerRadius: 8, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(Color.white.opacity(0.055), lineWidth: 0.5)
     }
+    .pointingHandCursor()
+    .onHover { isHovering in
+      if isHovering {
+        hoveredZoneID = zone.id
+      } else if hoveredZoneID == zone.id {
+        hoveredZoneID = nil
+      }
+    }
+    .animation(.easeInOut(duration: 0.12), value: hoverVisible)
     .help("Click to choose a color. Shift-click to apply the chosen color to all RGB zones.")
     .popover(
       isPresented: Binding(

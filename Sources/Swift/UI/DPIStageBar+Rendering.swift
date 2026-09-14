@@ -10,6 +10,7 @@ extension DPIStageBar {
     let positionValue = parsedValue ?? capabilities.minimum ?? 800
     let isDefault = defaultStage == index + 1
     let isShift = shiftStage == index + 1
+    let isHovered = hoveredStageIndex == index && draggingStage == nil && editingStage == nil
     let x =
       draggingStage == index
       ? (activeDragX ?? position(for: positionValue, width: width))
@@ -21,7 +22,7 @@ extension DPIStageBar {
     } label: {
       ZStack(alignment: .topLeading) {
         ZStack {
-          stageShape(isDefault: isDefault, isShift: isShift)
+          stageShape(isDefault: isDefault, isShift: isShift, isHovered: isHovered)
             .frame(width: 30, height: 30)
           Text("\(index + 1)")
             .font(.callout.weight(.bold))
@@ -61,16 +62,34 @@ extension DPIStageBar {
   }
 
   @ViewBuilder
-  func stageShape(isDefault: Bool, isShift: Bool) -> some View {
+  func stageShape(isDefault: Bool, isShift: Bool, isHovered: Bool = false) -> some View {
     if isDefault {
       RoundedRectangle(cornerRadius: 4, style: .continuous)
         .fill(DPIStagePalette.defaultStage)
+        .overlay {
+          if isHovered {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+              .stroke(.white.opacity(0.42), lineWidth: 2)
+          }
+        }
     } else if isShift {
       DPIStagePentagon()
         .fill(DPIStagePalette.shift)
+        .overlay {
+          if isHovered {
+            DPIStagePentagon()
+              .stroke(.white.opacity(0.42), lineWidth: 2)
+          }
+        }
     } else {
       Circle()
         .fill(DPIStagePalette.other)
+        .overlay {
+          if isHovered {
+            Circle()
+              .stroke(.white.opacity(0.42), lineWidth: 2)
+          }
+        }
     }
   }
 }

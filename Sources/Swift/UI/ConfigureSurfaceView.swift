@@ -108,6 +108,8 @@ struct ConfigureSurfaceView: View {
     if let guidance = model.knownDeviceRefreshGuidance {
       messages.append(guidance.sleepDescription)
       messages.append(guidance.wakeInstructions)
+    } else {
+      messages.append("Move or click the mouse to wake it while LOPE reads it.")
     }
     messages.append("LOPE will keep checking in the background.")
     return messages.joined(separator: "\n\n")

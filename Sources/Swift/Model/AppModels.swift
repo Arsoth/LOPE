@@ -134,6 +134,47 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
     !isWiredAccessPrompt && connection.caseInsensitiveCompare("Wired") == .orderedSame
   }
 
+  var isNonWiredDevice: Bool {
+    !isWiredAccessPrompt && !isWiredDevice
+  }
+
+  var isGenericPairedName: Bool {
+    Self.isGenericPairedName(name)
+  }
+
+  static func isGenericPairedName(_ name: String) -> Bool {
+    let components = name.lowercased()
+      .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+    guard components.count >= 3,
+      components.prefix(3).map(String.init) == ["paired", "logitech", "mouse"]
+    else { return false }
+    return components.dropFirst(3).allSatisfy { $0 == "lightspeed" }
+  }
+
+  func replacingName(_ name: String) -> DeviceChoice {
+    DeviceChoice(
+      id: id,
+      name: name,
+      connection: connection,
+      productID: productID,
+      deviceKey: deviceKey
+    )
+  }
+
+  static func preferredName(reported: String, fallback: String) -> String {
+    let trimmed = reported.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, !isGenericPairedName(trimmed) else { return fallback }
+    return trimmed
+  }
+
+  func matchesReconnectIdentity(_ other: DeviceChoice) -> Bool {
+    if deviceKey == other.deviceKey { return true }
+    guard !productID.isEmpty, productID.caseInsensitiveCompare(other.productID) == .orderedSame
+    else { return false }
+    if name == other.name { return true }
+    return isGenericPairedName || other.isGenericPairedName
+  }
+
   static let wiredAccessPrompt = DeviceChoice(
     id: wiredAccessPromptID,
     name: "Allow wired mice",
@@ -144,10 +185,11 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
 
   static func addingWiredAccessPrompt(
     to devices: [DeviceChoice],
-    accessAuthorized: Bool
+    accessAuthorized: Bool,
+    accessWarning: Bool = false
   ) -> [DeviceChoice] {
     guard !accessAuthorized,
-      devices.contains(where: { $0.isWiredDevice }),
+      accessWarning || devices.contains(where: { $0.isWiredDevice }),
       !devices.contains(where: { $0.isWiredAccessPrompt })
     else {
       return devices

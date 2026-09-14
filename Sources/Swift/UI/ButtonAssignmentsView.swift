@@ -222,8 +222,12 @@ struct ButtonAssignmentsView: View {
         })
     ) {
       Text("Use Recorded Key").tag(0)
-      ForEach(model.keyboardOutputKeys) { key in
-        Text(key.label).tag(Int(key.id))
+      ForEach(model.extendedKeyboardKeyGroups) { group in
+        Section(group.label) {
+          ForEach(group.keys) { key in
+            Text(key.label).tag(Int(key.id))
+          }
+        }
       }
     }
     .controlSize(.small)

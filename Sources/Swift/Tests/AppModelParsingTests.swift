@@ -139,6 +139,16 @@ final class AppModelParsingTests: XCTestCase {
     XCTAssertEqual(devices[0].name, "G100S")
   }
 
+  func testReportedDeviceNamePrefersSpecificPairedModelOverGenericLabel() {
+    let text = """
+      Onboard profiles for Paired Logitech Mouse - Lightspeed:
+      Device: G604
+      Selected profile: 1
+      """
+
+    XCTAssertEqual(AppModel.reportedDeviceName(in: text), "G604")
+  }
+
   func testProfileNumbersExtractsProfileHeaderIDs() {
     let text = """
       Profile 1 (sector 0x0100, enabled=yes)

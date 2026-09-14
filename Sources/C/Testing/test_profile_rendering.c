@@ -1,5 +1,11 @@
-#include "internal.h"
+#include "profile_io.h"
+#include "profile_rendering.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 int test_profile_rendering(void) {
     char spec_description[160];

@@ -105,14 +105,15 @@ test-modified:
 
 SWIFT_FORMAT_CONFIG := .swift-format
 SWIFT_FORMAT_PATHS := Sources/Swift Package.swift
+CLANG_FORMAT := xcrun clang-format
 
 format:
 	xcrun swift-format format --configuration $(SWIFT_FORMAT_CONFIG) --in-place --recursive $(SWIFT_FORMAT_PATHS)
-	clang-format -i $(C_SRC)
+	$(CLANG_FORMAT) -i $(C_SRC)
 
 format-check:
 	xcrun swift-format lint --configuration $(SWIFT_FORMAT_CONFIG) --strict --recursive $(SWIFT_FORMAT_PATHS)
-	clang-format --dry-run --Werror $(C_SRC)
+	$(CLANG_FORMAT) --dry-run --Werror $(C_SRC)
 
 lint: format-check
 
@@ -131,7 +132,7 @@ COVERAGE_MIN_REGION ?= 90
 COVERAGE_MIN_FUNCTION ?= 90
 COVERAGE_MIN_LINE ?= 90
 COVERAGE_MIN_BRANCH ?= 90
-COVERAGE_C_SOURCES_PATTERN ?= Sources/(?!C/Testing/|C/Core/main\.m)
+COVERAGE_C_SOURCES_PATTERN ?= Sources/(?!C/Testing/|C/Core/main\.m|C/Backup/backup_codec\.h|C/Core/engine_boundary\.h|C/Profiles/profile_codec\.h)
 COVERAGE_SWIFT_SOURCES_PATTERN ?= /Sources/(?!Swift/Model/Shims/|Swift/Tests/)
 COVERAGE_COLOR ?= auto
 SWIFT_TEST_ARGS ?=
@@ -155,7 +156,7 @@ $(C_COVERAGE_PROFDATA): $(C_SRC)
 	@xcrun llvm-profdata merge -sparse $(C_COVERAGE_PROFRAW) -o $(C_COVERAGE_PROFDATA)
 
 coverage-c: $(C_COVERAGE_PROFDATA)
-	@COVERAGE_COLOR=$(COVERAGE_COLOR) bash scripts/colorize-coverage-report.sh $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA) --show-branch-summary --ignore-filename-regex='/Sources/C/Testing/|Core/main\.m|Core/types\.h|Profiles/g600\.h'
+	@COVERAGE_COLOR=$(COVERAGE_COLOR) bash scripts/colorize-coverage-report.sh $(C_COVERAGE_BIN) -instr-profile=$(C_COVERAGE_PROFDATA) --show-branch-summary --ignore-filename-regex='/Sources/C/Testing/|Core/main\.m|Core/types\.h|Profiles/g600\.h|Backup/backup_codec\.h|Core/engine_boundary\.h|Profiles/profile_codec\.h'
 
 coverage-swift:
 	@rm -f $(APP) bin/$(APP)

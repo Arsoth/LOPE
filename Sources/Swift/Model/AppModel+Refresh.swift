@@ -20,10 +20,14 @@ enum AppModelRefreshConfiguration {
 extension AppModel {
   func refresh() {
     let expectedDevice = knownDisconnectedDevice
+    let preferredDeviceIndex =
+      devices.contains {
+        $0.id == selectedDeviceIndex && !$0.isWiredAccessPrompt
+      } ? selectedDeviceIndex : -1
     stopKnownDevicePolling(clearDevice: false)
     stopLiveDPIPolling()
     startRefresh(
-      preferredDeviceIndex: selectedDeviceIndex,
+      preferredDeviceIndex: preferredDeviceIndex,
       preferredProfileNumber: profileNumber,
       expectedDevice: expectedDevice
     )
@@ -40,7 +44,7 @@ extension AppModel {
   func selectDevice(_ index: Int) {
     guard let selected = devices.first(where: { $0.id == index }) else { return }
     if selected.isWiredAccessPrompt {
-      wiredAccessInstructionsPresented = true
+      presentWiredAccessInstructions()
       return
     }
     guard selectedDeviceIndex != index else { return }
@@ -62,6 +66,17 @@ extension AppModel {
   func updateInputMonitoringAuthorization() {
     inputMonitoringAuthorized =
       IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+    if inputMonitoringAuthorized {
+      wiredAccessInstructionsShown = false
+      wiredAccessDeviceName = nil
+    }
+  }
+
+  func presentWiredAccessInstructions(for device: DeviceChoice? = nil) {
+    guard !wiredAccessInstructionsShown else { return }
+    wiredAccessInstructionsShown = true
+    wiredAccessDeviceName = device?.name
+    wiredAccessInstructionsPresented = true
   }
 
   func reloadSelectedProfile() {

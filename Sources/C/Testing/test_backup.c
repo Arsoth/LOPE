@@ -1,4 +1,14 @@
-#include "internal.h"
+#include "backup.h"
+#include "g600.h"
+#include "hid_types.h"
+#include "profile_io.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static bool g_backup_read_eintr;
 static bool g_backup_read_partial;

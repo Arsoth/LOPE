@@ -1,4 +1,11 @@
-#include "internal.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+#include "watch_cli.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static int watch_context_create_failure(HidContext *context) {
     (void)context;
@@ -295,6 +302,16 @@ int test_watch_cli(void) {
                        parsed.headers_only && parsed.summary_only && parsed.sensor_only &&
                        parsed.include_dpi && parsed.include_report_rate;
 
+    char *json_argv[] = {"lope", "list", "--format", "json", "--json"};
+    parse_options_ok =
+        parse_options_ok && parse_options(5, json_argv, &parsed) && parsed.structured_output;
+
+    char *format_missing_argv[] = {"lope", "list", "--format"};
+    parse_options_ok = parse_options_ok && !parse_options(3, format_missing_argv, &parsed);
+
+    char *format_invalid_argv[] = {"lope", "list", "--format", "text"};
+    parse_options_ok = parse_options_ok && !parse_options(4, format_invalid_argv, &parsed);
+
     char *missing_value_argv[] = {"lope", "list", "--device"};
     parse_options_ok = parse_options_ok && !parse_options(3, missing_value_argv, &parsed);
 
@@ -319,6 +336,20 @@ int test_watch_cli(void) {
 
     char *invalid_shift_argv[] = {"lope", "set-dpi", "--shift", "0", "800"};
     parse_options_ok = parse_options_ok && !parse_options(5, invalid_shift_argv, &parsed);
+
+    char *shift_too_large_argv[] = {"lope", "set-dpi", "--shift", "6", "800"};
+    parse_options_ok = parse_options_ok && !parse_options(5, shift_too_large_argv, &parsed);
+
+    char *state_too_many_argv[(MAX_BATCH_PROFILE_CHANGES + 1) * 2 + 2];
+    state_too_many_argv[0] = "lope";
+    state_too_many_argv[1] = "apply";
+    for (size_t i = 0; i < MAX_BATCH_PROFILE_CHANGES + 1; i++) {
+        state_too_many_argv[2 + i * 2] = "--profile-state-change";
+        state_too_many_argv[3 + i * 2] = "1:enable";
+    }
+    parse_options_ok =
+        parse_options_ok && !parse_options((int)((MAX_BATCH_PROFILE_CHANGES + 1) * 2 + 2),
+                                           state_too_many_argv, &parsed);
 
     char *dpi_report_rate_argv[] = {"lope",
                                     "apply",

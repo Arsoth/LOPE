@@ -1,7 +1,9 @@
 #ifndef LOPE_LOGITECH_ONBOARD_TEST_DOUBLES_H
 #define LOPE_LOGITECH_ONBOARD_TEST_DOUBLES_H
 
-#include "internal.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+#include "profile_io.h"
 
 // Shared self-test mocking seams, used by the per-module self-tests under
 // Sources/C/Testing/ to exercise command/profile/discovery logic without

@@ -511,16 +511,33 @@ final class AppModelEditingDPITests: XCTestCase {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
     model.dpiCapabilities = stageCapabilities()
-    // Use a 4-stage starting point (a single-stage increment to the clamped
-    // maximum) rather than jumping several stages at once: the insertion
-    // branch below only accounts for growing the active count by exactly
-    // one, so a multi-stage jump from a small starting count is a separate,
-    // pre-existing edge case outside what this coverage pass targets.
     model.dpiCount = 4
     model.dpiStages = ["400", "800", "1200", "1600", ""]
 
     model.setDPIStageCount(10)
     XCTAssertEqual(model.dpiCount, 5)
+  }
+
+  func testSetDPIStageCountPadsEveryStageForMultiStageIncrease() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.dpiCapabilities = stageCapabilities()
+    model.dpiCount = 1
+    model.dpiStages = ["400", "", "", "", ""]
+
+    model.setDPIStageCount(5)
+
+    XCTAssertEqual(model.dpiCount, 5)
+    XCTAssertEqual(model.dpiStages.prefix(5).compactMap(Int.init).count, 5)
+    XCTAssertNil(
+      DPIEditorValidation.message(
+        stages: model.dpiStages,
+        count: model.dpiCount,
+        defaultStage: model.defaultStage,
+        shiftStage: model.shiftStage,
+        capabilities: model.dpiCapabilities
+      )
+    )
   }
 
   func testSetDPIStageCountIsNoOpWhenRequestMatchesCurrentCount() {

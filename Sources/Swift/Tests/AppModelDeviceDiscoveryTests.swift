@@ -130,7 +130,7 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
 
   // MARK: - makeDeviceEnumerationSnapshot
 
-  func testMakeDeviceEnumerationSnapshotPrefersKeyThenIndexThenFirst() {
+  func testMakeDeviceEnumerationSnapshotRequiresAnExplicitSelection() {
     let lineA = deviceListLine(id: 1, name: "Mouse A", productID: "0xAAAA", key: "aaaa-a1")
     let lineB = deviceListLine(id: 2, name: "Mouse B", productID: "0xBBBB", key: "bbbb-b2")
     let engine = makeFakeEngine("echo '\(lineA)'; echo '\(lineB)'; exit 0")
@@ -146,11 +146,11 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
       preferredDeviceKey: nil)
     XCTAssertEqual(byIndex.selectedDeviceIndex, 1)
 
-    let byFirst = AppModel.makeDeviceEnumerationSnapshot(
+    let withoutSelection = AppModel.makeDeviceEnumerationSnapshot(
       executable: engine, currentDirectory: directory, preferredDeviceIndex: 999,
       preferredDeviceKey: nil)
-    XCTAssertEqual(byFirst.selectedDeviceIndex, 1, "falls back to the first discovered device")
-    XCTAssertEqual(byFirst.devices.count, 2)
+    XCTAssertNil(withoutSelection.selectedDeviceIndex)
+    XCTAssertEqual(withoutSelection.devices.count, 2)
   }
 
   func testMakeDeviceEnumerationSnapshotDetectsAccessWarningText() {
@@ -166,6 +166,9 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
       preferredDeviceKey: nil)
     XCTAssertTrue(snapshot.accessWarning)
     XCTAssertNil(snapshot.errorMessage)
+    XCTAssertNil(snapshot.selectedDeviceIndex)
+    XCTAssertEqual(snapshot.devices.first?.name, "Mouse A")
+    XCTAssertFalse(snapshot.devices.contains(where: { $0.isWiredAccessPrompt }))
   }
 
   func testMakeDeviceEnumerationSnapshotReturnsErrorMessageOnFailure() {
@@ -225,6 +228,31 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     let line = deviceListLine(
       id: 1, name: cachedDevice.name, productID: cachedDevice.productID,
       key: cachedDevice.deviceKey)
+    let otherLine = deviceListLine(
+      id: 2, name: "Other Mouse", productID: "0xBBBB", key: "bbbb-0002")
+    let engine = makeFakeEngine("echo '\(line)'; echo '\(otherLine)'; exit 0")
+
+    let model = AppModel(startInitialRefresh: false)
+    model.devices = [cachedDevice.replacingName("Previously remembered name")]
+    model.startBackgroundDeviceEnumeration(
+      executable: engine, currentDirectory: makeTemporaryDirectory(), cachedDevice: cachedDevice,
+      generation: model.refreshGeneration)
+    await model.refreshTask?.value
+
+    XCTAssertEqual(model.devices.map(\.deviceKey), [cachedDevice.deviceKey, "bbbb-0002"])
+    XCTAssertEqual(model.selectedDeviceIndex, 1)
+    XCTAssertEqual(model.currentDeviceName, cachedDevice.name)
+    XCTAssertEqual(model.deviceSummary, cachedDevice.title)
+    XCTAssertNil(model.refreshTask)
+  }
+
+  func testStartBackgroundDeviceEnumerationUsesCachedNameWhenNothingIsRemembered() async {
+    let cachedDevice = DeviceChoice(
+      id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-0001")
+    let line = deviceListLine(
+      id: 1, name: cachedDevice.name, productID: cachedDevice.productID,
+      key: cachedDevice.deviceKey)
     let engine = makeFakeEngine("echo '\(line)'; exit 0")
 
     let model = AppModel(startInitialRefresh: false)
@@ -233,14 +261,36 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
       generation: model.refreshGeneration)
     await model.refreshTask?.value
 
-    XCTAssertEqual(model.devices.map(\.deviceKey), [cachedDevice.deviceKey])
-    XCTAssertEqual(model.selectedDeviceIndex, 1)
     XCTAssertEqual(model.currentDeviceName, cachedDevice.name)
-    XCTAssertEqual(model.deviceSummary, cachedDevice.title)
-    XCTAssertNil(model.refreshTask)
+    XCTAssertEqual(model.selectedDeviceIndex, cachedDevice.id)
   }
 
-  func testStartBackgroundDeviceEnumerationFallsBackWhenCachedDeviceIsGone() async {
+  func testStartBackgroundDeviceEnumerationPresentsWiredAccessWarning() async {
+    let cachedDevice = DeviceChoice(
+      id: 1, name: "Missing Mouse", connection: "Wireless", productID: "0xAAAA",
+      deviceKey: "aaaa-9999")
+    let wiredLine = deviceListLine(
+      id: 4, connection: "Wired", name: "Wired Mouse", productID: "0xCCCC", key: "cccc-0004")
+    let engine = makeFakeEngine(
+      """
+      echo '\(wiredLine)'
+      echo "macOS denied HID access to the wired interface" 1>&2
+      exit 0
+      """)
+
+    let model = AppModel(startInitialRefresh: false)
+    model.startBackgroundDeviceEnumeration(
+      executable: engine, currentDirectory: makeTemporaryDirectory(), cachedDevice: cachedDevice,
+      generation: model.refreshGeneration)
+    await model.refreshTask?.value
+
+    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertEqual(model.wiredAccessDeviceName, "Wired Mouse")
+    XCTAssertEqual(model.selectedDeviceIndex, 0)
+    XCTAssertTrue(model.status.contains("Input Monitoring"))
+  }
+
+  func testStartBackgroundDeviceEnumerationDoesNotSelectAnotherMouseWhenCachedDeviceIsGone() async {
     let cachedDevice = DeviceChoice(
       id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-9999")
@@ -255,12 +305,10 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     await model.refreshTask?.value
 
     XCTAssertEqual(model.devices.map(\.deviceKey), ["dddd-0005"])
-    XCTAssertEqual(model.selectedDeviceIndex, 5)
-    // Falling back hands off to startRefresh(), which (with no bundled
-    // engine reachable through AppModel.engine in the test environment)
-    // synchronously reports the engine as unavailable — observable proof
-    // that the fallback path really did call startRefresh().
-    XCTAssertEqual(model.status, EngineError.unavailable.localizedDescription)
+    XCTAssertEqual(model.selectedDeviceIndex, 0)
+    XCTAssertEqual(model.currentDeviceName, "")
+    XCTAssertEqual(model.deviceSummary, "Choose a Logitech mouse to continue")
+    XCTAssertEqual(model.status, "Choose a Logitech mouse to continue.")
   }
 
   func testStartBackgroundDeviceEnumerationClearsStateWhenNoDevicesRemain() async {

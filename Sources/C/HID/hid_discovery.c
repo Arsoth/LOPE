@@ -1,4 +1,11 @@
-#include "internal.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+
+#include <IOKit/hid/IOHIDKeys.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 HidCheckAccessFn hid_check_access_impl = IOHIDCheckAccess;
 HidManagerCreateFn hid_manager_create_impl = IOHIDManagerCreate;
@@ -148,9 +155,10 @@ static bool receiver_device_name(Device *device, uint8_t slot) {
 
 const char *receiver_pairing_model_name(Reply pairing_reply) {
     // Lightspeed pairing information carries the mouse WPID at bytes 3..4.
-    // G603 is WPID 0x406C. This lets the list retain the model identity when
-    // the mouse is asleep and the receiver's codename register is transiently
-    // unavailable. Add future verified WPID mappings here as needed.
+    // These WPID mappings let the list retain the model identity when a mouse
+    // is asleep and the receiver's codename register is transiently
+    // unavailable. The values are the receiver pairing identifiers, not the
+    // receiver's USB product ID.
     if (pairing_reply.status != REPLY_OK || pairing_reply.length < 5) {
         return NULL;
     }
@@ -158,6 +166,14 @@ const char *receiver_pairing_model_name(Reply pairing_reply) {
     switch (wpid) {
     case 0x406C:
         return "G603 LIGHTSPEED";
+    case 0x4070:
+        return "G703 LIGHTSPEED";
+    case 0x4085:
+        return "G604 LIGHTSPEED";
+    case 0x4093:
+        return "PRO X SUPERLIGHT";
+    case 0x40BD:
+        return "PRO X 2 SUPERSTRIKE";
     default:
         return NULL;
     }
@@ -535,7 +551,24 @@ int discover_devices(HidContext *context, int requested_slot, Device *devices, s
         // in the device picker so the UI can accurately report that profiles
         // are unavailable, rather than silently dropping the mouse.
         if (!iface->channel_open) {
-            if (iface->is_mouse && !is_receiver_interface(iface)) {
+            bool has_mouse_collection = iface->is_mouse;
+            if (!has_mouse_collection && !is_receiver_interface(iface)) {
+                // A mouse commonly exposes separate standard-mouse and
+                // vendor interfaces. They share the physical location and
+                // product ID even though only the vendor interface can carry
+                // HID++. Preserve the vendor interface as an inaccessible
+                // wired mouse when its matching standard collection is still
+                // enumerable.
+                for (size_t other = 0; other < context->count; other++) {
+                    const HidInterface *candidate = &context->items[other];
+                    if (candidate->is_mouse && candidate->location_id == iface->location_id &&
+                        candidate->product_id == iface->product_id) {
+                        has_mouse_collection = true;
+                        break;
+                    }
+                }
+            }
+            if (has_mouse_collection && !is_receiver_interface(iface)) {
                 add_device(devices, count, iface, 0xFF, 0xFF, 0.0, inspect_features);
             }
             continue;

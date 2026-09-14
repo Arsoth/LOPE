@@ -1,4 +1,12 @@
-#include "internal.h"
+#include "watch_cli.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+
+#include <errno.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 WatchDeviceOpenFn watch_device_open_impl = IOHIDDeviceOpen;
 WatchDeviceCloseFn watch_device_close_impl = IOHIDDeviceClose;
@@ -176,6 +184,7 @@ void print_usage(const char *program) {
     printf("  --profile-state-change N:STATE       batch profile state (enable or disable)\n");
     printf("  --backup-directory DIR               directory for an apply operation's backups\n");
     printf("  --operation-id ID                    stable ID shared by all apply backups\n");
+    printf("  --format json                       emit the versioned GUI-facing JSON contract\n");
     printf("  --yes                                permit the requested mouse write\n");
     printf("  --help                               show this help\n");
 }
@@ -225,6 +234,23 @@ int parse_options(int argc, char **argv, Options *options) {
         }
         if (strcmp(arg, "--yes") == 0) {
             options->yes = true;
+            continue;
+        }
+        if (strcmp(arg, "--json") == 0) {
+            options->structured_output = true;
+            continue;
+        }
+        if (strcmp(arg, "--format") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "--format requires a value\n");
+                return 0;
+            }
+            const char *format = argv[++i];
+            if (strcmp(format, "json") != 0) {
+                fprintf(stderr, "unsupported output format '%s'; use json\n", format);
+                return 0;
+            }
+            options->structured_output = true;
             continue;
         }
         if (strcmp(arg, "--headers-only") == 0) {

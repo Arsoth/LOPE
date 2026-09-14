@@ -56,6 +56,7 @@ extension AppModel {
   }
 
   func keyboardKeyChoice(buttonIndex: Int) -> Int {
+    guard !capturedKeyboardButtonIndices.contains(buttonIndex) else { return 0 }
     let key = UInt8(keyboardKey(buttonIndex: buttonIndex))
     return keyboardOutputKeys.contains(where: { $0.id == key }) ? Int(key) : 0
   }
@@ -97,6 +98,7 @@ extension AppModel {
       return
     }
     setKeyboardChord(buttonIndex: buttonIndex, modifier: modifier, key: keyCode)
+    capturedKeyboardButtonIndices.insert(buttonIndex)
     recordingKeyboardButtonID = nil
     status = "Recorded \(key.label)."
   }
@@ -167,6 +169,7 @@ extension AppModel {
   }
 
   func specialKeyChoice(buttonIndex: Int) -> Int {
+    guard !capturedKeyboardButtonIndices.contains(buttonIndex) else { return 0 }
     let key = UInt8(keyboardKey(buttonIndex: buttonIndex))
     return keyboardOutputKeys.contains(where: { $0.id == key }) ? Int(key) : 0
   }

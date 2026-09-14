@@ -24,14 +24,15 @@ extension AppModel {
         else { continue }
 
         let selected = self.devices.first { $0.id == self.selectedDeviceIndex }
-        let selectedIndex = selected?.id ?? self.selectedDeviceIndex
+        let selectedIndex = selected?.id ?? -1
         let currentDirectory = self.backupDirectory
         let snapshot = await Task.detached(priority: .utility) {
           Self.makeDeviceEnumerationSnapshot(
             executable: executable,
             currentDirectory: currentDirectory,
             preferredDeviceIndex: selectedIndex,
-            preferredDeviceKey: nil
+            preferredDeviceKey: nil,
+            preferredDevice: selected
           )
         }.value
         guard !Task.isCancelled else { return }
@@ -51,9 +52,7 @@ extension AppModel {
         // and registry portions of deviceKey. Product/name matching
         // lets us recognize that same mouse after reconnect without
         // trusting the stale HID identity.
-        let matchingDevice = snapshot.devices.first {
-          !$0.productID.isEmpty && $0.productID == selected.productID && $0.name == selected.name
-        }
+        let matchingDevice = snapshot.devices.first { $0.matchesReconnectIdentity(selected) }
         let reachable = matchingDevice != nil
         let identityChanged = matchingDevice?.deviceKey != selected.deviceKey
         if !initialized {
@@ -87,9 +86,15 @@ extension AppModel {
   }
 
   func beginKnownDeviceRefresh(_ device: DeviceChoice) {
+    guard device.isNonWiredDevice else { return }
+    // The failed profile-read task can call this method before its own
+    // closure returns. Release that completed task so the next polling tick
+    // is allowed to launch a probe.
+    refreshTask = nil
     knownDisconnectedDevice = device
     waitingForKnownDevice = true
     knownDevicePollAttempts = 0
+    busy = true
     currentDeviceName = device.name
     deviceSummary = "\(device.title) — waiting for the mouse"
     // Keep the loading/profile-derived surface beneath the wake modal. The
@@ -112,7 +117,7 @@ extension AppModel {
 
         self.knownDevicePollAttempts = attempt
         self.status = self.knownDeviceRefreshStatus(for: device, expired: false)
-        guard !self.busy else { continue }
+        guard self.refreshTask == nil else { continue }
         self.startKnownDeviceProbe(device)
       }
 
@@ -121,6 +126,24 @@ extension AppModel {
       else { return }
       self.waitingForKnownDevice = false
       self.knownDevicePollTask = nil
+      self.busy = false
+      self.loadingProfile = false
+      self.refreshTask = nil
+      let prompt = self.devices.first(where: { $0.isWiredAccessPrompt })
+      let remainingDevices = self.devices.filter {
+        !$0.isWiredAccessPrompt && !$0.matchesReconnectIdentity(device)
+      }
+      self.devices = remainingDevices + (prompt.map { [$0] } ?? [])
+      if remainingDevices.isEmpty {
+        self.selectedDeviceIndex = 0
+        self.currentDeviceName = ""
+        self.deviceSummary =
+          "Wake \(device.name), then choose Refresh, or select another mouse"
+      } else {
+        self.selectedDeviceIndex = 0
+        self.currentDeviceName = ""
+        self.deviceSummary = "Choose a Logitech mouse to continue"
+      }
       self.resetEditorState()
       self.status = self.knownDeviceRefreshStatus(for: device, expired: true)
     }
@@ -139,7 +162,7 @@ extension AppModel {
     // until the mouse responds.
     busy = true
     guard let engine else {
-      busy = false
+      busy = waitingForKnownDevice
       return
     }
 
@@ -150,7 +173,8 @@ extension AppModel {
           executable: engine,
           currentDirectory: currentDirectory,
           preferredDeviceIndex: device.id,
-          preferredDeviceKey: device.deviceKey
+          preferredDeviceKey: device.deviceKey,
+          preferredDevice: device
         )
       }.value
 
@@ -162,24 +186,29 @@ extension AppModel {
       guard enumeration.errorMessage == nil,
         let selectedIndex = enumeration.selectedDeviceIndex,
         let selected = enumeration.devices.first(where: { $0.id == selectedIndex }),
-        selected.deviceKey == device.deviceKey
+        selected.matchesReconnectIdentity(device)
       else {
         self.finishKnownDeviceProbe(generation: generation)
         return
       }
 
-      self.devices = enumeration.devices
+      let resolvedSelected = selected.replacingName(
+        DeviceChoice.preferredName(reported: selected.name, fallback: device.name))
+      let resolvedDevices = enumeration.devices.map {
+        $0.deviceKey == resolvedSelected.deviceKey ? resolvedSelected : $0
+      }
+      self.devices = resolvedDevices
       self.selectedDeviceIndex = selected.id
-      self.currentDeviceName = selected.name
-      self.deviceSummary = "\(selected.title) — waiting for the mouse"
-      self.rememberSelectedDevice(selected)
+      self.currentDeviceName = resolvedSelected.name
+      self.deviceSummary = "\(resolvedSelected.title) — waiting for the mouse"
+      self.rememberSelectedDevice(resolvedSelected)
       let profileReadProgress = self.profileReadProgressHandler(generation: generation)
 
       let snapshot = await Task.detached(priority: .utility) {
         Self.makeProfileSnapshot(
           executable: engine,
           currentDirectory: currentDirectory,
-          devices: enumeration.devices,
+          devices: resolvedDevices,
           selectedDeviceKey: selected.deviceKey,
           selectedDeviceIndex: selected.id,
           preferredProfileNumber: preferredProfileNumber,
@@ -203,7 +232,7 @@ extension AppModel {
 
   func finishKnownDeviceProbe(generation: Int) {
     guard refreshGeneration == generation else { return }
-    busy = false
+    busy = waitingForKnownDevice
     refreshTask = nil
   }
 
@@ -221,6 +250,10 @@ extension AppModel {
     _ device: DeviceChoice,
     availableDevices: [DeviceChoice] = []
   ) {
+    guard device.isNonWiredDevice else {
+      presentWiredAccessInstructions(for: device)
+      return
+    }
     busy = false
     loadingProfile = false
     refreshTask = nil
@@ -242,6 +275,7 @@ extension AppModel {
       // engine's list is one-based, so the picker has no stale target.
       selectedDeviceIndex = 0
     }
+    busy = true
     if knownDevicePollTask == nil {
       beginKnownDeviceRefresh(device)
     }
@@ -253,12 +287,13 @@ extension AppModel {
       productID: device.productID
     )?.refreshGuidance
     guard let guidance else {
-      return "\(device.name) is not currently detected. Turn it on, then choose Refresh."
+      return expired
+        ? "Still waiting for \(device.name). Move or click it to wake it, then choose Refresh."
+        : "Checking for \(device.name)…"
     }
     if expired {
       return "Still waiting for \(device.name). \(guidance.wakeInstructions)"
     }
-    return
-      "\(guidance.sleepDescription) \(guidance.wakeInstructions) LOPE will keep checking in the background."
+    return "Checking for \(device.name)…"
   }
 }

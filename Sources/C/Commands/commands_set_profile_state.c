@@ -1,4 +1,13 @@
-#include "internal.h"
+#include "commands_set_profile_state.h"
+#include "backup.h"
+#include "commands_read.h"
+#include "hid_discovery.h"
+#include "profile_io.h"
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int run_set_profile_state(const Options *options) {
     if (options->positional_count != 2) {

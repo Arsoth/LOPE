@@ -3,6 +3,9 @@
 
 #include "types.h"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 typedef ssize_t (*BackupReadFn)(int fd, void *bytes, size_t length);
 typedef ssize_t (*BackupWriteFn)(int fd, const void *bytes, size_t length);
 typedef int (*BackupCloseFn)(int fd);

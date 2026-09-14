@@ -119,6 +119,36 @@ final class AppModelsTests: XCTestCase {
     XCTAssertFalse(notWired.isWiredDevice)
   }
 
+  func testPairedGenericNameIsReplacedBySpecificModelIdentity() {
+    let generic = DeviceChoice(
+      id: 1, name: "Paired Logitech Mouse - Lightspeed", connection: "Wireless",
+      productID: "0x4085", deviceKey: "paired")
+
+    XCTAssertTrue(generic.isGenericPairedName)
+    XCTAssertEqual(DeviceChoice.preferredName(reported: "G604", fallback: generic.name), "G604")
+    XCTAssertEqual(
+      DeviceChoice.preferredName(
+        reported: "Paired Logitech Mouse - Lightspeed", fallback: "G604"),
+      "G604")
+    XCTAssertFalse(
+      DeviceChoice(
+        id: 1, name: "G604", connection: "Wireless", productID: "0x4085", deviceKey: "paired"
+      ).isGenericPairedName)
+  }
+
+  func testPairedIdentityMatchesWhenReceiverKeyChanges() {
+    let previous = DeviceChoice(
+      id: 1, name: "G604", connection: "Wireless", productID: "0x4085", deviceKey: "old-key")
+    let reconnected = DeviceChoice(
+      id: 3, name: "Paired Logitech Mouse - Lightspeed", connection: "Wireless",
+      productID: "0x4085", deviceKey: "new-key")
+    let different = DeviceChoice(
+      id: 3, name: "G502 X", connection: "Wireless", productID: "0x4085", deviceKey: "new-key")
+
+    XCTAssertTrue(reconnected.matchesReconnectIdentity(previous))
+    XCTAssertFalse(different.matchesReconnectIdentity(previous))
+  }
+
   func testAddingWiredAccessPromptGuardBranches() {
     let wired = DeviceChoice(
       id: 1, name: "G604", connection: "Wired", productID: "0x1", deviceKey: "wired")
@@ -137,6 +167,17 @@ final class AppModelsTests: XCTestCase {
     // Wired device present and not yet authorized: prompt appended.
     let appended = DeviceChoice.addingWiredAccessPrompt(to: [wired], accessAuthorized: false)
     XCTAssertEqual(appended, [wired, DeviceChoice.wiredAccessPrompt])
+  }
+
+  func testAddingWiredAccessPromptWhenWarningHasNoWiredListEntry() {
+    let receiver = DeviceChoice(
+      id: 2, name: "G604", connection: "LIGHTSPEED", productID: "0x4085", deviceKey: "receiver")
+
+    let devices = DeviceChoice.addingWiredAccessPrompt(
+      to: [receiver], accessAuthorized: false, accessWarning: true)
+
+    XCTAssertEqual(Array(devices.dropLast()), [receiver])
+    XCTAssertTrue(devices.last?.isWiredAccessPrompt == true)
   }
 
   func testEditableBackupRoundTripsThroughJSON() throws {

@@ -1,7 +1,11 @@
 #ifndef LOPE_LOGITECH_ONBOARD_INTERNAL_H
 #define LOPE_LOGITECH_ONBOARD_INTERNAL_H
 
+// The executable entrypoint uses this aggregate to dispatch every command.
+// Implementation and self-test modules include only the narrower headers they
+// actually use.
 #include "types.h"
+#include "engine_boundary.h"
 #include "hid_transport.h"
 #include "hid_discovery.h"
 #include "profile_io.h"

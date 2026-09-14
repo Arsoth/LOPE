@@ -73,12 +73,20 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(makeSnapshot(selectedDeviceIndex: nil, accessWarning: true))
 
-    XCTAssertTrue(model.status.contains("Enable Input Monitoring"))
+    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertTrue(model.status.contains("System Settings"))
+    XCTAssertFalse(model.status.contains("No Logitech mouse was found"))
+
+    // Dismissing the app-owned prompt and refreshing again must not create a
+    // second permission flow until authorization changes.
+    model.wiredAccessInstructionsPresented = false
+    model.applyRefreshSnapshot(makeSnapshot(selectedDeviceIndex: nil, accessWarning: true))
+    XCTAssertFalse(model.wiredAccessInstructionsPresented)
   }
 
   // MARK: - Selected device, no profile text
 
-  func testApplyRefreshSnapshotWithKnownOnboardCapabilityBeginsKnownDeviceRefresh() {
+  func testApplyRefreshSnapshotDoesNotWakePollAWiredDevice() {
     let model = AppModel(startInitialRefresh: false)
     let device = DeviceChoice(
       id: 1, name: "G502 X", connection: "Wired", productID: "0x0000", deviceKey: "known-device")
@@ -88,7 +96,25 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
         devices: [device], selectedDeviceIndex: 1, profileText: nil,
         profileError: "sleeping", selectedProfileNumber: nil))
 
+    XCTAssertFalse(model.waitingForKnownDevice)
+    XCTAssertFalse(model.busy)
+    XCTAssertNil(model.knownDevicePollTask)
+    XCTAssertTrue(model.status.contains("Choose Refresh"))
+  }
+
+  func testApplyRefreshSnapshotBeginsWakePollingForAnyNonWiredDeviceWithReadError() {
+    let model = AppModel(startInitialRefresh: false)
+    let device = DeviceChoice(
+      id: 1, name: "Unrecognized Mouse", connection: "Bluetooth", productID: "0x9999",
+      deviceKey: "unknown-device")
+
+    model.applyRefreshSnapshot(
+      makeSnapshot(
+        devices: [device], selectedDeviceIndex: 1, profileText: nil,
+        profileError: "timed out", selectedProfileNumber: nil))
+
     XCTAssertTrue(model.waitingForKnownDevice)
+    XCTAssertTrue(model.busy)
     XCTAssertEqual(model.knownDisconnectedDevice, device)
     model.knownDevicePollTask?.cancel()
   }
@@ -121,7 +147,8 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
         devices: [device], selectedDeviceIndex: 1, profileText: nil,
         profileError: "timed out", accessWarning: false))
 
-    XCTAssertTrue(model.status.contains("Wake it"))
+    XCTAssertTrue(model.status.contains("Choose Refresh"))
+    XCTAssertFalse(model.status.contains("Wake it"))
   }
 
   func testApplyRefreshSnapshotWithUnknownDeviceAndNoProfileErrorReportsNoCompatibleProfile() {
@@ -336,7 +363,7 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     let status = model.profileReadStatus(for: "G502 X", accessWarning: false)
 
-    XCTAssertTrue(status.contains("Wake it"))
+    XCTAssertTrue(status.contains("Choose Refresh"))
   }
 
   func testProfileReadStatusIgnoresAccessWarningForMXSeriesMouse() {

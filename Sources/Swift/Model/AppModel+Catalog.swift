@@ -142,6 +142,15 @@ extension AppModel {
       KeyboardKeyChoice(id: 0x7F, label: "Mute"),
       KeyboardKeyChoice(id: 0x80, label: "Volume Up"),
       KeyboardKeyChoice(id: 0x81, label: "Volume Down"),
+      KeyboardKeyChoice(id: 0xB0, label: "Play"),
+      KeyboardKeyChoice(id: 0xB1, label: "Pause"),
+      KeyboardKeyChoice(id: 0xB2, label: "Record"),
+      KeyboardKeyChoice(id: 0xB3, label: "Fast Forward"),
+      KeyboardKeyChoice(id: 0xB4, label: "Rewind"),
+      KeyboardKeyChoice(id: 0xB5, label: "Scan Next Track"),
+      KeyboardKeyChoice(id: 0xB6, label: "Scan Previous Track"),
+      KeyboardKeyChoice(id: 0xB7, label: "Stop"),
+      KeyboardKeyChoice(id: 0xB8, label: "Eject"),
       KeyboardKeyChoice(id: 0x82, label: "Locking Caps Lock"),
       KeyboardKeyChoice(id: 0x83, label: "Locking Num Lock"),
       KeyboardKeyChoice(id: 0x84, label: "Locking Scroll Lock"),
@@ -204,7 +213,25 @@ extension AppModel {
   /// of the normal recorder UI. Character keys, F1–F12, Tab, Enter, and
   /// similar everyday keys are captured by recording instead.
   var extendedKeyboardKeys: [KeyboardKeyChoice] {
-    keyboardKeys.filter { isExtendedKeyboardKey($0) }
+    extendedKeyboardKeyGroups.flatMap(\.keys)
+  }
+
+  var extendedKeyboardKeyGroups: [KeyboardKeyGroupChoice] {
+    KeyboardKeyGroup.allCases.compactMap { group in
+      let keys =
+        keyboardKeys
+        .filter { isExtendedKeyboardKey($0) && keyboardKeyGroup(for: $0) == group }
+        .sorted { lhs, rhs in
+          let leftLabel = lhs.label.lowercased()
+          let rightLabel = rhs.label.lowercased()
+          if leftLabel != rightLabel {
+            return leftLabel < rightLabel
+          }
+          return lhs.id < rhs.id
+        }
+      guard !keys.isEmpty else { return nil }
+      return KeyboardKeyGroupChoice(group: group, keys: keys)
+    }
   }
 
   var keyboardOutputKeys: [KeyboardKeyChoice] {
@@ -217,13 +244,27 @@ extension AppModel {
 
   func isExtendedKeyboardKey(_ key: KeyboardKeyChoice) -> Bool {
     switch key.id {
-    case 0x46...0x52,  // Print Screen through arrow keys
+    case 0x46...0x67,  // Print Screen through keypad equal sign
       0x68...0x73,  // F13–F24
       0x74...0xA5,  // extended keyboard/page usages
+      0xB0...0xB8,  // media usages
       0xF8...0xFA:  // Sleep, Wake, Refresh extensions
       return true
     default:
       return false
+    }
+  }
+
+  private func keyboardKeyGroup(for key: KeyboardKeyChoice) -> KeyboardKeyGroup {
+    switch key.id {
+    case 0x46...0x67:
+      return .standard
+    case 0x68...0x73:
+      return .function
+    case 0x7F...0x81, 0xB0...0xB8:
+      return .media
+    default:
+      return .other
     }
   }
 

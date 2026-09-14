@@ -46,11 +46,12 @@ setup, see [development-setup.md](development-setup.md).
 - `.clang-format` keeps include sorting disabled so module headers and
   platform headers remain in deliberate, readable groups.
 - `make install-hooks` copies `scripts/git-hooks/pre-commit` into
-  `.git/hooks/pre-commit`. That hook runs `make format-check` and the
-  staged-file `make test-modified` gate before every commit. Each clone needs
-  to run `make install-hooks` once; it is not automatic. The hook is a fast,
-  changed-files gate; run `make test` and `make coverage-check` when a full
-  repository check is appropriate.
+  `.git/hooks/pre-commit`. Before every commit, that hook runs `make format`
+  for Swift and C, re-stages only paths that were already staged, runs
+  `make format-check`, and runs the staged-file `make test-modified` gate.
+  Each clone needs to run `make install-hooks` once; it is not automatic. The
+  hook is a fast, changed-files gate; run `make test` and `make coverage-check`
+  when a full repository check is appropriate.
 - Never bypass commit hooks.
 - Work TDD-first and keep solutions simple and non-duplicative: T.D.D. ·
   K.I.S.S. · D.R.Y.
@@ -128,8 +129,12 @@ setup, see [development-setup.md](development-setup.md).
   terminal detection.
 - `coverage-check-c` and `coverage-c` both exclude `Sources/C/Testing/`
   (`--ignore-filename-regex`/a negative-lookahead source pattern) from the
-  report and the threshold check. That directory is test infrastructure —
-  the `test_<module>.c` files, `selftest.c`'s dispatcher, and
+  report and the threshold check. They also exclude the declaration-only
+  headers `Sources/C/Backup/backup_codec.h`,
+  `Sources/C/Core/engine_boundary.h`, and
+  `Sources/C/Profiles/profile_codec.h`; these headers define no functions to
+  exercise or grade. The testing directory is test infrastructure — the
+  `test_<module>.c` files, `selftest.c`'s dispatcher, and
   `test_doubles.c`'s mocking seams — not production code. Self-test
   files built from `&&`-chained assertions (`ok = a() && b() && !c(); if
   (!ok) { ...; return 1; }`) structurally cap their own branch coverage
@@ -159,12 +164,15 @@ setup, see [development-setup.md](development-setup.md).
   `writeProfileEditorExport`/`applyImportedProfileEditorDraft` in
   `AppModel+ProfileEditor.swift` versus their callers in
   `AppModel+ProfileEditorShim.swift` for the pattern.
-- `make test-modified` is wired into the pre-commit hook alongside
-  `make format-check`. Its coverage invocation uses the same configured
-  per-file thresholds, but limits the report to changed production files.
-- Automated pull-request checks run `make test` and `make coverage-check` for
-  the complete repository. Run those same commands locally for broad changes
-  or before requesting review.
+- `make test-modified` is wired into the pre-commit hook after the automatic
+  `make format` and `make format-check` steps. Its coverage invocation uses
+  the same configured per-file thresholds, but limits the report to changed
+  production files.
+- Automated pull-request checks are four separate required gates: `PR Title`,
+  `Formatting` (`make lint`), `Tests` (`make test`), and `Coverage`
+  (`make coverage-check`). Run the same commands locally for broad changes or
+  before requesting review. Configure those four check names as required in
+  the repository's branch protection settings.
 - For each uncovered line or path you touch:
   1. Write a test for reachable behavior and relevant edge cases.
   2. There is no per-line exclusion comment (no `LCOV_EXCL_LINE` equivalent
@@ -176,6 +184,17 @@ setup, see [development-setup.md](development-setup.md).
   3. Add any newly discovered edge case to the relevant test file.
 - Prefer running `make test-modified` for ordinary branch work; run
   `make coverage-check` for broad changes and before requesting review.
+
+## C header layering
+
+`Sources/C/Core/types.h` is the platform-neutral shared model and protocol
+layer. It may be included by profile, backup, command, and codec code without
+pulling in Apple HID or POSIX declarations. Concrete HID channels, interfaces,
+and manager contexts live in `Sources/C/HID/hid_types.h`; HID transport and
+discovery headers include that layer when they need the platform types. The
+aggregate `Sources/C/Core/internal.h` is reserved for the executable entrypoint
+that dispatches all commands; implementation and self-test modules should
+include their narrower module headers directly.
 
 ## Style
 

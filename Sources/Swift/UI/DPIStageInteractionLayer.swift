@@ -88,6 +88,7 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
   let onDragBegan: (Int, CGFloat) -> Void
   let onDragChanged: (CGFloat) -> Void
   let onDragEnded: (CGFloat) -> Void
+  let onHover: (Int?) -> Void
 
   func makeNSView(context: Context) -> InteractionView {
     let view = InteractionView()
@@ -105,22 +106,24 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
   }
 
   private func update(_ view: InteractionView) {
-    view.targets = targets
     view.onTap = onTap
     view.onBackgroundClick = onBackgroundClick
     view.onDragBegan = onDragBegan
     view.onDragChanged = onDragChanged
     view.onDragEnded = onDragEnded
+    view.onHover = onHover
+    view.targets = targets
     view.setSamplingActive(isActive)
+    view.refreshHoverState()
   }
 
   final class InteractionView: NSView {
-    var targets: [DPIStageHitTarget] = []
     var onTap: ((Int) -> Void)?
     var onBackgroundClick: (() -> Void)?
     var onDragBegan: ((Int, CGFloat) -> Void)?
     var onDragChanged: ((CGFloat) -> Void)?
     var onDragEnded: ((CGFloat) -> Void)?
+    var onHover: ((Int?) -> Void)?
 
     private let dragThreshold: CGFloat = 5
     // Matches the visible badge (the circle/rounded-rect/pentagon icon drawn
@@ -138,18 +141,42 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
     private let tickLock = NSLock()
     private var tickQueued = false
     private var hoverTrackingArea: NSTrackingArea?
-    private var isShowingPointingHand = false
+    private var hoveredStageIndex: Int?
 
     override var isFlipped: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    // Cursor rects (`resetCursorRects`/`addCursorRect`) and `.cursorUpdate`
-    // tracking areas both only re-evaluate the cursor when the pointer
-    // *enters* a registered region; neither reacts as the pointer glides
-    // between a handle and the bare track within this one large view. A
-    // `.mouseMoved` tracking area gets a callback on every move so the
-    // handles can show a pointing hand exactly while over them.
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      window?.invalidateCursorRects(for: self)
+      refreshHoverState()
+    }
+
+    var targets: [DPIStageHitTarget] = [] {
+      didSet { window?.invalidateCursorRects(for: self) }
+    }
+
+    override func resetCursorRects() {
+      super.resetCursorRects()
+      guard !targets.isEmpty else { return }
+      addCursorRect(
+        CGRect(
+          x: 0,
+          y: trackRange.lowerBound,
+          width: bounds.width,
+          height: trackRange.upperBound - trackRange.lowerBound
+        ),
+        cursor: .pointingHand
+      )
+      for target in targets {
+        addCursorRect(badgeRect(for: target.x), cursor: .pointingHand)
+      }
+    }
+
+    // Tracking areas are used for the visual hover ring. Cursor rectangles
+    // above own the cursor itself, so hover state never mutates the process-
+    // wide cursor or competes with another editor surface.
     override func updateTrackingAreas() {
       super.updateTrackingAreas()
       if let hoverTrackingArea {
@@ -167,22 +194,33 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
 
     override func mouseMoved(with event: NSEvent) {
       super.mouseMoved(with: event)
-      updateHoverCursor(at: convert(event.locationInWindow, from: nil))
+      updateHover(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+      super.mouseEntered(with: event)
+      updateHover(at: convert(event.locationInWindow, from: nil))
     }
 
     override func mouseExited(with event: NSEvent) {
       super.mouseExited(with: event)
-      setPointingHand(false)
+      updateHover(at: nil)
     }
 
-    private func updateHoverCursor(at point: CGPoint) {
-      setPointingHand(target(at: point) != nil)
+    private func updateHover(at point: CGPoint?) {
+      let nextIndex = point.flatMap { target(at: $0)?.index }
+      guard nextIndex != hoveredStageIndex else { return }
+      hoveredStageIndex = nextIndex
+      onHover?(nextIndex)
     }
 
-    private func setPointingHand(_ showPointingHand: Bool) {
-      guard showPointingHand != isShowingPointingHand else { return }
-      isShowingPointingHand = showPointingHand
-      (showPointingHand ? NSCursor.pointingHand : NSCursor.arrow).set()
+    func refreshHoverState() {
+      guard let window else {
+        updateHover(at: nil)
+        return
+      }
+      let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+      updateHover(at: convert(windowPoint, from: nil))
     }
 
     override func mouseDown(with event: NSEvent) {

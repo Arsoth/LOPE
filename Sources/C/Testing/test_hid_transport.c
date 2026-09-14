@@ -1,5 +1,9 @@
-#include "internal.h"
+#include "hid_transport.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static IOReturn g_open_results[4];
 static size_t g_open_result_count;

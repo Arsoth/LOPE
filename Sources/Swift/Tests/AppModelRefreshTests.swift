@@ -52,6 +52,7 @@ final class AppModelRefreshTests: XCTestCase {
         accessWarning: false
       ))
     XCTAssertTrue(sleepingModel.waitingForKnownDevice)
+    XCTAssertTrue(sleepingModel.busy)
     XCTAssertFalse(sleepingModel.buttons.isEmpty)
     XCTAssertFalse(sleepingModel.profiles.isEmpty)
     sleepingModel.knownDevicePollTask?.cancel()

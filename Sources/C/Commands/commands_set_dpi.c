@@ -1,4 +1,12 @@
-#include "internal.h"
+#include "commands_set_dpi.h"
+#include "backup.h"
+#include "commands_read.h"
+#include "hid_discovery.h"
+#include "profile_io.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 bool dpi_value_in_list(const uint16_t *values, size_t count, uint16_t wanted) {
     for (size_t i = 0; i < count; i++) {

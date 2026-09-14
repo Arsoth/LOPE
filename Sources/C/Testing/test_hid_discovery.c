@@ -1,5 +1,11 @@
-#include "internal.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+#include "g600.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     uint32_t vendor_id;
@@ -198,7 +204,23 @@ int test_hid_discovery(void) {
     short_pairing.length = 4;
     Reply error_pairing = g603_pairing;
     error_pairing.status = REPLY_TIMEOUT;
+    Reply g604_pairing = g603_pairing;
+    g604_pairing.bytes[3] = 0x40;
+    g604_pairing.bytes[4] = 0x85;
+    Reply g703_pairing = g603_pairing;
+    g703_pairing.bytes[3] = 0x40;
+    g703_pairing.bytes[4] = 0x70;
+    Reply pro_x_pairing = g603_pairing;
+    pro_x_pairing.bytes[3] = 0x40;
+    pro_x_pairing.bytes[4] = 0x93;
+    Reply pro_x2_pairing = g603_pairing;
+    pro_x2_pairing.bytes[3] = 0x40;
+    pro_x2_pairing.bytes[4] = 0xBD;
     if (strcmp(receiver_pairing_model_name(g603_pairing), "G603 LIGHTSPEED") != 0 ||
+        strcmp(receiver_pairing_model_name(g604_pairing), "G604 LIGHTSPEED") != 0 ||
+        strcmp(receiver_pairing_model_name(g703_pairing), "G703 LIGHTSPEED") != 0 ||
+        strcmp(receiver_pairing_model_name(pro_x_pairing), "PRO X SUPERLIGHT") != 0 ||
+        strcmp(receiver_pairing_model_name(pro_x2_pairing), "PRO X 2 SUPERSTRIKE") != 0 ||
         receiver_pairing_model_name(unknown_pairing) != NULL ||
         receiver_pairing_model_name(short_pairing) != NULL ||
         receiver_pairing_model_name(error_pairing) != NULL) {
@@ -404,6 +426,20 @@ int test_hid_discovery(void) {
         fprintf(stderr, "discover_device_by_key self-test failed\n");
         return 1;
     }
+    HidInterface g600_key_interface = {.is_vendor = true,
+                                       .channel_open = true,
+                                       .product_id = G600_PRODUCT_ID,
+                                       .location_id = 0x1234,
+                                       .registry_id = 0x5678};
+    HidContext g600_key_context = {.items = &g600_key_interface, .count = 1};
+    discover_bad_key_count = 0;
+    if (discover_device_by_key(&g600_key_context, "1234-5678-FF", discover_key_devices,
+                               &discover_bad_key_count) != 1 ||
+        discover_bad_key_count != 1) {
+        fprintf(stderr, "discover_device_by_key G600 self-test failed\n");
+        return 1;
+    }
+    hid_device_open_impl = IOHIDDeviceOpen;
 
     HidInterface receiver_interface = {0};
     receiver_interface.is_vendor = true;
@@ -928,6 +964,17 @@ int test_hid_discovery(void) {
     closed_ok = closed_ok &&
                 discover_devices(&closed_context, -1, closed_devices, &closed_count, false) &&
                 closed_count == 0;
+    HidInterface closed_vendor_only = {
+        .product_id = 0x4085, .is_vendor = true, .location_id = 0xAA};
+    HidInterface closed_standard_collection = {
+        .product_id = 0x4085, .is_mouse = true, .location_id = 0xAA};
+    HidInterface closed_matching_items[] = {closed_vendor_only, closed_standard_collection};
+    HidContext closed_matching_context = {.items = closed_matching_items, .count = 2};
+    closed_count = 0;
+    closed_ok =
+        closed_ok &&
+        discover_devices(&closed_matching_context, -1, closed_devices, &closed_count, false) &&
+        closed_count == 1 && closed_devices[0].iface == &closed_matching_items[0];
 
     HidInterface open_interface = {.product_id = 0x4085, .is_vendor = true};
     HidInterface already_open = {.product_id = 0x4085, .is_vendor = true, .channel_open = true};

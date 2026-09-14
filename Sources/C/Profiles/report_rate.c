@@ -5,7 +5,15 @@
 // query is therefore preferred over the device-wide 0x8060 list whenever the
 // feature is present; it is the only list this module exposes to callers.
 
-#include "internal.h"
+#include "report_rate.h"
+#include "commands_read.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 uint32_t report_rate_hertz_from_interval(uint8_t milliseconds) {
     if (milliseconds == 0) {

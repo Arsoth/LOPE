@@ -9,10 +9,12 @@
 
 int test_hid_transport(void);
 int test_hid_discovery(void);
+int test_profile_codec(void);
 int test_profile_io(void);
 int test_profile_rendering(void);
 int test_report_rate(void);
 int test_g600(void);
+int test_backup_codec(void);
 int test_backup(void);
 int test_commands_read(void);
 int test_commands_set_dpi(void);
@@ -20,5 +22,6 @@ int test_commands_set_profile_state(void);
 int test_commands_apply(void);
 int test_commands_backup_bind(void);
 int test_watch_cli(void);
+int test_engine_boundary(void);
 
 #endif // LOPE_LOGITECH_ONBOARD_SELFTEST_MODULES_H

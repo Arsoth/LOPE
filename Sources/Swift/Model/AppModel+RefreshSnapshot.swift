@@ -7,7 +7,10 @@ import Foundation
 extension AppModel {
   func applyRefreshSnapshot(_ snapshot: RefreshSnapshot) {
     defer {
-      busy = false
+      // A failed read for a non-wired mouse transitions directly into the
+      // wake/recovery poll. Keep the operation busy until that poll either
+      // reconnects the mouse or reaches its timeout.
+      busy = waitingForKnownDevice
       loadingProfile = false
       refreshTask = nil
     }
@@ -21,6 +24,9 @@ extension AppModel {
     }
 
     devices = snapshot.devices
+    if snapshot.accessWarning {
+      presentWiredAccessInstructions(for: devices.first(where: { $0.isWiredDevice }))
+    }
     guard let selectedIndex = snapshot.selectedDeviceIndex,
       let selected = devices.first(where: { $0.id == selectedIndex })
     else {
@@ -33,8 +39,10 @@ extension AppModel {
       resetEditorState()
       status =
         snapshot.accessWarning
-        ? "macOS denied access to one or more Logitech HID++ interfaces. Enable Input Monitoring, then Refresh."
-        : "No Logitech mouse was found"
+        ? "A wired Logitech mouse needs Input Monitoring. Choose a wireless mouse, or enable access in System Settings."
+        : devices.contains(where: { !$0.isWiredAccessPrompt })
+          ? "Choose a Logitech mouse to continue."
+          : "No Logitech mouse was found"
       return
     }
 
@@ -45,7 +53,7 @@ extension AppModel {
     refreshBackups()
 
     guard let profileText = snapshot.profileText else {
-      if hasKnownOnboardProfileCapability(selected) {
+      if selected.isNonWiredDevice && snapshot.profileError != nil {
         beginKnownDeviceRefresh(selected)
         return
       }
@@ -180,6 +188,9 @@ extension AppModel {
     if accessWarning && !isMXSeriesMouse {
       return
         "macOS is blocking access to \(deviceName). Enable Input Monitoring, then choose Refresh."
+    }
+    if devices.first(where: { $0.id == selectedDeviceIndex })?.isWiredDevice == true {
+      return "Couldn’t read \(deviceName)’s onboard profile. Choose Refresh to try again."
     }
     return
       "Couldn’t read \(deviceName)’s onboard profile. Is the mouse turned on and awake? Wake it, then choose Refresh."

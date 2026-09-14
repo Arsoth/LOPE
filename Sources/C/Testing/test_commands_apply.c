@@ -1,5 +1,13 @@
-#include "internal.h"
+#include "commands_apply.h"
+#include "engine_boundary.h"
+#include "g600.h"
+#include "profile_io.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 typedef struct {
     const bool *outcomes;
@@ -36,6 +44,13 @@ int test_commands_apply(void) {
         batch_affected_sector_count(false, false) == 0;
     if (!batch_plan_ok) {
         fprintf(stderr, "batch sector planning self-test failed\n");
+        return 1;
+    }
+    EngineBoundaryWriteResult null_options_boundary;
+    EngineBoundaryError null_options_error;
+    if (engine_apply(NULL, &null_options_boundary, &null_options_error) != 1 ||
+        null_options_boundary.profile != 0 || !null_options_boundary.dry_run) {
+        fprintf(stderr, "engine_apply null-options self-test failed\n");
         return 1;
     }
 
@@ -80,6 +95,8 @@ int test_commands_apply(void) {
                          !parse_batch_raw_record("8001000", raw_record_spec) &&
                          !parse_batch_raw_record("8001000G", raw_record_spec) &&
                          !parse_batch_raw_record("ZZ000000", raw_record_spec) &&
+                         !parse_batch_raw_record("  000000", raw_record_spec) &&
+                         !parse_batch_raw_record("++000000", raw_record_spec) &&
                          !parse_batch_raw_record("-10010004", raw_record_spec) &&
                          !parse_batch_raw_record(NULL, raw_record_spec);
     if (!raw_record_ok) {
@@ -627,7 +644,7 @@ int test_commands_apply(void) {
     // otherwise writable button layout.
     uint8_t apply2_rgb_bad_sector[255];
     memcpy(apply2_rgb_bad_sector, mock_sector, sizeof(apply2_rgb_bad_sector));
-    apply2_rgb_bad_sector[RGB_PROFILE_BASE_OFFSET] = 0x02;
+    memset(apply2_rgb_bad_sector + RGB_PROFILE_BASE_OFFSET, 0xFF, RGB_PROFILE_RECORD_BYTES);
     sector_put_crc(apply2_rgb_bad_sector, sizeof(apply2_rgb_bad_sector));
     Reply apply2_rgb_bad_chunks[32];
     size_t apply2_rgb_bad_chunk_count = build_sector_read_replies(
@@ -1118,9 +1135,15 @@ int test_commands_apply(void) {
     make_batch_backup_path(apply2_happy_directory, apply2_happy.operation_id,
                            apply2_happy_backup_path);
     unlink(apply2_happy_backup_path);
-    int apply2_happy_result = run_apply(&apply2_happy);
+    EngineBoundaryWriteResult apply2_happy_boundary;
+    EngineBoundaryError apply2_happy_error;
+    int apply2_happy_result =
+        engine_apply(&apply2_happy, &apply2_happy_boundary, &apply2_happy_error);
     unlink(apply2_happy_backup_path);
-    if (apply2_happy_result != 0) {
+    if (apply2_happy_result != 0 || !apply2_happy_boundary.completed ||
+        !apply2_happy_boundary.changed || apply2_happy_boundary.planned_count != 1 ||
+        apply2_happy_boundary.verified_count != 1 ||
+        apply2_happy_error.code != ENGINE_BOUNDARY_ERROR_NONE) {
         fprintf(stderr, "run_apply happy-path self-test failed (result=%d)\n", apply2_happy_result);
         return 1;
     }
@@ -1139,6 +1162,27 @@ int test_commands_apply(void) {
     apply2_no_device.button_change_count = 1;
     if (run_apply(&apply2_no_device) != 1) {
         fprintf(stderr, "run_apply select-device-failure self-test failed\n");
+        return 1;
+    }
+    g_discover_devices_test_context = &apply2_discovery;
+
+    Device apply2_unstable_device = set_dpi_device;
+    apply2_unstable_device.iface = NULL;
+    DiscoverDevicesTestContext apply2_unstable_discovery = {
+        .devices = &apply2_unstable_device, .count = 1, .result = 1};
+    g_discover_devices_test_context = &apply2_unstable_discovery;
+    Options apply2_unstable = {0};
+    apply2_unstable.profile = 1;
+    apply2_unstable.device_index = -1;
+    apply2_unstable.dpi_default = -1;
+    apply2_unstable.dpi_shift = -1;
+    apply2_unstable.button_changes[0] = apply2_valid_button_change;
+    apply2_unstable.button_change_count = 1;
+    EngineBoundaryWriteResult apply2_unstable_boundary;
+    EngineBoundaryError apply2_unstable_error;
+    if (engine_apply(&apply2_unstable, &apply2_unstable_boundary, &apply2_unstable_error) != 1 ||
+        apply2_unstable_error.code != ENGINE_BOUNDARY_ERROR_DEVICE_NOT_FOUND) {
+        fprintf(stderr, "engine_apply unstable-device self-test failed\n");
         return 1;
     }
     g_discover_devices_test_context = &apply2_discovery;
@@ -1164,6 +1208,13 @@ int test_commands_apply(void) {
     // only exercises that run_apply reaches and returns the dispatch, not
     // a successful G600 write (which test_g600.c covers directly).
     run_apply(&apply2_g600_dispatch_options);
+    EngineBoundaryWriteResult g600_boundary;
+    EngineBoundaryError g600_error;
+    if (engine_apply(&apply2_g600_dispatch_options, &g600_boundary, &g600_error) != 1 ||
+        g600_error.code != ENGINE_BOUNDARY_ERROR_UNSUPPORTED) {
+        fprintf(stderr, "engine_apply G600 structured-output self-test failed\n");
+        return 1;
+    }
     g_discover_devices_test_context = &apply2_discovery;
 
     // profile-state validation failure inside run_apply's own control read
@@ -1714,7 +1765,13 @@ int test_commands_apply(void) {
     make_batch_backup_path("/tmp", apply2_control_only_enable.operation_id,
                            apply2_control_only_enable_backup_path);
     unlink(apply2_control_only_enable_backup_path);
-    if (run_apply(&apply2_control_only_enable) != 0) {
+    EngineBoundaryWriteResult control_only_boundary;
+    EngineBoundaryError control_only_error;
+    if (engine_apply(&apply2_control_only_enable, &control_only_boundary, &control_only_error) !=
+            0 ||
+        !control_only_boundary.completed || !control_only_boundary.changed ||
+        control_only_boundary.planned_count != 1 || control_only_boundary.verified_count != 1 ||
+        control_only_error.code != ENGINE_BOUNDARY_ERROR_NONE) {
         fprintf(stderr, "run_apply control-only success self-test failed\n");
         return 1;
     }
@@ -1725,6 +1782,8 @@ int test_commands_apply(void) {
     Options apply_context_failure = {0};
     apply_context_failure.profile = 1;
     apply_context_failure.device_index = -1;
+    apply_context_failure.dpi_default = -1;
+    apply_context_failure.dpi_shift = -1;
     apply_context_failure.button_changes[0] = apply2_valid_button_change;
     apply_context_failure.button_change_count = 1;
     if (run_apply(&apply_context_failure) != 1) {

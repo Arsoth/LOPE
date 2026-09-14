@@ -1,5 +1,11 @@
-#include "internal.h"
+#include "hid_types.h"
+#include "profile_io.h"
+#include "profile_rendering.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int test_profile_io(void) {
     const uint8_t sample[] = "123456789";

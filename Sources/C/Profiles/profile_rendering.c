@@ -1,4 +1,9 @@
-#include "internal.h"
+#include "profile_rendering.h"
+#include "profile_io.h"
+#include "hid_discovery.h"
+
+#include <stdio.h>
+#include <string.h>
 
 const char *function_name(uint8_t value) {
     static const char *names[] = {

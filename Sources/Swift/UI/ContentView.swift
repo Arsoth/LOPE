@@ -102,24 +102,13 @@ struct ContentView: View {
           }
         )
         StatusArea(
-          status: model.status,
+          status: model.statusFooterText,
           events: statusHistory.events,
           messageOpacity: statusMessageOpacity,
           background: appBackground,
           historyPresented: $statusHistoryPresented
         )
 
-        // Future expansion: restore the button-press highlighting control
-        // here, below the footer/status line, after a reliable Logitech
-        // button-event path is available. AppKit only exposed buttons 1–3
-        // in testing, and the HID monitor did not provide dependable
-        // mappings for the remaining controls.
-        // HStack(spacing: 8) {
-        //     Spacer()
-        //     Button("Highlight presses") {
-        //         // Future button-event monitor action.
-        //     }
-        // }
       }
     }
     .padding(.top, 20)
@@ -153,8 +142,11 @@ struct ContentView: View {
         model.updateInputMonitoringAuthorization()
       }
     }
-    .alert("Allow wired mice", isPresented: $model.wiredAccessInstructionsPresented) {
-      Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+    .alert(
+      model.wiredAccessDeviceName.map { "Allow \($0)" } ?? "Allow wired mice",
+      isPresented: $model.wiredAccessInstructionsPresented
+    ) {
+      Button("Open System Settings", action: model.openInputMonitoringSettings)
       Button("Cancel", role: .cancel) {}
     } message: {
       Text(

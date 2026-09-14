@@ -1,5 +1,12 @@
-#include "internal.h"
+#include "commands_read.h"
+#include "g600.h"
+#include "profile_io.h"
 #include "test_doubles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 static int create_empty_hid_context(HidContext *context) {
     memset(context, 0, sizeof(*context));

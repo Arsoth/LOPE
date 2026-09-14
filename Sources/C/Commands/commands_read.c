@@ -1,4 +1,14 @@
-#include "internal.h"
+#include "commands_read.h"
+#include "g600.h"
+#include "hid_discovery.h"
+#include "hid_transport.h"
+#include "profile_io.h"
+#include "profile_rendering.h"
+#include "report_rate.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 void print_supported_dpi(const uint16_t *values, size_t count);
 
