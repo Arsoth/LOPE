@@ -113,9 +113,6 @@ struct BackupEntry: Identifiable {
 }
 
 struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
-  static let wiredAccessPromptID = -1
-  static let wiredAccessPromptDeviceKey = "lope-wired-access-prompt"
-
   let id: Int
   let name: String
   let connection: String
@@ -126,16 +123,12 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
     "\(name) — \(connection)"
   }
 
-  var isWiredAccessPrompt: Bool {
-    id == Self.wiredAccessPromptID && deviceKey == Self.wiredAccessPromptDeviceKey
-  }
-
   var isWiredDevice: Bool {
-    !isWiredAccessPrompt && connection.caseInsensitiveCompare("Wired") == .orderedSame
+    connection.caseInsensitiveCompare("Wired") == .orderedSame
   }
 
   var isNonWiredDevice: Bool {
-    !isWiredAccessPrompt && !isWiredDevice
+    !isWiredDevice
   }
 
   var isGenericPairedName: Bool {
@@ -191,27 +184,6 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
     return isGenericPairedName || other.isGenericPairedName
   }
 
-  static let wiredAccessPrompt = DeviceChoice(
-    id: wiredAccessPromptID,
-    name: "Allow wired mice",
-    connection: "Input Monitoring",
-    productID: "",
-    deviceKey: wiredAccessPromptDeviceKey
-  )
-
-  static func addingWiredAccessPrompt(
-    to devices: [DeviceChoice],
-    accessAuthorized: Bool,
-    accessWarning: Bool = false
-  ) -> [DeviceChoice] {
-    guard !accessAuthorized,
-      accessWarning || devices.contains(where: { $0.isWiredDevice }),
-      !devices.contains(where: { $0.isWiredAccessPrompt })
-    else {
-      return devices
-    }
-    return devices + [wiredAccessPrompt]
-  }
 }
 
 struct EditableBackup: Codable {

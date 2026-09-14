@@ -6,7 +6,7 @@ import XCTest
 @testable import LOPECore
 
 final class AppModelsTests: XCTestCase {
-  func testWiredAccessPromptAndMXClassification() {
+  func testWiredAndMXClassification() {
     let wired = DeviceChoice(
       id: 1, name: "G Pro", connection: "Wired", productID: "0xC085", deviceKey: "wired")
     let receiver = DeviceChoice(
@@ -14,13 +14,8 @@ final class AppModelsTests: XCTestCase {
     let bluetooth = DeviceChoice(
       id: 3, name: "MX Master 3S", connection: "Bluetooth", productID: "0xB034",
       deviceKey: "bluetooth")
-    let withoutAccess = DeviceChoice.addingWiredAccessPrompt(
-      to: [wired, receiver], accessAuthorized: false)
-    let withAccess = DeviceChoice.addingWiredAccessPrompt(
-      to: [wired, receiver], accessAuthorized: true)
-
-    XCTAssertEqual(withoutAccess.last?.isWiredAccessPrompt, true)
-    XCTAssertEqual(withAccess.count, 2)
+    XCTAssertTrue(wired.isWiredDevice)
+    XCTAssertFalse(receiver.isWiredDevice)
     // isMXSeriesMouse lives in DeviceClassification.swift; checked here
     // against the same device fixtures rather than duplicating them.
     XCTAssertTrue(
@@ -91,25 +86,6 @@ final class AppModelsTests: XCTestCase {
     XCTAssertEqual(unknown.deviceStatusLabel, "Unknown device — review before using")
   }
 
-  func testDeviceChoiceWiredAccessPromptIdentity() {
-    let prompt = DeviceChoice.wiredAccessPrompt
-    XCTAssertTrue(prompt.isWiredAccessPrompt)
-    XCTAssertFalse(prompt.isWiredDevice)
-    XCTAssertEqual(prompt.title, "Allow wired mice — Input Monitoring")
-
-    // id matches but deviceKey does not: not the sentinel prompt.
-    let idOnly = DeviceChoice(
-      id: DeviceChoice.wiredAccessPromptID, name: "Something", connection: "Wired",
-      productID: "", deviceKey: "not-the-prompt-key")
-    XCTAssertFalse(idOnly.isWiredAccessPrompt)
-
-    // deviceKey matches but id does not: not the sentinel prompt.
-    let keyOnly = DeviceChoice(
-      id: 99, name: "Something", connection: "Wired", productID: "",
-      deviceKey: DeviceChoice.wiredAccessPromptDeviceKey)
-    XCTAssertFalse(keyOnly.isWiredAccessPrompt)
-  }
-
   func testDeviceChoiceIsWiredDeviceIsCaseInsensitive() {
     let wired = DeviceChoice(
       id: 1, name: "G604", connection: "WIRED", productID: "0x1", deviceKey: "wired")
@@ -158,37 +134,6 @@ final class AppModelsTests: XCTestCase {
 
     XCTAssertTrue(reconnected.matchesReconnectIdentity(previous))
     XCTAssertFalse(different.matchesReconnectIdentity(previous))
-  }
-
-  func testAddingWiredAccessPromptGuardBranches() {
-    let wired = DeviceChoice(
-      id: 1, name: "G604", connection: "Wired", productID: "0x1", deviceKey: "wired")
-    let receiver = DeviceChoice(
-      id: 2, name: "G Pro", connection: "LIGHTSPEED", productID: "0x2", deviceKey: "receiver")
-
-    // No wired device present: unchanged regardless of authorization.
-    let noWired = DeviceChoice.addingWiredAccessPrompt(to: [receiver], accessAuthorized: false)
-    XCTAssertEqual(noWired, [receiver])
-
-    // Prompt already present: not duplicated.
-    let alreadyPrompted = DeviceChoice.addingWiredAccessPrompt(
-      to: [wired, DeviceChoice.wiredAccessPrompt], accessAuthorized: false)
-    XCTAssertEqual(alreadyPrompted.count, 2)
-
-    // Wired device present and not yet authorized: prompt appended.
-    let appended = DeviceChoice.addingWiredAccessPrompt(to: [wired], accessAuthorized: false)
-    XCTAssertEqual(appended, [wired, DeviceChoice.wiredAccessPrompt])
-  }
-
-  func testAddingWiredAccessPromptWhenWarningHasNoWiredListEntry() {
-    let receiver = DeviceChoice(
-      id: 2, name: "G604", connection: "LIGHTSPEED", productID: "0x4085", deviceKey: "receiver")
-
-    let devices = DeviceChoice.addingWiredAccessPrompt(
-      to: [receiver], accessAuthorized: false, accessWarning: true)
-
-    XCTAssertEqual(Array(devices.dropLast()), [receiver])
-    XCTAssertTrue(devices.last?.isWiredAccessPrompt == true)
   }
 
   func testEditableBackupRoundTripsThroughJSON() throws {

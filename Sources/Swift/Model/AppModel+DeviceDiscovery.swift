@@ -2,7 +2,6 @@
 // Copyright (C) 2026
 
 import Foundation
-import IOKit.hidsystem
 
 @MainActor
 extension AppModel {
@@ -44,13 +43,18 @@ extension AppModel {
         self.publishDevices(enumeration.devices)
         self.selectedDeviceIndex = 0
         self.currentDeviceName = ""
-        let hasSelectableDevice = enumeration.devices.contains(where: { !$0.isWiredAccessPrompt })
+        let hasSelectableDevice = !enumeration.devices.isEmpty
         self.deviceSummary =
           hasSelectableDevice
           ? "Choose a Logitech mouse to continue"
           : "No editable Logitech mouse found"
         self.resetEditorState()
-        if enumeration.accessWarning {
+        let hasWiredDevice = enumeration.devices.contains(where: { $0.isWiredDevice })
+        var needsInputMonitoring = enumeration.accessWarning
+        if !needsInputMonitoring && hasWiredDevice {
+          needsInputMonitoring = !self.inputMonitoringAuthorized
+        }
+        if needsInputMonitoring {
           self.status =
             "A wired Logitech mouse needs Input Monitoring. Choose a wireless mouse, or enable access in System Settings."
         } else if hasSelectableDevice {
@@ -61,9 +65,14 @@ extension AppModel {
         return
       }
 
-      let preservedName =
-        self.devices
-        .first(where: { $0.deviceKey == cachedDevice.deviceKey })?.name ?? cachedDevice.name
+      let preservedName: String
+      if let existingName = self.devices.first(where: { $0.deviceKey == cachedDevice.deviceKey })?
+        .name
+      {
+        preservedName = existingName
+      } else {
+        preservedName = cachedDevice.name
+      }
       self.selectedDeviceIndex = selected.id
       let resolvedSelected = selected.replacingName(
         DeviceChoice.preferredName(reported: selected.name, fallback: preservedName))
@@ -94,13 +103,6 @@ extension AppModel {
       )
       let discovered = parseDeviceChoices(list)
       let accessWarning = list.localizedCaseInsensitiveContains("macOS denied HID access")
-      let accessAuthorized =
-        IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
-      let displayedDevices = DeviceChoice.addingWiredAccessPrompt(
-        to: discovered,
-        accessAuthorized: accessAuthorized,
-        accessWarning: accessWarning
-      )
       let selectedIndex: Int?
       if let preferredDeviceKey,
         let keyMatch = discovered.first(where: { $0.deviceKey == preferredDeviceKey })
@@ -120,7 +122,7 @@ extension AppModel {
         selectedIndex = nil
       }
       return DeviceEnumerationSnapshot(
-        devices: displayedDevices,
+        devices: discovered,
         selectedDeviceIndex: selectedIndex,
         accessWarning: accessWarning,
         errorMessage: nil
@@ -163,7 +165,10 @@ extension AppModel {
       }
     }
 
-    throw lastError ?? EngineError.failed("The Logitech device list could not be read.")
+    if let lastError {
+      throw lastError
+    }
+    throw EngineError.failed("The Logitech device list could not be read.")
   }
 
   func loadLastSelectedDevice() -> DeviceChoice? {

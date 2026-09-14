@@ -93,6 +93,11 @@ static IOHIDAccessType discovery_check_access_double(IOHIDRequestType request_ty
     return (IOHIDAccessType)0;
 }
 
+static IOHIDAccessType discovery_check_access_denied_double(IOHIDRequestType request_type) {
+    (void)request_type;
+    return kIOHIDAccessTypeDenied;
+}
+
 static IOHIDManagerRef discovery_manager_create_double(CFAllocatorRef allocator,
                                                        IOOptionBits options) {
     (void)allocator;
@@ -573,6 +578,7 @@ int test_hid_discovery(void) {
 
     Device unnamed_receiver = {.iface = &receiver_interface, .device_number = 1};
     Device unnamed_direct = {.iface = &discover_direct_interface, .device_number = 0xFF};
+    Device no_interface = {0};
     snprintf(discover_direct_interface.product, sizeof(discover_direct_interface.product),
              "Direct Mouse");
     Device named_device = {.iface = &discover_direct_interface, .device_number = 0xFF};
@@ -584,11 +590,13 @@ int test_hid_discovery(void) {
     discover_direct_interface.product[0] = '\0';
     receiver_ok = receiver_ok &&
                   strcmp(device_label(&unnamed_direct), "Logitech HID++ device") == 0 &&
-                  !is_receiver_endpoint(NULL) && !is_receiver_endpoint(&unnamed_direct);
+                  !is_receiver_endpoint(NULL) && !is_receiver_endpoint(&unnamed_direct) &&
+                  !is_receiver_endpoint(&no_interface);
 
     Device keyboard_device = {.iface = &discover_direct_interface, .device_number = 0xFF};
     snprintf(keyboard_device.name, sizeof(keyboard_device.name), "Office Keyboard");
-    receiver_ok = receiver_ok && !is_mouse_device(NULL) && !is_mouse_device(&keyboard_device);
+    receiver_ok = receiver_ok && !is_mouse_device(NULL) && !is_mouse_device(&no_interface) &&
+                  !is_mouse_device(&keyboard_device);
     keyboard_device.name[0] = '\0';
     snprintf(discover_direct_interface.product, sizeof(discover_direct_interface.product),
              "Keypad");
@@ -1044,12 +1052,31 @@ int test_hid_discovery(void) {
         closed_count == 1 && closed_devices[0].iface == &closed_matching_items[0];
 
     HidInterface open_interface = {.product_id = 0x4085, .is_vendor = true};
+    HidInterface blocked_wired_interface = {.product_id = 0x1234, .is_vendor = true};
+    HidInterface bluetooth_interface = {.product_id = 0xB034, .is_vendor = true};
+    HidInterface receiver_for_open = {.product_id = 0xC539, .is_vendor = true};
+    HidInterface bluetooth_transport_interface = {.product_id = 0x1234, .is_vendor = true};
+    snprintf(blocked_wired_interface.transport, sizeof(blocked_wired_interface.transport), "USB");
+    snprintf(bluetooth_interface.transport, sizeof(bluetooth_interface.transport), "USB");
+    snprintf(receiver_for_open.transport, sizeof(receiver_for_open.transport), "USB");
+    snprintf(bluetooth_transport_interface.transport,
+             sizeof(bluetooth_transport_interface.transport), "Bluetooth");
     HidInterface already_open = {.product_id = 0x4085, .is_vendor = true, .channel_open = true};
     HidInterface not_vendor = {.product_id = 0x4085, .is_vendor = false};
-    HidInterface open_items[] = {not_vendor, already_open, open_interface};
+    HidInterface open_items[] = {not_vendor,
+                                 already_open,
+                                 open_interface,
+                                 blocked_wired_interface,
+                                 bluetooth_interface,
+                                 receiver_for_open,
+                                 bluetooth_transport_interface};
     HidContext open_context = {.items = open_items, .count = 3};
+    hid_check_access_impl = discovery_check_access_denied_double;
     g_discovery_channel_open_result = kIOReturnSuccess;
-    bool open_channels_ok = open_vendor_channels(&open_context) && open_items[2].channel_open;
+    open_context.count = sizeof(open_items) / sizeof(open_items[0]);
+    bool open_channels_ok = open_vendor_channels(&open_context) && open_items[2].channel_open &&
+                            !open_items[3].channel_open && open_items[4].channel_open &&
+                            open_items[5].channel_open && open_items[6].channel_open;
     if (open_items[2].channel_open) {
         channel_close(&open_items[2].channel);
         open_items[2].channel_open = false;

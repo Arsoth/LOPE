@@ -12,12 +12,10 @@ Requirements: macOS 13 or newer and a compatible Logitech mouse or receiver.
 
 1. Connect the mouse or receiver and open LOPE.
 2. Choose a device if more than one is listed. Wireless and receiver-connected
-   mice work without an extra permission. If a wired mouse needs access, choose
-   **Allow wired mice — Input Monitoring** and enable LOPE in System Settings.
-3. Keep a wireless mouse awake while it is being read, then click **Refresh**.
-   The G603 and G604 show device-specific sleep guidance and retry a missing
-   known device for up to 60 seconds.
-4. Choose an onboard profile, edit button outputs or DPI stages, and press
+   mice work without an extra permission. If a wired mouse needs access,
+   selecting it will prompt you to enable LOPE in System Settings.
+3. If a wireless mouse is asleep while switching to it, LOPE will prompt you to give it a wiggle.
+4. Choose an onboard profile, edit button outputs, DPI stages, RGB (if available) and response rate, and press
    **Save to mouse**.
 
 LOPE creates an initial exact binary backup for each readable onboard profile

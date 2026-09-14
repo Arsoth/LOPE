@@ -168,18 +168,6 @@ final class AppModelRefreshTests: XCTestCase {
     XCTAssertEqual(model.selectedDeviceIndex, previousIndex)
   }
 
-  func testSelectDevicePresentsWiredAccessInstructionsForPromptEntry() {
-    let model = AppModel(startInitialRefresh: false)
-    configureFixtureDevice(model)
-    model.devices.append(.wiredAccessPrompt)
-    let previousIndex = model.selectedDeviceIndex
-
-    model.selectDevice(DeviceChoice.wiredAccessPromptID)
-
-    XCTAssertTrue(model.wiredAccessInstructionsPresented)
-    XCTAssertEqual(model.selectedDeviceIndex, previousIndex)
-  }
-
   func testSelectDevicePresentsWiredAccessInstructionsForBlockedWiredDevice() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -190,6 +178,33 @@ final class AppModelRefreshTests: XCTestCase {
     XCTAssertTrue(model.wiredAccessInstructionsPresented)
     XCTAssertEqual(model.wiredAccessDeviceName, "G502 X")
     XCTAssertEqual(model.selectedDeviceIndex, 1)
+  }
+
+  func testPresentWiredAccessInstructionsUsesFirstWiredDeviceAndDoesNotReplaceIt() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.presentWiredAccessInstructions()
+    model.presentWiredAccessInstructions(
+      for: DeviceChoice(
+        id: 2, name: "Other Wired Mouse", connection: "Wired", productID: "0x1234",
+        deviceKey: "other"))
+
+    XCTAssertTrue(model.wiredAccessInstructionsPresented)
+    XCTAssertEqual(model.wiredAccessDeviceName, "G502 X")
+  }
+
+  func testShowInputMonitoringRequirementLeavesRealDeviceSelected() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.showInputMonitoringRequirement(for: model.devices[0])
+
+    XCTAssertEqual(model.selectedDeviceIndex, 1)
+    XCTAssertEqual(model.deviceSummary, "G502 X — Wired")
+    XCTAssertFalse(model.loadingProfile)
+    XCTAssertFalse(model.busy)
+    XCTAssertFalse(model.status.contains("Allow wired mice"))
+    XCTAssertTrue(model.status.contains("Input Monitoring"))
   }
 
   func testSelectDeviceIgnoresReselectingTheCurrentDevice() {

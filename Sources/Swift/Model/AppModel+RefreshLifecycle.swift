@@ -6,6 +6,14 @@ import Foundation
 @MainActor
 extension AppModel {
   func startInitialRefresh(cachedDevice: DeviceChoice) {
+    if cachedDevice.isWiredDevice && !inputMonitoringAuthorized {
+      // The cached device is still useful for the initial picker state, but
+      // do not let a profile read implicitly ask for Input Monitoring. The
+      // normal enumeration path can show the real device without opening its
+      // vendor interface, and an explicit selection opens the permission UI.
+      startRefresh(preferredDeviceIndex: cachedDevice.id, preferredProfileNumber: profileNumber)
+      return
+    }
     refreshTask?.cancel()
     stopLiveDPIPolling()
     refreshGeneration += 1
@@ -164,6 +172,10 @@ extension AppModel {
       self.publishDevices(resolvedDevices)
       self.currentDeviceName = resolvedSelected.name
       self.deviceSummary = resolvedSelected.title
+      if resolvedSelected.isWiredDevice && !self.inputMonitoringAuthorized {
+        self.showInputMonitoringRequirement(for: resolvedSelected)
+        return
+      }
       if expectedDevice != nil {
         self.stopKnownDevicePolling(clearDevice: false)
       }

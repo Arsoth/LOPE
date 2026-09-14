@@ -456,10 +456,33 @@ HidContextCreateFn hid_context_create_impl = hid_context_create_hardware;
 
 int hid_context_create(HidContext *context) { return hid_context_create_impl(context); }
 
+static bool is_receiver_interface(const HidInterface *iface);
+
+static bool interface_needs_input_monitoring(const HidInterface *iface) {
+    if (is_receiver_interface(iface)) {
+        return false;
+    }
+    // Bluetooth and Logitech wireless product IDs can be queried without the
+    // wired HID Input Monitoring permission. Direct USB vendor interfaces are
+    // the path that must remain closed until the user grants access.
+    return !text_contains_case_insensitive(iface->transport, "bluetooth") &&
+           !is_wireless_device_product(iface->product_id) &&
+           !is_bluetooth_device_product(iface->product_id);
+}
+
 int open_vendor_channels(HidContext *context) {
+    bool input_monitoring_authorized =
+        hid_check_access_impl(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted;
     for (size_t i = 0; i < context->count; i++) {
         HidInterface *iface = &context->items[i];
         if (!iface->is_vendor || iface->channel_open) {
+            continue;
+        }
+        if (!input_monitoring_authorized && interface_needs_input_monitoring(iface)) {
+            // Enumeration remains passive when access is missing. The
+            // standard mouse collection is still enough for discover_devices
+            // to expose the real wired device without causing macOS to ask for
+            // permission as a side effect of IOHIDDeviceOpen.
             continue;
         }
         if (channel_open(&iface->channel, iface->device)) {

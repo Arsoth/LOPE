@@ -2,8 +2,6 @@
 // Copyright (C) 2026
 
 import AppKit
-import ApplicationServices
-import CoreGraphics
 import SwiftUI
 
 struct ModalKeyboardHandler: NSViewRepresentable {
@@ -75,19 +73,14 @@ struct KeyboardInputMonitor: NSViewRepresentable {
     var isActive = false
     var onKeyDown: (NSEvent) -> Void = { _ in }
     var localMonitor: Any?
-    var eventTap: CFMachPort?
-    var eventTapSource: CFRunLoopSource?
-    var eventTapCanSuppressEvents = false
 
     func update(isActive: Bool, onKeyDown: @escaping (NSEvent) -> Void) {
       self.isActive = isActive
       self.onKeyDown = onKeyDown
       if isActive {
         installLocalMonitor()
-        installEventTap()
       } else {
         removeLocalMonitor()
-        removeEventTap()
       }
     }
 
@@ -106,65 +99,6 @@ struct KeyboardInputMonitor: NSViewRepresentable {
       }
     }
 
-    private func installEventTap() {
-      guard eventTap == nil else { return }
-      // Accessibility is only needed for an active filtering tap. Keep
-      // the fallback passive so users can record from other apps with
-      // Input Monitoring alone, without prompting for Accessibility.
-      eventTapCanSuppressEvents = AXIsProcessTrusted()
-      if !CGPreflightListenEventAccess() {
-        _ = CGRequestListenEventAccess()
-      }
-      let tapOptions: CGEventTapOptions = eventTapCanSuppressEvents ? .defaultTap : .listenOnly
-      let eventMask =
-        (CGEventMask(1) << CGEventType.keyDown.rawValue)
-        | (CGEventMask(1) << CGEventType.keyUp.rawValue)
-        | (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
-      let coordinatorPointer = Unmanaged.passUnretained(self).toOpaque()
-      guard
-        let tap = CGEvent.tapCreate(
-          tap: .cgSessionEventTap,
-          place: .headInsertEventTap,
-          options: tapOptions,
-          eventsOfInterest: eventMask,
-          callback: { _, type, event, refcon in
-            guard let refcon else { return Unmanaged.passUnretained(event) }
-            let coordinator = Unmanaged<Coordinator>
-              .fromOpaque(refcon)
-              .takeUnretainedValue()
-            guard coordinator.isActive else {
-              return Unmanaged.passUnretained(event)
-            }
-            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-              if let eventTap = coordinator.eventTap {
-                CGEvent.tapEnable(tap: eventTap, enable: true)
-              }
-              return Unmanaged.passUnretained(event)
-            }
-            if type == .keyDown, let nsEvent = NSEvent(cgEvent: event) {
-              coordinator.onKeyDown(nsEvent)
-            }
-            // An active tap stops global shortcuts such as Cmd+Shift+4.
-            // A listen-only tap can still capture the chord, but must
-            // pass it through to the app that owns the shortcut.
-            return coordinator.eventTapCanSuppressEvents
-              ? nil
-              : Unmanaged.passUnretained(event)
-          },
-          userInfo: coordinatorPointer
-        )
-      else {
-        return
-      }
-
-      eventTap = tap
-      if let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) {
-        eventTapSource = source
-        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-      }
-      CGEvent.tapEnable(tap: tap, enable: true)
-    }
-
     private func removeLocalMonitor() {
       if let localMonitor {
         NSEvent.removeMonitor(localMonitor)
@@ -172,22 +106,8 @@ struct KeyboardInputMonitor: NSViewRepresentable {
       }
     }
 
-    private func removeEventTap() {
-      if let source = eventTapSource {
-        CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
-        eventTapSource = nil
-      }
-      if let eventTap {
-        CGEvent.tapEnable(tap: eventTap, enable: false)
-        CFMachPortInvalidate(eventTap)
-        self.eventTap = nil
-      }
-      eventTapCanSuppressEvents = false
-    }
-
     deinit {
       removeLocalMonitor()
-      removeEventTap()
     }
   }
 

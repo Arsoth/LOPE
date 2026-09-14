@@ -308,7 +308,7 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     XCTAssertEqual(model.currentDeviceName, "")
   }
 
-  func testBeginKnownDeviceRefreshExpirationKeepsOtherDevicesAndAccessPrompt() async {
+  func testBeginKnownDeviceRefreshExpirationKeepsOtherDevices() async {
     let model = makeModel()
     model.knownDevicePollPolicy = (intervalNanoseconds: 10_000_000, maximumAttempts: 1)
     let device = DeviceChoice(
@@ -317,12 +317,12 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     let other = DeviceChoice(
       id: 2, name: "Other Mouse", connection: "Wireless", productID: "0xEEEE",
       deviceKey: "eeee-0002")
-    model.devices = [device, other, .wiredAccessPrompt]
+    model.devices = [device, other]
 
     model.beginKnownDeviceRefresh(device)
     await model.knownDevicePollTask?.value
 
-    XCTAssertEqual(model.devices, [other, .wiredAccessPrompt])
+    XCTAssertEqual(model.devices, [other])
     XCTAssertEqual(model.deviceSummary, "Choose a Logitech mouse to continue")
     XCTAssertEqual(model.selectedDeviceIndex, 0)
   }

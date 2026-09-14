@@ -208,7 +208,8 @@ struct ContentView: View {
         .accessibilityHidden(true)
 
       CenteredAppModal(
-        title: model.wiredAccessDeviceName.map { "Allow \($0)" } ?? "Allow wired mice",
+        title: model.wiredAccessDeviceName.map { "Input Monitoring required for \($0)" }
+          ?? "Input Monitoring required",
         message: wiredAccessInstructionsMessage,
         symbol: "lock.shield",
         onDefaultAction: openWiredAccessSettings,
@@ -228,7 +229,7 @@ struct ContentView: View {
   }
 
   private var wiredAccessInstructionsMessage: String {
-    "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, enable LOPE in System Settings > Privacy & Security > Input Monitoring, then return and choose Refresh."
+    "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, use the button below. macOS will register LOPE in Input Monitoring, then enable it in System Settings and return to choose Refresh."
   }
 
   private func dismissWiredAccessInstructions() {

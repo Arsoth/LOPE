@@ -22,7 +22,7 @@ extension AppModel {
     let expectedDevice = knownDisconnectedDevice
     let preferredDeviceIndex =
       devices.contains {
-        $0.id == selectedDeviceIndex && !$0.isWiredAccessPrompt
+        $0.id == selectedDeviceIndex
       } ? selectedDeviceIndex : -1
     stopKnownDevicePolling(clearDevice: false)
     stopLiveDPIPolling()
@@ -43,10 +43,6 @@ extension AppModel {
 
   func selectDevice(_ index: Int) {
     guard let selected = devices.first(where: { $0.id == index }) else { return }
-    if selected.isWiredAccessPrompt {
-      presentWiredAccessInstructions()
-      return
-    }
     if selected.isWiredDevice {
       if !inputMonitoringAuthorized {
         presentWiredAccessInstructions(for: selected)
@@ -88,6 +84,18 @@ extension AppModel {
 
   func publishDevices(_ discovered: [DeviceChoice]) {
     devices = discovered
+  }
+
+  func showInputMonitoringRequirement(for device: DeviceChoice) {
+    stopLiveDPIPolling()
+    busy = false
+    loadingProfile = false
+    refreshTask = nil
+    currentDeviceName = device.name
+    deviceSummary = device.title
+    resetEditorState()
+    status =
+      "Input Monitoring is required to read \(device.name). Choose the device again to open System Settings."
   }
 
   func reloadSelectedProfile() {

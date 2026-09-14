@@ -39,9 +39,11 @@ extension AppModel {
       status =
         snapshot.accessWarning
         ? "A wired Logitech mouse needs Input Monitoring. Choose a wireless mouse, or enable access in System Settings."
-        : devices.contains(where: { !$0.isWiredAccessPrompt })
-          ? "Choose a Logitech mouse to continue."
-          : "No Logitech mouse was found"
+        : devices.contains(where: { $0.isWiredDevice }) && !inputMonitoringAuthorized
+          ? "A wired Logitech mouse needs Input Monitoring. Select it to enable access in System Settings."
+          : !devices.isEmpty
+            ? "Choose a Logitech mouse to continue."
+            : "No Logitech mouse was found"
       return
     }
 

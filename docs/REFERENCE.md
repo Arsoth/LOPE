@@ -72,12 +72,14 @@ identity and is never serialized into new backup metadata.
 
 LOPE does not request access or show a modal during enumeration. If macOS
 reports that a wired HID interface needs Input Monitoring, the picker keeps the
-wired mouse visible and adds a non-device entry, **Allow wired mice — Input
-Monitoring**. Selecting the blocked wired mouse or this helper explains the
-permission in the same centered modal used for wake guidance and opens the
-matching System Settings page. Wireless and receiver devices stay usable
-without this wired-access entry. The entry is UI-only and is never sent to the
-HID engine as a device selector.
+real wired mouse visible. Selecting it explains the permission and opens the
+matching System Settings page. The explicit permission action calls
+`IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)`, which registers LOPE with
+the Input Monitoring privacy pane before the user enables it. Wireless and
+receiver devices stay usable without this permission.
+
+Keyboard recording uses an app-local event monitor while LOPE is active, so it
+does not request Input Monitoring. It does not capture keys from other apps.
 
 Input Monitoring state is refreshed when the app becomes active and after the
 settings link is opened. A permission change is followed by an explicit
@@ -247,9 +249,9 @@ remain separated.
 - Confirm that the mouse or receiver is connected and powered on.
 - Keep wireless mice active and click **Refresh**. For G603/G604, follow the
   wake text and allow the one-minute known-device poll to finish.
-- For a wired device, select the Input Monitoring helper entry, enable LOPE in
-  **System Settings → Privacy & Security → Input Monitoring**, return to LOPE,
-  and click **Refresh**.
+- For a wired device, select the real mouse entry and use its Input Monitoring
+  action. Enable LOPE in **System Settings → Privacy & Security → Input
+  Monitoring**, return to LOPE, and click **Refresh**.
 - Quit G HUB and other remappers while reading or saving.
 - A connected MX mouse without a descriptor is intentionally not shown in the
   generic button editor, and **Create profile** intentionally refuses to

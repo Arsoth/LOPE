@@ -93,12 +93,12 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [wired, wireless, .wiredAccessPrompt], selectedDeviceIndex: wireless.id,
+        devices: [wired, wireless], selectedDeviceIndex: wireless.id,
         accessWarning: true))
 
     XCTAssertFalse(model.wiredAccessInstructionsPresented)
     XCTAssertTrue(model.devices.contains(where: { $0.deviceKey == wired.deviceKey }))
-    XCTAssertEqual(model.devices, [wired, wireless, .wiredAccessPrompt])
+    XCTAssertEqual(model.devices, [wired, wireless])
 
     model.inputMonitoringAuthorized = false
     model.selectDevice(wired.id)

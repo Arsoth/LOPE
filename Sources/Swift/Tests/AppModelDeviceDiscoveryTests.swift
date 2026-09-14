@@ -168,7 +168,7 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     XCTAssertNil(snapshot.errorMessage)
     XCTAssertNil(snapshot.selectedDeviceIndex)
     XCTAssertEqual(snapshot.devices.first?.name, "Mouse A")
-    XCTAssertFalse(snapshot.devices.contains(where: { $0.isWiredAccessPrompt }))
+    XCTAssertEqual(snapshot.devices.count, 1)
   }
 
   func testMakeDeviceEnumerationSnapshotReturnsErrorMessageOnFailure() {

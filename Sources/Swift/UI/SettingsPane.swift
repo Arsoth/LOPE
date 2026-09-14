@@ -58,7 +58,7 @@ struct SettingsPane: View {
               .font(.callout.weight(.medium))
             }
             Text(
-              "Input Monitoring lets LOPE read wired Logitech mice. Wireless and receiver-connected mice do not need this permission."
+              "Input Monitoring lets LOPE read wired Logitech mice. Wireless and receiver-connected mice do not need this permission. The button registers LOPE with macOS before opening the setting."
             )
             .font(.caption)
             .foregroundStyle(.secondary)

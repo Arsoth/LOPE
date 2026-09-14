@@ -19,7 +19,11 @@ output="$(mktemp)"
 trap 'rm -f "$output"' EXIT
 
 status=0
-swift test "$@" >"$output" 2>&1 || status=$?
+# This package currently contains XCTest cases only. On Xcode toolchains that
+# auto-launch Swift Testing, the empty Swift Testing bundle can be reported as
+# a missing test executable after the XCTest bundle has already passed. Keep
+# the runner aligned with the package's actual test framework.
+swift test --disable-swift-testing "$@" >"$output" 2>&1 || status=$?
 
 if [[ "$status" -ne 0 ]]; then
   cat "$output"
