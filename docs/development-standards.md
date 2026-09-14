@@ -25,7 +25,10 @@ setup, see [development-setup.md](development-setup.md).
   changed files and checks coverage for changed production files. Run the full
   `make test` after touching shared test/build infrastructure, and run the full
   repository checks before requesting review. Passing test runs print only a
-  concise summary; failing runs print the captured diagnostics.
+  concise summary; failing runs print just the failing lines (compiler
+  errors, failed cases, non-zero failure summaries) rather than the full
+  pass/fail transcript, with the full transcript saved to a timestamped file
+  under `$TMPDIR` for cases the filter misses.
 - `swift test`/`swift build` are driven by `Package.swift`, which exists
   only to run the Swift unit tests; it does not build or replace the
   shipped app. The app is still built by the Makefile via direct `swiftc`
