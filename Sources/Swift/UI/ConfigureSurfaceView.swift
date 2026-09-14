@@ -165,6 +165,9 @@ struct EmptyStateView: View {
   private var emptyStateTitle: String {
     if engineUnavailable { return "LOPE needs to be reinstalled" }
     if model.devices.isEmpty { return "No editable Logitech mouse detected" }
+    if inputMonitoringRequiredForWiredMouse {
+      return "Input Monitoring required for \(wiredMouseName)"
+    }
     if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
       return "No MX mouse profile descriptor"
     }
@@ -180,11 +183,25 @@ struct EmptyStateView: View {
       return
         "The app lists Logitech mice. macOS may also be blocking access even when the mouse is connected."
     }
+    if inputMonitoringRequiredForWiredMouse {
+      return
+        "\(wiredMouseName) is connected, but LOPE cannot read its onboard profile until Input Monitoring is enabled. Enable LOPE in System Settings, then choose Refresh."
+    }
     if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
       return
         "\(model.deviceSummary) is connected, but LOPE does not have a profile JSON for this MX mouse’s button layout yet."
     }
     return
       "\(model.deviceSummary) is connected, but it does not expose an onboard profile format this app can edit."
+  }
+
+  private var inputMonitoringRequiredForWiredMouse: Bool {
+    !model.inputMonitoringAuthorized
+      && model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.isWiredDevice == true
+  }
+
+  private var wiredMouseName: String {
+    model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.name
+      ?? model.currentDeviceName
   }
 }
