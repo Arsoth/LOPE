@@ -20,6 +20,7 @@ extension AppModel {
         }
         guard let self, !Task.isCancelled else { return }
         guard !self.busy, !self.waitingForKnownDevice,
+          !self.inputMonitoringRequestInProgress,
           let executable = self.engine
         else { continue }
 

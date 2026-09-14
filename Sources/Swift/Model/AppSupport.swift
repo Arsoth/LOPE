@@ -49,6 +49,18 @@ enum EngineRunner {
   // newly selected device is being queried.
   private static let invocationLock = NSLock()
 
+  /// Wait until a previously launched engine process has released the HID
+  /// invocation lock. This keeps an explicit TCC request attributed to the
+  /// GUI instead of an in-flight helper process.
+  static func waitUntilIdle() async {
+    await Task.detached(priority: .utility, operation: waitUntilIdleSynchronously).value
+  }
+
+  private static func waitUntilIdleSynchronously() {
+    invocationLock.lock()
+    invocationLock.unlock()
+  }
+
   static func run(executable: URL, arguments: [String], currentDirectory: URL) throws -> String {
     invocationLock.lock()
     defer { invocationLock.unlock() }

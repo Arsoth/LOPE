@@ -19,6 +19,7 @@ enum AppModelRefreshConfiguration {
 @MainActor
 extension AppModel {
   func refresh() {
+    inputMonitoringRequestInProgress = false
     let expectedDevice = knownDisconnectedDevice
     let preferredDeviceIndex =
       devices.contains {
@@ -43,6 +44,7 @@ extension AppModel {
 
   func selectDevice(_ index: Int) {
     guard let selected = devices.first(where: { $0.id == index }) else { return }
+    inputMonitoringRequestInProgress = false
     if selected.isWiredDevice {
       if !inputMonitoringAuthorized {
         presentWiredAccessInstructions(for: selected)
@@ -73,6 +75,12 @@ extension AppModel {
         wiredAccessInstructionsPresented = false
       }
       wiredAccessDeviceName = nil
+      if inputMonitoringRequestInProgress {
+        inputMonitoringRequestInProgress = false
+        if reconnectMonitorTask == nil {
+          startReconnectMonitor()
+        }
+      }
     }
   }
 

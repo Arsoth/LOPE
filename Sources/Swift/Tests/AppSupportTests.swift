@@ -41,6 +41,10 @@ final class AppSupportTests: XCTestCase {
     XCTAssertEqual(output, "hello\n")
   }
 
+  func testEngineRunnerWaitUntilIdleCompletes() async {
+    await EngineRunner.waitUntilIdle()
+  }
+
   func testEngineRunnerRunThrowsTrimmedFailureMessage() {
     XCTAssertThrowsError(
       try EngineRunner.run(
