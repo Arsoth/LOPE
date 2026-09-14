@@ -162,9 +162,25 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
   }
 
   static func preferredName(reported: String, fallback: String) -> String {
-    let trimmed = reported.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, !isGenericPairedName(trimmed) else { return fallback }
-    return trimmed
+    let normalizedReported = normalizedReportedName(reported)
+    guard !normalizedReported.isEmpty, !isGenericPairedName(normalizedReported) else {
+      return normalizedReportedName(fallback)
+    }
+    return normalizedReported
+  }
+
+  static func normalizedReportedName(_ name: String) -> String {
+    var normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let genericSuffixes = [" Wireless Gaming Mouse"]
+    for suffix in genericSuffixes {
+      guard normalized.count > suffix.count,
+        normalized.lowercased().hasSuffix(suffix.lowercased())
+      else { continue }
+      normalized.removeLast(suffix.count)
+      normalized = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+      break
+    }
+    return normalized
   }
 
   func matchesReconnectIdentity(_ other: DeviceChoice) -> Bool {

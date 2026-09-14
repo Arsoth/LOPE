@@ -47,6 +47,7 @@ bool is_duplicate_direct_mouse_endpoint(const Device *candidate, const Device *d
                                         size_t count);
 bool is_mouse_device(const Device *device);
 const char *device_label(const Device *device);
+uint32_t device_mouse_product_id(const Device *device);
 const char *device_connection(const Device *device);
 void format_device_key(const Device *device, char *out, size_t out_size);
 bool parse_device_key(const char *text, uint64_t *location_id, uint64_t *registry_id,

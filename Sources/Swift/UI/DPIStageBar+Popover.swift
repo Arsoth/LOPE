@@ -4,6 +4,14 @@
 import SwiftUI
 
 extension DPIStageBar {
+  var stagePopoverBackground: Color {
+    colorScheme == .light ? .white : Color.black.opacity(0.86)
+  }
+
+  var stagePopoverBorder: Color {
+    colorScheme == .light ? Color.black.opacity(0.16) : Color.white.opacity(0.16)
+  }
+
   func stagePopover(index: Int, isInteractive: Bool) -> some View {
     let isDefault = defaultStage == index + 1
     let isShift = shiftStage == index + 1
@@ -71,11 +79,11 @@ extension DPIStageBar {
     .padding(14)
     .frame(width: 230)
     .background(
-      Color.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+      stagePopoverBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous)
     )
     .overlay {
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .stroke(.white.opacity(0.16), lineWidth: 0.75)
+        .stroke(stagePopoverBorder, lineWidth: 0.75)
     }
     .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
   }

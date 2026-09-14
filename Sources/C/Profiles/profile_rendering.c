@@ -340,5 +340,5 @@ void print_device_line(const Device *device, size_t index) {
     char key[64];
     format_device_key(device, key, sizeof(key));
     printf("[%zu] %s  %s  (HID++ %.1f, product 0x%04X, key %s)\n", index, device_connection(device),
-           device_label(device), device->protocol, device->iface->product_id, key);
+           device_label(device), device->protocol, device_mouse_product_id(device), key);
 }

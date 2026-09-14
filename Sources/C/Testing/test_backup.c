@@ -166,10 +166,35 @@ int test_backup(void) {
     if (package_ok) {
         package_ok = package.sector_count == 1 && package.sectors[0].sector == 0x0123 &&
                      package.sectors[0].size == 255 &&
+                     package.product_id == dummy_interface.product_id &&
                      memcmp(package.sectors[0].data, profile.data, 255) == 0;
         package_release(&package);
     }
     unlink(temp_path);
+
+    HidInterface receiver_interface = dummy_interface;
+    receiver_interface.product_id = 0xC539;
+    Device receiver_device = dummy_device;
+    receiver_device.iface = &receiver_interface;
+    receiver_device.mouse_product_id = 0x4085;
+    receiver_device.request_device_number = 1;
+    char receiver_path[] = "/tmp/lomps-selftest-receiver-XXXXXX";
+    int receiver_fd = mkstemp(receiver_path);
+    bool receiver_identity_ok = receiver_fd >= 0;
+    if (receiver_fd >= 0) {
+        close(receiver_fd);
+        unlink(receiver_path);
+    }
+    receiver_identity_ok = receiver_identity_ok && package_write(receiver_path, &receiver_device,
+                                                                 &profile, profile.data, true);
+    if (receiver_identity_ok) {
+        receiver_identity_ok = package_read(receiver_path, &package);
+    }
+    if (receiver_identity_ok) {
+        receiver_identity_ok = package.product_id == 0x4085 && package.device_number == 1;
+        package_release(&package);
+    }
+    unlink(receiver_path);
 
     uint8_t control_data[255] = {0};
     control_data[2] = 1;
@@ -296,7 +321,7 @@ int test_backup(void) {
     memset(&boundary_package, 0, sizeof(boundary_package));
     boundary_package.sector_count = MAX_BACKUP_SECTORS + 1;
     package_release(&boundary_package);
-    if (!package_ok || !combined_package_ok) {
+    if (!package_ok || !receiver_identity_ok || !combined_package_ok) {
         free(profile.data);
         fprintf(stderr, "backup package self-test failed\n");
         return 1;

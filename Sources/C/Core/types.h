@@ -105,6 +105,12 @@ typedef struct {
 
 typedef struct {
     HidInterface *iface;
+    // Stable product identity for the paired mouse. Direct devices use their
+    // HID product ID; receiver-backed slots use the mouse WPID from the
+    // receiver pairing record. This is deliberately separate from
+    // iface->product_id, which identifies the transport interface (often the
+    // receiver) and is still required for HID++ routing.
+    uint32_t mouse_product_id;
     // device_number is the address returned by discovery and is useful for
     // identifying receiver slots. request_device_number is the address that
     // must be used for subsequent HID++ calls; a direct wireless endpoint can

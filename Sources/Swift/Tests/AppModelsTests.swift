@@ -136,6 +136,17 @@ final class AppModelsTests: XCTestCase {
       ).isGenericPairedName)
   }
 
+  func testPreferredNameRemovesGenericWirelessGamingMouseSuffix() {
+    XCTAssertEqual(
+      DeviceChoice.preferredName(
+        reported: "G604 Wireless Gaming Mouse", fallback: "G604"),
+      "G604")
+    XCTAssertEqual(
+      DeviceChoice.preferredName(
+        reported: "G603 wireless gaming mouse", fallback: "G603"),
+      "G603")
+  }
+
   func testPairedIdentityMatchesWhenReceiverKeyChanges() {
     let previous = DeviceChoice(
       id: 1, name: "G604", connection: "Wireless", productID: "0x4085", deviceKey: "old-key")

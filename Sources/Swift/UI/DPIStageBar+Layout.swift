@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026
 
+import AppKit
 import SwiftUI
 
 extension DPIStageBar {
@@ -63,6 +64,7 @@ extension DPIStageBar {
           },
           onHover: { index in
             hoveredStageIndex = index
+            (index == nil ? NSCursor.arrow : NSCursor.pointingHand).set()
           }
         )
         .frame(width: proxy.size.width, height: 86)
@@ -153,7 +155,7 @@ extension DPIStageBar {
             }
             .frame(width: 230)
             DPIStageTriangle()
-              .fill(Color.black.opacity(0.86))
+              .fill(stagePopoverBackground)
               .frame(width: 22, height: 11)
               .rotationEffect(.degrees(180))
               .offset(x: arrowX - popoverWidth / 2)

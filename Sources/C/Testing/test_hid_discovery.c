@@ -464,8 +464,54 @@ int test_hid_discovery(void) {
         discover_devices(&receiver_context, -1, receiver_devices, &receiver_count, false) &&
         receiver_count == 1 && receiver_devices[0].device_number == 1 &&
         receiver_devices[0].request_device_number == 1 &&
+        receiver_devices[0].mouse_product_id == 0x406C &&
+        device_mouse_product_id(&receiver_devices[0]) == 0x406C &&
         strcmp(device_label(&receiver_devices[0]), "G603 LIGHTSPEED") == 0 &&
         is_mouse_device(&receiver_devices[0]) && receiver_test_context.calls == 5;
+    Device direct_identity_device = {.iface = &discover_direct_interface};
+    discover_direct_interface.product_id = 0xC099;
+    bool identity_ok = device_mouse_product_id(NULL) == 0 &&
+                       device_mouse_product_id(&direct_identity_device) == 0xC099;
+    direct_identity_device.mouse_product_id = 0x4085;
+    identity_ok = identity_ok && device_mouse_product_id(&direct_identity_device) == 0x4085;
+    Device no_identity_interface = {0};
+    identity_ok = identity_ok && device_mouse_product_id(&no_identity_interface) == 0;
+    Device receiver_identity_device = {.iface = &receiver_interface, .device_number = 1};
+    receiver_identity_device.mouse_product_id = 0;
+    identity_ok = identity_ok && device_mouse_product_id(&receiver_identity_device) == 0;
+    receiver_ok = receiver_ok && identity_ok;
+    if (!receiver_ok) {
+        fprintf(stderr, "mouse identity self-test failed\n");
+        return 1;
+    }
+
+    HidInterface requested_receiver_interface = receiver_interface;
+    requested_receiver_interface.location_id = 0x21;
+    requested_receiver_interface.registry_id = 0x22;
+    HidContext requested_receiver_context = {
+        .items = &requested_receiver_interface,
+        .count = 1,
+    };
+    Reply requested_receiver_replies[] = {
+        {.status = REPLY_OK, .length = 8, .bytes = {0, 0, 0, 0x40, 0x85, 0, 0, 1}},
+        {.status = REPLY_OK, .length = 3, .bytes = {0x02, 0x00, 0x5A}},
+        {.status = REPLY_TIMEOUT},
+        {.status = REPLY_TIMEOUT},
+        {.status = REPLY_TIMEOUT},
+    };
+    ChannelRequestTestContext requested_receiver_test = {
+        .replies = requested_receiver_replies,
+        .reply_count = sizeof(requested_receiver_replies) / sizeof(requested_receiver_replies[0]),
+    };
+    g_channel_request_test_context = &requested_receiver_test;
+    receiver_count = 0;
+    receiver_ok = receiver_ok &&
+                  discover_devices(&requested_receiver_context, 1, receiver_devices,
+                                   &receiver_count, false) &&
+                  receiver_count == 1 && receiver_devices[0].device_number == 1 &&
+                  receiver_devices[0].request_device_number == 1 &&
+                  receiver_devices[0].mouse_product_id == 0x4085 &&
+                  strcmp(device_label(&receiver_devices[0]), "G604 LIGHTSPEED") == 0;
     Device receiver_endpoint = {
         .iface = &receiver_interface, .device_number = 0xFF, .request_device_number = 0xFF};
     receiver_ok = receiver_ok && is_receiver_endpoint(&receiver_endpoint) &&
@@ -496,6 +542,18 @@ int test_hid_discovery(void) {
         receiver_ok &&
         discover_devices(&receiver_context, -1, receiver_devices, &receiver_count, false) &&
         receiver_count == 1 && receiver_devices[0].protocol == 2.0;
+
+    Reply receiver_short_replies[] = {short_pairing, receiver_ping_reply};
+    ChannelRequestTestContext receiver_short_context = {
+        .replies = receiver_short_replies,
+        .reply_count = sizeof(receiver_short_replies) / sizeof(receiver_short_replies[0]),
+    };
+    g_channel_request_test_context = &receiver_short_context;
+    receiver_count = 0;
+    receiver_ok =
+        receiver_ok &&
+        discover_devices(&receiver_context, -1, receiver_devices, &receiver_count, false) &&
+        receiver_count == 1 && receiver_devices[0].mouse_product_id == 0;
 
     ChannelRequestTestContext receiver_empty_context = {.replies = &error_pairing,
                                                         .reply_count = 1};
@@ -661,6 +719,12 @@ int test_hid_discovery(void) {
     receiver_ok =
         receiver_ok && !hid_discovery_add_receiver_slot_device_for_test(
                            add_devices, &add_count, &receiver_interface, 1, error_pairing, false);
+    add_count = 0;
+    receiver_ok = receiver_ok &&
+                  hid_discovery_add_receiver_slot_device_for_test(
+                      add_devices, &add_count, &receiver_interface, 1, g603_pairing, false) &&
+                  add_count == 1 && add_devices[0].mouse_product_id == 0x406C &&
+                  device_mouse_product_id(&add_devices[0]) == 0x406C;
     add_count = MAX_DEVICES;
     receiver_ok =
         receiver_ok && !hid_discovery_add_receiver_slot_device_for_test(

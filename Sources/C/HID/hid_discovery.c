@@ -114,6 +114,8 @@ static bool receiver_pairing_reply_is_present(Reply reply) {
 static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8_t device_number,
                       uint8_t request_device_number, double protocol, bool inspect_features);
 
+static bool is_receiver_interface(const HidInterface *iface);
+
 static bool receiver_device_name(Device *device, uint8_t slot) {
     // The receiver name register can briefly time out while a sleeping
     // LIGHTSPEED mouse is waking. Retry the name read independently of the
@@ -192,6 +194,20 @@ static void receiver_slot_name(Device *device, uint8_t slot, Reply pairing_reply
     }
 }
 
+static uint32_t receiver_pairing_product_id(Reply pairing_reply) {
+    if (pairing_reply.status != REPLY_OK || pairing_reply.length < 5) {
+        return 0;
+    }
+    return (uint32_t)(((uint32_t)pairing_reply.bytes[3] << 8) | pairing_reply.bytes[4]);
+}
+
+static void receiver_slot_identity(Device *device, uint8_t slot, Reply pairing_reply) {
+    // The receiver interface remains the transport endpoint. The pairing
+    // record is the only source for the paired mouse's model/product identity.
+    device->mouse_product_id = receiver_pairing_product_id(pairing_reply);
+    receiver_slot_name(device, slot, pairing_reply);
+}
+
 static bool add_receiver_slot_device(Device *devices, size_t *count, HidInterface *iface,
                                      uint8_t slot, Reply pairing_reply, bool inspect_features) {
     if (!receiver_pairing_reply_is_present(pairing_reply)) {
@@ -206,7 +222,7 @@ static bool add_receiver_slot_device(Device *devices, size_t *count, HidInterfac
         return false;
     }
     Device *device = &devices[*count - 1];
-    receiver_slot_name(device, slot, pairing_reply);
+    receiver_slot_identity(device, slot, pairing_reply);
     return true;
 }
 
@@ -461,6 +477,7 @@ static int add_device(Device *devices, size_t *count, HidInterface *iface, uint8
     Device *device = &devices[(*count)++];
     memset(device, 0, sizeof(*device));
     device->iface = iface;
+    device->mouse_product_id = is_receiver_interface(iface) ? 0 : iface->product_id;
     device->device_number = device_number;
     device->request_device_number = request_device_number;
     device->protocol = protocol;
@@ -581,12 +598,25 @@ int discover_devices(HidContext *context, int requested_slot, Device *devices, s
             continue;
         }
         if (requested_slot >= 0) {
+            bool receiver_slot = is_receiver_interface(iface) && requested_slot >= 1 &&
+                                 requested_slot <= receiver_slot_limit(iface);
+            Reply pairing_reply = {0};
+            if (receiver_slot) {
+                pairing_reply =
+                    receiver_register_read(iface, REGISTER_RECEIVER_INFO, true,
+                                           (uint8_t)(RECEIVER_INFO_PAIRING + requested_slot - 1));
+            }
             double protocol = 0;
             uint8_t resolved_device_number = (uint8_t)requested_slot;
             if (ping_interface(iface, (uint8_t)requested_slot, 1.0, &protocol,
                                &resolved_device_number)) {
+                size_t before = *count;
                 add_device(devices, count, iface, resolved_device_number, (uint8_t)requested_slot,
                            protocol, inspect_features);
+                if (receiver_slot && *count > before) {
+                    receiver_slot_identity(&devices[*count - 1], (uint8_t)requested_slot,
+                                           pairing_reply);
+                }
             }
             continue;
         }
@@ -617,8 +647,8 @@ int discover_devices(HidContext *context, int requested_slot, Device *devices, s
                         double device_protocol = pairing_present ? 2.0 : protocol;
                         add_device(devices, count, iface, resolved_device_number, slot,
                                    device_protocol, inspect_features);
-                        if (*count > before && devices[*count - 1].name[0] == '\0') {
-                            receiver_slot_name(&devices[*count - 1], slot, pairing_reply);
+                        if (*count > before) {
+                            receiver_slot_identity(&devices[*count - 1], slot, pairing_reply);
                         }
                     }
                 } else if (pairing_present) {
@@ -696,8 +726,8 @@ int discover_device_by_key(HidContext *context, const char *key, Device *devices
                         pairing_present || is_receiver_interface(iface) ? 2.0 : protocol;
                     add_device(devices, count, iface, resolved_device_number, device_number,
                                device_protocol, true);
-                    if (*count > before && devices[*count - 1].name[0] == '\0') {
-                        receiver_slot_name(&devices[*count - 1], device_number, pairing_reply);
+                    if (*count > before) {
+                        receiver_slot_identity(&devices[*count - 1], device_number, pairing_reply);
                     }
                 }
                 return 1;
@@ -757,6 +787,18 @@ const char *device_label(const Device *device) {
         return device->iface->product;
     }
     return "Logitech HID++ device";
+}
+
+uint32_t device_mouse_product_id(const Device *device) {
+    if (device == NULL || device->iface == NULL) {
+        return 0;
+    }
+    if (device->mouse_product_id != 0) {
+        return device->mouse_product_id;
+    }
+    // Preserve sensible behavior for direct Device fixtures and older callers
+    // that construct a Device manually, but never fall back to a receiver PID.
+    return is_receiver_interface(device->iface) ? 0 : device->iface->product_id;
 }
 
 bool is_receiver_endpoint(const Device *device) {

@@ -65,7 +65,7 @@ bool engine_boundary_device_from_device(const Device *device, size_t index,
     memset(result, 0, sizeof(*result));
     result->index = index;
     result->vendor_id = device->iface->vendor_id;
-    result->product_id = device->iface->product_id;
+    result->product_id = device_mouse_product_id(device);
     result->device_number = device->device_number;
     result->request_device_number = device->request_device_number;
     result->protocol = device->protocol;

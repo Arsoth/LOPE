@@ -87,10 +87,10 @@ extension AppModel {
       // `pieces` element, so `pieces` can never actually be empty here
       // (verified empirically against the compiled NSRegularExpression).
       let connection = pieces.first ?? "Logitech HID++"
-      let name =
+      let name = DeviceChoice.normalizedReportedName(
         pieces.dropFirst().joined(separator: " ").isEmpty
-        ? descriptor
-        : pieces.dropFirst().joined(separator: " ")
+          ? descriptor
+          : pieces.dropFirst().joined(separator: " "))
       result.append(
         DeviceChoice(
           id: id,

@@ -140,12 +140,27 @@ int test_engine_boundary(void) {
     EngineBoundaryDevice boundary_device;
     if (!engine_boundary_device_from_device(&device, 3, &boundary_device) ||
         boundary_device.index != 3 || boundary_device.vendor_id != LOGITECH_VID ||
+        boundary_device.product_id != iface.product_id ||
         strcmp(boundary_device.name, device.name) != 0 ||
         strcmp(boundary_device.connection, "Wired") != 0 ||
         strcmp(boundary_device.device_key, "1234-5678-FF") != 0 ||
         engine_boundary_device_from_device(NULL, 0, &boundary_device) ||
         engine_boundary_device_from_device(&device, 0, NULL)) {
         fprintf(stderr, "engine boundary device projection self-test failed\n");
+        return 1;
+    }
+    HidInterface receiver_iface = iface;
+    receiver_iface.product_id = 0xC539;
+    receiver_iface.is_mouse = false;
+    Device receiver_device = device;
+    receiver_device.iface = &receiver_iface;
+    receiver_device.device_number = 1;
+    receiver_device.request_device_number = 1;
+    receiver_device.mouse_product_id = 0x4085;
+    if (!engine_boundary_device_from_device(&receiver_device, 4, &boundary_device) ||
+        boundary_device.product_id != 0x4085 || boundary_device.device_number != 1 ||
+        boundary_device.request_device_number != 1) {
+        fprintf(stderr, "engine boundary receiver identity self-test failed\n");
         return 1;
     }
     Device no_interface_device = device;

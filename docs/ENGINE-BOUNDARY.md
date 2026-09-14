@@ -76,6 +76,12 @@ is used, it also contains the selected onboard profile when that profile is
 available. `current_dpi` is the same typed sensor result without the optional
 onboard-profile section.
 
+For receiver-backed mice, `product_id` is the paired mouse's product identity
+from the receiver pairing record, not the receiver USB product ID. The
+`device_number`/`request_device_number` fields continue to describe the HID++
+routing path. The receiver interface product is an internal transport detail
+and is never used as the mouse identity.
+
 `write` is returned by the combined `apply` operation. It contains the
 operation ID, selected device, profile number, whether changes were effective,
 whether the invocation was a preview, planned sectors and their lengths,

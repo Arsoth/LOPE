@@ -47,7 +47,7 @@ struct DPIStageOutsideClickMonitor: NSViewRepresentable {
   }
 
   func makeNSView(context: Context) -> NSView {
-    let view = NSView()
+    let view = OutsideClickView()
     update(view, coordinator: context.coordinator)
     context.coordinator.install()
     return view
@@ -66,6 +66,13 @@ struct DPIStageOutsideClickMonitor: NSViewRepresentable {
     coordinator.isActive = isActive
     coordinator.excludedFrame = excludedFrame
     coordinator.onOutsideClick = onOutsideClick
+  }
+
+  /// SwiftUI reports the popup frame in a top-left coordinate space. AppKit's
+  /// default NSView coordinate system is bottom-left, so this monitor must use
+  /// a flipped view before comparing the two frames.
+  final class OutsideClickView: NSView {
+    override var isFlipped: Bool { true }
   }
 }
 
@@ -126,10 +133,11 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
     var onHover: ((Int?) -> Void)?
 
     private let dragThreshold: CGFloat = 5
-    // Matches the visible badge (the circle/rounded-rect/pentagon icon drawn
-    // in `stageHandle`), not the button's full frame, which also spans the
-    // DPI value label below the badge. The label is not a drag/click target.
-    private let badgeSize: CGFloat = 34
+    // Matches the visible badge (the 30pt circle/rounded-rect/pentagon icon
+    // drawn in `stageHandle`), not the button's full frame, which also spans
+    // the DPI value label below the badge. The label is not a drag/click
+    // target.
+    private let badgeSize: CGFloat = 30
     private let badgeCenterY: CGFloat = 43
     private let trackRange: ClosedRange<CGFloat> = 24...65
     private var mouseDownPoint: CGPoint?
@@ -149,34 +157,13 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
 
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
-      window?.invalidateCursorRects(for: self)
       refreshHoverState()
     }
 
-    var targets: [DPIStageHitTarget] = [] {
-      didSet { window?.invalidateCursorRects(for: self) }
-    }
+    var targets: [DPIStageHitTarget] = []
 
-    override func resetCursorRects() {
-      super.resetCursorRects()
-      guard !targets.isEmpty else { return }
-      addCursorRect(
-        CGRect(
-          x: 0,
-          y: trackRange.lowerBound,
-          width: bounds.width,
-          height: trackRange.upperBound - trackRange.lowerBound
-        ),
-        cursor: .pointingHand
-      )
-      for target in targets {
-        addCursorRect(badgeRect(for: target.x), cursor: .pointingHand)
-      }
-    }
-
-    // Tracking areas are used for the visual hover ring. Cursor rectangles
-    // above own the cursor itself, so hover state never mutates the process-
-    // wide cursor or competes with another editor surface.
+    // The tracking area drives the same hover callback used to render the
+    // badge highlight. Cursor state is assigned by that callback as well.
     override func updateTrackingAreas() {
       super.updateTrackingAreas()
       if let hoverTrackingArea {
@@ -208,7 +195,8 @@ struct DPIStageInteractionLayer: NSViewRepresentable {
     }
 
     private func updateHover(at point: CGPoint?) {
-      let nextIndex = point.flatMap { target(at: $0)?.index }
+      let hoveredTarget = point.flatMap { target(at: $0) }
+      let nextIndex = hoveredTarget?.index
       guard nextIndex != hoveredStageIndex else { return }
       hoveredStageIndex = nextIndex
       onHover?(nextIndex)

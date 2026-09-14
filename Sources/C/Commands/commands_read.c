@@ -103,7 +103,10 @@ int run_info(const Options *options) {
     }
     printf("Device: %s\n", device_label(device));
     printf("  vendor/product: 0x%04X / 0x%04X\n", device->iface->vendor_id,
-           device->iface->product_id);
+           device_mouse_product_id(device));
+    if (is_receiver_routed_device(device)) {
+        printf("  receiver interface product: 0x%04X\n", device->iface->product_id);
+    }
     printf("  connection: %s, device number: 0x%02X\n",
            device->device_number == 0xFF ? "direct or receiver" : "receiver",
            device->device_number);

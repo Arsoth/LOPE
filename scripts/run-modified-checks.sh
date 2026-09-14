@@ -173,6 +173,10 @@ while IFS= read -r path; do
     Sources/Swift/Tests/*.swift)
       run_full_swift=1
       ;;
+    Sources/Swift/UI/*.swift)
+      # UI views have no XCTest target; the signed app rebuild and formatting
+      # gate provide the relevant verification for these files.
+      ;;
     Sources/Swift/*|Sources/Swift/*/*)
       run_full_swift=1
       ;;

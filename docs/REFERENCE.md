@@ -57,6 +57,11 @@ device's display name, connection type, product ID, and HID identity are kept
 together so that a refresh cannot accidentally apply one mouse's profile to
 another.
 
+For receiver-backed mice, the product ID is the paired mouse's WPID from the
+receiver pairing record. The receiver's USB product ID remains transport-only:
+it selects the receiver interface and routing path, but it is not a mouse
+identity and is never serialized into new backup metadata.
+
 LOPE does not request access during enumeration. If macOS reports that a wired
 HID interface needs Input Monitoring, the picker adds a non-device entry,
 **Allow wired mice — Input Monitoring**. Selecting it explains the permission
@@ -218,6 +223,12 @@ profile state, friendly physical-control names, the readable output, the
 layer (`normal` or `gShift`), and the raw four-byte record. Loading JSON changes
 only the editor draft; it never writes to the mouse by itself. Restore and save
 operations require the selected device to match the backup metadata.
+
+Receiver-backed binary packages may contain the receiver's product ID rather
+than the paired mouse's model ID. When that ID is shared by multiple models,
+LOPE uses the model name in the backup filename (and in JSON metadata when
+present) before falling back to product-ID matching, so G603 and G604 backups
+remain separated.
 
 ## Troubleshooting
 

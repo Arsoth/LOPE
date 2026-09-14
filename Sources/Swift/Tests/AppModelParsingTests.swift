@@ -139,6 +139,13 @@ final class AppModelParsingTests: XCTestCase {
     XCTAssertEqual(devices[0].name, "G100S")
   }
 
+  func testParseDeviceChoicesRemovesGenericWirelessGamingMouseSuffix() {
+    let text =
+      "[1] Wireless  G604 Wireless Gaming Mouse (HID++ 4.5, product 0x4085, key ab604)"
+
+    XCTAssertEqual(AppModel.parseDeviceChoices(text).first?.name, "G604")
+  }
+
   func testReportedDeviceNamePrefersSpecificPairedModelOverGenericLabel() {
     let text = """
       Onboard profiles for Paired Logitech Mouse - Lightspeed:

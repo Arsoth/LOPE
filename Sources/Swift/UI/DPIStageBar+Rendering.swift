@@ -28,7 +28,7 @@ extension DPIStageBar {
             .font(.callout.weight(.bold))
             .foregroundStyle(.black)
         }
-        .frame(width: 34, height: 34)
+        .frame(width: 30, height: 30)
         .position(x: 42, y: 16)
         Text(displayValue)
           .font(.caption2.monospacedDigit())
@@ -69,7 +69,9 @@ extension DPIStageBar {
         .overlay {
           if isHovered {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-              .stroke(.white.opacity(0.42), lineWidth: 2)
+              .stroke(
+                colorScheme == .light ? .black.opacity(0.42) : .white.opacity(0.42), lineWidth: 2
+              )
           }
         }
     } else if isShift {
@@ -78,7 +80,9 @@ extension DPIStageBar {
         .overlay {
           if isHovered {
             DPIStagePentagon()
-              .stroke(.white.opacity(0.42), lineWidth: 2)
+              .stroke(
+                colorScheme == .light ? .black.opacity(0.42) : .white.opacity(0.42), lineWidth: 2
+              )
           }
         }
     } else {
@@ -87,7 +91,9 @@ extension DPIStageBar {
         .overlay {
           if isHovered {
             Circle()
-              .stroke(.white.opacity(0.42), lineWidth: 2)
+              .stroke(
+                colorScheme == .light ? .black.opacity(0.42) : .white.opacity(0.42), lineWidth: 2
+              )
           }
         }
     }

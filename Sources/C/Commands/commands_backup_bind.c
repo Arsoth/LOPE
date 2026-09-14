@@ -429,10 +429,11 @@ int run_restore(const Options *options) {
     if (!select_device(devices, count, options, &device)) {
         goto done;
     }
-    if (package.product_id != 0 && package.product_id != device->iface->product_id) {
+    uint32_t connected_product_id = device_mouse_product_id(device);
+    if (package.product_id != 0 && package.product_id != connected_product_id) {
         fprintf(stderr,
                 "refusing restore: backup product 0x%04X does not match connected product 0x%04X\n",
-                package.product_id, device->iface->product_id);
+                package.product_id, connected_product_id);
         goto done;
     }
     if (is_g600_device(device)) {
@@ -501,10 +502,9 @@ int run_restore(const Options *options) {
     }
 
     printf("Restore target: %s, %zu sector(s)\n", device_label(device), package.sector_count);
-    printf("The backup was made for device 0x%04X via device number 0x%02X; connected product is "
-           "0x%04X via 0x%02X.\n",
-           package.product_id, package.device_number, device->iface->product_id,
-           device->device_number);
+    printf("The backup was made for mouse 0x%04X via device number 0x%02X; connected mouse product "
+           "is 0x%04X via slot 0x%02X.\n",
+           package.product_id, package.device_number, connected_product_id, device->device_number);
     for (size_t i = 0; i < package.sector_count; i++) {
         printf("  Sector 0x%04X: backup CRC OK; current CRC: %s; %s\n", package.sectors[i].sector,
                sector_crc_ok(current[i], package.sectors[i].size) ? "OK" : "INVALID",

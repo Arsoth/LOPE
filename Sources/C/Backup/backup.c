@@ -1,5 +1,6 @@
 #include "backup.h"
 #include "backup_codec.h"
+#include "hid_discovery.h"
 #include "hid_types.h"
 #include "profile_codec.h"
 #include "profile_io.h"
@@ -65,7 +66,7 @@ int package_write_multi(const char *path, const Device *device, uint8_t profile_
     }
     BackupCodecHeader codec_header = {
         .vendor_id = (uint16_t)device->iface->vendor_id,
-        .product_id = (uint16_t)device->iface->product_id,
+        .product_id = (uint16_t)device_mouse_product_id(device),
         .device_number = device->request_device_number,
         .profile_format = profile_format,
         .sector_count = sector_count,

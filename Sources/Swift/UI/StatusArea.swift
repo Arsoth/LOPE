@@ -13,6 +13,8 @@ struct StatusArea: View {
   @Binding var historyPresented: Bool
 
   private let panelHeight: CGFloat = 270
+  private let historyHeaderHeight: CGFloat = 48
+  private let eventRowHeight: CGFloat = 40
   private let timestampColumnWidth: CGFloat = 48
   private let eventColumnSpacing: CGFloat = 4
   private let horizontalInset: CGFloat = 20
@@ -31,17 +33,24 @@ struct StatusArea: View {
   }
 
   private func statusBar(showsHistoryHeader: Bool) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      Divider()
-        .frame(maxWidth: .infinity)
+    VStack(alignment: .leading, spacing: showsHistoryHeader ? 0 : 14) {
+      if !showsHistoryHeader {
+        Divider()
+          .frame(maxWidth: .infinity)
+      }
 
-      HStack(alignment: .top) {
+      HStack(alignment: .center, spacing: 8) {
         Button {
           historyPresented.toggle()
         } label: {
           Image(systemName: "info.circle")
+            .frame(width: 20, height: 20)
+            .contentShape(Circle())
+            .pointingHandCursor(circleDiameter: 20)
         }
         .buttonStyle(.plain)
+        .frame(width: 20, height: 20)
+        .contentShape(Circle())
         .accessibilityLabel(showsHistoryHeader ? "Close recent events" : "Show recent events")
         if showsHistoryHeader {
           Text("Recent events")
@@ -61,42 +70,38 @@ struct StatusArea: View {
         }
       }
       .padding(.horizontal, horizontalInset)
+      .frame(
+        maxWidth: .infinity,
+        minHeight: showsHistoryHeader ? historyHeaderHeight : nil,
+        alignment: .center
+      )
     }
-    .padding(.bottom, 20)
+    .padding(.bottom, showsHistoryHeader ? 0 : 20)
     .frame(maxWidth: .infinity)
-    .background(background)
-    .shadow(color: .black.opacity(0.24), radius: 7, y: -3)
+    .background {
+      if showsHistoryHeader {
+        background
+          .overlay(Color.primary.opacity(0.05))
+      } else {
+        background
+      }
+    }
+    .overlay(alignment: .bottom) {
+      if showsHistoryHeader {
+        Divider()
+      }
+    }
+    .shadow(color: .black.opacity(0.24), radius: 8, y: -3)
   }
 
   private var historyDrawer: some View {
     VStack(spacing: 0) {
       statusBar(showsHistoryHeader: true)
 
-      Divider()
-        .frame(maxWidth: .infinity)
-
       ScrollView {
         LazyVStack(alignment: .leading, spacing: 0) {
           ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
-            VStack(alignment: .leading, spacing: 5) {
-              HStack(alignment: .firstTextBaseline, spacing: eventColumnSpacing) {
-                Text(event.timestamp.formatted(date: .omitted, time: .shortened))
-                  .font(.caption.monospacedDigit())
-                  .foregroundStyle(.primary.opacity(0.58))
-                  .frame(width: timestampColumnWidth, alignment: .leading)
-                  .textSelection(.enabled)
-                Text(event.message)
-                  .font(.callout)
-                  .fixedSize(horizontal: false, vertical: true)
-                  .textSelection(.enabled)
-              }
-              .padding(.horizontal, horizontalInset)
-              if index < events.count - 1 {
-                Divider()
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 9)
+            eventRow(event, isLast: index == events.count - 1)
           }
         }
         .frame(maxWidth: .infinity)
@@ -113,6 +118,33 @@ struct StatusArea: View {
     }
     .onExitCommand {
       historyPresented = false
+    }
+  }
+
+  private func eventRow(_ event: StatusEvent, isLast: Bool) -> some View {
+    HStack(alignment: .center, spacing: eventColumnSpacing) {
+      Text(event.timestamp.formatted(date: .omitted, time: .shortened))
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.primary.opacity(0.58))
+        .frame(width: timestampColumnWidth, alignment: .leading)
+        .textSelection(.enabled)
+      Text(event.message)
+        .font(.callout)
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .textSelection(.enabled)
+    }
+    .padding(.horizontal, horizontalInset)
+    .frame(
+      maxWidth: .infinity,
+      minHeight: eventRowHeight,
+      maxHeight: eventRowHeight,
+      alignment: .leading
+    )
+    .overlay(alignment: .bottom) {
+      if !isLast {
+        Divider()
+      }
     }
   }
 }

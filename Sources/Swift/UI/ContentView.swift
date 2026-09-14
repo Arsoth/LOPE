@@ -54,16 +54,8 @@ struct ContentView: View {
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 0) {
           if selectedTab != .settings {
-            VStack(alignment: .leading, spacing: 14) {
-              DeviceHeader(
-                model: model,
-                hidesEditingActions: selectedTab == .profileEditor,
-                onSave: saveToMouse
-              )
-              .padding(.horizontal, 20)
-              Divider()
-                .frame(maxWidth: .infinity)
-            }
+            deviceHeaderSurface
+              .zIndex(1)
           }
           TabView(selection: $selectedTab) {
             ZStack {
@@ -111,7 +103,7 @@ struct ContentView: View {
 
       }
     }
-    .padding(.top, 20)
+    .padding(.top, selectedTab == .settings ? 20 : 0)
     .frame(minWidth: 960, minHeight: 520)
     .background(appBackground)
     .preferredColorScheme(preferredColorScheme)
@@ -180,6 +172,23 @@ struct ContentView: View {
           ?? "Choose “Left click” for the primary-click button, then save again."
       )
     }
+  }
+
+  private var deviceHeaderSurface: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      DeviceHeader(
+        model: model,
+        hidesEditingActions: selectedTab == .profileEditor,
+        onSave: saveToMouse
+      )
+      .padding(.horizontal, 20)
+      Divider()
+        .frame(maxWidth: .infinity)
+    }
+    .padding(.top, 20)
+    .frame(maxWidth: .infinity)
+    .background(appBackground)
+    .shadow(color: .black.opacity(0.24), radius: 8, y: 3)
   }
 
   private func saveToMouse() {
