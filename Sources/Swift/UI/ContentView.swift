@@ -52,7 +52,7 @@ struct ContentView: View {
       .frame(width: 0, height: 0)
 
       VStack(alignment: .leading, spacing: 0) {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 20) {
           if selectedTab != .settings {
             deviceHeaderSurface
               .zIndex(1)
