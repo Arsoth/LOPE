@@ -10,11 +10,17 @@
 # LOPE TODO Ingest:
 
 - area beside status drawer button shows a text select cursor even when nothing is there
-- why is `Recon Mouse - Wireless` showing
+- why is `Recon Mouse - Wireless` showing sometimes
 - Switching from Light to system breaks the UI for a little while, fades in color wise later. this is a regression. Light to dark and dark to light work fine.
 - put the light theme and dark theme dropdown selectors horizontally, and make them longer.
 - settings cards should be full width (like mouse profiles)
 - put the key categories in a 2x2 grid
+- move themes button into appearance
+- add a refresh button that pulls themes from the folder
+- make light an dark a hash validated system theme that are automatically built and loaded into the themes folder (means the empty theme is no longer needed). if they are modified, put the system one back in place and rename the modified one
+- switching theme should pull from the themes json (yes this is to make development not need to rebuild the app for color changes)
+- the device picker can still show the unauthorized wired device while the wired device popup is active, it should be hidden during that point
+- the wake wireless mouse popup doesn't need a refresh button and loading spinner
 
 # LOPE todo list
 
