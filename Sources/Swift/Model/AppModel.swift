@@ -48,6 +48,12 @@ final class AppModel: ObservableObject {
   @Published var showNonStandardKeyboardKeys = false
   @Published var waitingForKnownDevice = false
   @Published var knownDevicePollAttempts = 0
+  // True once the ~60-second known-device poll loop exhausts its attempts
+  // without the mouse responding. The wake modal stays visible
+  // (`waitingForKnownDevice` is untouched) and offers a Retry action
+  // instead of disappearing; `retryKnownDeviceWake()` clears this and
+  // restarts the poll loop.
+  @Published var knownDeviceWakeExpired = false
   @Published var appearancePreference: AppearancePreference
   @Published var isDarkAppearance = false
   @Published var themes: [ThemeDefinition] = []
