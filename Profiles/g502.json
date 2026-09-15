@@ -110,7 +110,7 @@
 	},
 	"rgbProfile": {
 		"supported": true,
-		"profileFormats": [4, 5],
+		"profileFormats": [2, 4, 5],
 		"baseOffset": 208,
 		"recordBytes": 11,
 		"colorOffset": 1,

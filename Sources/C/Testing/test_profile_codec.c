@@ -190,6 +190,8 @@ int test_profile_codec(void) {
     profile_codec_detect_rgb_layout(rgb_data, sizeof(rgb_data), 5, &rgb_layout);
     bool rgb_ok = rgb_layout.supported && rgb_layout.offset == PROFILE_CODEC_RGB_BASE_OFFSET &&
                   rgb_layout.zone_count == 1 && rgb_layout.zone_present[0];
+    profile_codec_detect_rgb_layout(rgb_data, sizeof(rgb_data), 2, &rgb_layout);
+    rgb_ok = rgb_ok && rgb_layout.supported && rgb_layout.zone_count == 1;
     const uint8_t rgb_zone = 0;
     const uint8_t rgb_color[1][3] = {{0xAA, 0xBB, 0xCC}};
     rgb_ok = rgb_ok &&

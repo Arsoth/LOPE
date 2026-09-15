@@ -313,7 +313,8 @@ void profile_codec_detect_rgb_layout(const uint8_t *data, size_t data_length,
     *layout = (ProfileCodecRgbLayout){0};
     size_t required = PROFILE_CODEC_RGB_BASE_OFFSET +
                       PROFILE_CODEC_RGB_RECORD_BYTES * PROFILE_CODEC_RGB_RECORD_COUNT + 2;
-    if (data == NULL || profile_format < 4 || profile_format > 5 || data_length < required) {
+    if (data == NULL || (profile_format != 2 && profile_format != 4 && profile_format != 5) ||
+        data_length < required) {
         return;
     }
 
