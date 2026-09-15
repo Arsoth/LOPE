@@ -6,15 +6,17 @@ import Foundation
 enum ProfileOutputParser {
   static func rgbZone(from line: String) -> ParsedRGBZone? {
     let pattern = try! NSRegularExpression(
-      pattern: #"^\s*RGB zone\s+(\d+):\s*([0-9A-Fa-f]{6})\s+\(mode\s+0x[0-9A-Fa-f]{2}\)\s*$"#)
+      pattern: #"^\s*RGB zone\s+(\d+):\s*([0-9A-Fa-f]{6})\s+\(mode\s+0x([0-9A-Fa-f]{2})\)\s*$"#)
     let range = NSRange(line.startIndex..<line.endIndex, in: line)
     guard let match = pattern.firstMatch(in: line, range: range),
       let numberRange = Range(match.range(at: 1), in: line),
       let number = Int(line[numberRange]), number > 0,
       let colorRange = Range(match.range(at: 2), in: line),
-      let color = RGBColor(hex: String(line[colorRange]))
+      let color = RGBColor(hex: String(line[colorRange])),
+      let modeRange = Range(match.range(at: 3), in: line),
+      let modeByte = UInt8(line[modeRange], radix: 16)
     else { return nil }
-    return ParsedRGBZone(index: number - 1, color: color)
+    return ParsedRGBZone(index: number - 1, color: color, mode: RGBEffectMode.from(byte: modeByte))
   }
 
   static func profileFormat(from line: String) -> Int? {

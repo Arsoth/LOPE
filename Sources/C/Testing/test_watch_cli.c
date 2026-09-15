@@ -411,6 +411,17 @@ int test_watch_cli(void) {
         parse_options_ok && !parse_options((int)((MAX_BATCH_RGB_CHANGES + 1) * 2 + 2),
                                            too_many_rgb_changes_argv, &parsed);
 
+    char *too_many_rgb_mode_changes_argv[(MAX_BATCH_RGB_CHANGES + 1) * 2 + 2];
+    too_many_rgb_mode_changes_argv[0] = "lope";
+    too_many_rgb_mode_changes_argv[1] = "apply";
+    for (size_t i = 0; i < MAX_BATCH_RGB_CHANGES + 1; i++) {
+        too_many_rgb_mode_changes_argv[2 + i * 2] = "--rgb-mode-change";
+        too_many_rgb_mode_changes_argv[3 + i * 2] = "1:03";
+    }
+    parse_options_ok =
+        parse_options_ok && !parse_options((int)((MAX_BATCH_RGB_CHANGES + 1) * 2 + 2),
+                                           too_many_rgb_mode_changes_argv, &parsed);
+
     char *unknown_option_argv[] = {"lope", "list", "--bogus"};
     parse_options_ok = parse_options_ok && !parse_options(3, unknown_option_argv, &parsed);
 

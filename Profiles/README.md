@@ -33,6 +33,18 @@ read-only. G600 has a dedicated legacy feature-report reader that preserves the
 separate normal and G-Shift banks for inspection and backup, but its save path
 is not enabled until DPI, RGB, and profile-state support are implemented too.
 
+## `referenceProfile` (optional)
+
+A descriptor may carry a `referenceProfile` block recording a known-good button/DPI/report-rate/RGB configuration, distinct from `profileIO` (which describes the transport, not any particular values). `source` records exactly how trustworthy that data is:
+
+- `verifiedFactoryReset` — captured by triggering the manufacturer's own onboard-memory reset on real hardware and reading back the result. This is the only source the app offers as a one-click **Restore reference profile** write, gated by `MouseProfileDescriptor.canRestoreReferenceProfile` (requires this source *and* `profileIO.canSave`).
+- `userConfiguration` — a real device's current configuration, useful as a cross-check but not a factory default.
+- `manufacturerSpec` — from a published spec sheet rather than a device read.
+- `communityReverseEngineering` — from a third-party RE project rather than this device.
+- `unknown` — the default when `source` is omitted; never offered as a write.
+
+`buttons` maps profile-array button numbers to their onboard raw record (same 8-hex-digit format as everywhere else). `dpi` is optional (`stages`/`defaultStage`/`shiftStage`, same 1-based stage-index convention as `EditableBackup.DPI`). `reportRateHz` is optional. `rgbZones` is optional and maps a zone index to an effect `mode` name (`disabled`/`static`/`pulse`/`cycle`/`wave`/`breathe`/`ripple`) and, only when actually observed, a `color` hex string — do not fabricate a color for an effect mode (like a color-cycle) whose stored color bytes were never directly confirmed; recording the mode alone and leaving `color` absent is preferred over guessing.
+
 ## Sources and confidence
 
 Official Logitech product pages and setup/support guides are preferred for physical controls. Public HID++ device catalogs are used for older product IDs. If a legacy mapping is only a conservative physical description, the JSON says so in `profileIO.notes`; a future file with this exact model's full name automatically takes precedence, since matching always prefers the longer, more specific name.

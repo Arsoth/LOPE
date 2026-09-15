@@ -86,6 +86,10 @@ bool profile_codec_write_rgb_zone_colors(uint8_t *data, size_t data_length, size
                                          const bool zone_present[PROFILE_CODEC_RGB_RECORD_COUNT],
                                          const uint8_t zones[], const uint8_t colors[][3],
                                          size_t count);
+bool profile_codec_write_rgb_zone_modes(uint8_t *data, size_t data_length, size_t rgb_offset,
+                                        size_t rgb_zone_count,
+                                        const bool zone_present[PROFILE_CODEC_RGB_RECORD_COUNT],
+                                        const uint8_t zones[], const uint8_t modes[], size_t count);
 bool profile_codec_write_dpi_stage_table(uint8_t *data, size_t data_length, size_t dpi_offset,
                                          uint16_t unused_value, const uint16_t *stages,
                                          size_t count);

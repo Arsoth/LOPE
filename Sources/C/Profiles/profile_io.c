@@ -584,6 +584,16 @@ bool write_rgb_zone_colors(uint8_t *data, const Profile *profile, const uint8_t 
                                                zones, colors, count);
 }
 
+bool write_rgb_zone_modes(uint8_t *data, const Profile *profile, const uint8_t zones[],
+                          const uint8_t modes[], size_t count) {
+    if (profile == NULL || !profile->rgb_layout_supported) {
+        return false;
+    }
+    return profile_codec_write_rgb_zone_modes(data, profile->data_length, profile->rgb_offset,
+                                              profile->rgb_zone_count, profile->rgb_zone_present,
+                                              zones, modes, count);
+}
+
 bool write_dpi_stage_table(uint8_t *data, const Profile *profile, const uint16_t *stages,
                            size_t count) {
     if (profile == NULL || !profile->dpi_layout_supported) {

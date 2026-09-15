@@ -214,6 +214,34 @@ int test_profile_codec(void) {
              !profile_codec_write_rgb_zone_colors(rgb_data, sizeof(rgb_data), rgb_layout.offset,
                                                   rgb_layout.zone_count, rgb_layout.zone_present,
                                                   &rgb_zone, rgb_color, 0);
+    const uint8_t rgb_mode_cycle[1] = {0x03};
+    rgb_ok = rgb_ok &&
+             profile_codec_write_rgb_zone_modes(rgb_data, sizeof(rgb_data), rgb_layout.offset,
+                                                rgb_layout.zone_count, rgb_layout.zone_present,
+                                                &rgb_zone, rgb_mode_cycle, 1) &&
+             rgb_data[PROFILE_CODEC_RGB_BASE_OFFSET] == 0x03;
+    const uint8_t rgb_mode_unknown[1] = {0x99};
+    rgb_ok = rgb_ok &&
+             !profile_codec_write_rgb_zone_modes(rgb_data, sizeof(rgb_data), rgb_layout.offset,
+                                                 rgb_layout.zone_count, rgb_layout.zone_present,
+                                                 &rgb_zone, rgb_mode_unknown, 1) &&
+             !profile_codec_write_rgb_zone_modes(rgb_data, sizeof(rgb_data), rgb_layout.offset,
+                                                 rgb_layout.zone_count, rgb_layout.zone_present,
+                                                 duplicate_zones, rgb_mode_cycle, 2) &&
+             !profile_codec_write_rgb_zone_modes(NULL, sizeof(rgb_data), rgb_layout.offset,
+                                                 rgb_layout.zone_count, rgb_layout.zone_present,
+                                                 &rgb_zone, rgb_mode_cycle, 1) &&
+             !profile_codec_write_rgb_zone_modes(rgb_data, sizeof(rgb_data), rgb_layout.offset,
+                                                 rgb_layout.zone_count, NULL, &rgb_zone,
+                                                 rgb_mode_cycle, 1) &&
+             !profile_codec_write_rgb_zone_modes(rgb_data, sizeof(rgb_data), rgb_layout.offset,
+                                                 rgb_layout.zone_count, rgb_layout.zone_present,
+                                                 &rgb_zone, rgb_mode_cycle, 0);
+    if (!rgb_ok) {
+        fprintf(stderr, "profile codec RGB mode write self-test failed\n");
+        return 1;
+    }
+
     rgb_data[PROFILE_CODEC_RGB_BASE_OFFSET] = 2;
     profile_codec_detect_rgb_layout(rgb_data, sizeof(rgb_data), 5, &rgb_layout);
     rgb_ok = rgb_ok && rgb_layout.supported && rgb_layout.zone_count == 1;

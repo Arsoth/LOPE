@@ -367,6 +367,31 @@ bool profile_codec_write_rgb_zone_colors(uint8_t *data, size_t data_length, size
     return true;
 }
 
+bool profile_codec_write_rgb_zone_modes(uint8_t *data, size_t data_length, size_t rgb_offset,
+                                        size_t rgb_zone_count,
+                                        const bool zone_present[PROFILE_CODEC_RGB_RECORD_COUNT],
+                                        const uint8_t zones[], const uint8_t modes[],
+                                        size_t count) {
+    if (data == NULL || zones == NULL || modes == NULL || zone_present == NULL || count == 0 ||
+        count > PROFILE_CODEC_RGB_RECORD_COUNT || rgb_zone_count == 0 ||
+        rgb_zone_count > PROFILE_CODEC_RGB_RECORD_COUNT || rgb_offset > data_length ||
+        data_length - rgb_offset < PROFILE_CODEC_RGB_RECORD_BYTES * rgb_zone_count + 2) {
+        return false;
+    }
+    bool seen[PROFILE_CODEC_RGB_RECORD_COUNT] = {false};
+    for (size_t i = 0; i < count; i++) {
+        size_t zone = zones[i];
+        if (zone >= rgb_zone_count || zone >= PROFILE_CODEC_RGB_RECORD_COUNT || seen[zone] ||
+            !zone_present[zone] || !profile_codec_rgb_mode_is_known(modes[i])) {
+            return false;
+        }
+        seen[zone] = true;
+        size_t offset = rgb_offset + zone * PROFILE_CODEC_RGB_RECORD_BYTES;
+        data[offset] = modes[i];
+    }
+    return true;
+}
+
 bool profile_codec_write_dpi_stage_table(uint8_t *data, size_t data_length, size_t dpi_offset,
                                          uint16_t unused_value, const uint16_t *stages,
                                          size_t count) {

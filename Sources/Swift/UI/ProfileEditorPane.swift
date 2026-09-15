@@ -32,7 +32,7 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
         }
         .padding(.horizontal, 20)
         Text(
-          "Name each control below, then save. The saved profile is matched to \(model.currentDeviceName.isEmpty ? "this mouse" : model.currentDeviceName) by device name and product ID; a file with the same profile ID as a bundled one replaces it. Export produces a complete descriptor, ready to copy into Profiles/ for a pull request once Sources below is filled in."
+          "Name each control below, then save. The saved profile is matched to \(currentDeviceDisplayName.isEmpty ? "this mouse" : currentDeviceDisplayName) by device name and product ID; a file with the same profile ID as a bundled one replaces it. Export produces a complete descriptor, ready to copy into Profiles/ for a pull request once Sources below is filled in."
         )
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -78,5 +78,10 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
       }
     }
     .padding(.top, 4)
+  }
+
+  private var currentDeviceDisplayName: String {
+    model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.displayName
+      ?? model.currentDeviceName
   }
 }

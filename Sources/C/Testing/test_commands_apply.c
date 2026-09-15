@@ -226,6 +226,29 @@ int test_commands_apply(void) {
         return 1;
     }
 
+    uint8_t parsed_rgb_mode = 0;
+    int parsed_rgb_mode_zone = 0;
+    bool rgb_mode_parser_ok =
+        parse_batch_rgb_mode_change("3:03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        parsed_rgb_mode_zone == 3 && parsed_rgb_mode == 0x03 &&
+        !parse_batch_rgb_mode_change("3:GG", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change(NULL, &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change(":03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("1:", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("12345678901234567:03", &parsed_rgb_mode_zone,
+                                     &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("999:03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("5x:03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("0:03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("-1:03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("abc:03", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("1:0", &parsed_rgb_mode_zone, &parsed_rgb_mode) &&
+        !parse_batch_rgb_mode_change("1:003", &parsed_rgb_mode_zone, &parsed_rgb_mode);
+    if (!rgb_mode_parser_ok) {
+        fprintf(stderr, "parse_batch_rgb_mode_change self-test failed\n");
+        return 1;
+    }
+
     int parsed_button = 0;
     bool parsed_gshift = false;
     uint8_t parsed_button_spec[4] = {0};
@@ -328,6 +351,19 @@ int test_commands_apply(void) {
     apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
     apply_options.rgb_change_count = 1;
     apply_options.rgb_changes[0] = valid_rgb_change;
+
+    const char *invalid_rgb_mode_change = "not-valid";
+    apply_options.rgb_mode_changes[0] = invalid_rgb_mode_change;
+    apply_options.rgb_mode_change_count = 1;
+    apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
+
+    const char *duplicate_rgb_mode_change_a = "1:01";
+    const char *duplicate_rgb_mode_change_b = "1:03";
+    apply_options.rgb_mode_changes[0] = duplicate_rgb_mode_change_a;
+    apply_options.rgb_mode_changes[1] = duplicate_rgb_mode_change_b;
+    apply_options.rgb_mode_change_count = 2;
+    apply_validation_ok = apply_validation_ok && run_apply(&apply_options) == 1;
+    apply_options.rgb_mode_change_count = 0;
 
     const char *invalid_profile_state_change = "not-valid";
     apply_options.profile_state_changes[0] = invalid_profile_state_change;
@@ -788,6 +824,46 @@ int test_commands_apply(void) {
     apply2_rgb_range.rgb_change_count = 1;
     if (run_apply(&apply2_rgb_range) != 1) {
         fprintf(stderr, "run_apply RGB-zone-out-of-range self-test failed\n");
+        return 1;
+    }
+
+    Reply apply2_rgb_mode_range_replies[80];
+    memcpy(apply2_rgb_mode_range_replies, apply2_loaded_replies,
+           apply2_loaded_prefix_count * sizeof(Reply));
+    ChannelRequestTestContext apply2_rgb_mode_range_channel = {
+        .replies = apply2_rgb_mode_range_replies,
+        .reply_count = apply2_loaded_prefix_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_rgb_mode_range_channel;
+    Options apply2_rgb_mode_range = {0};
+    apply2_rgb_mode_range.profile = 1;
+    apply2_rgb_mode_range.device_index = -1;
+    apply2_rgb_mode_range.dpi_default = -1;
+    apply2_rgb_mode_range.dpi_shift = -1;
+    apply2_rgb_mode_range.rgb_mode_changes[0] = "99:03";
+    apply2_rgb_mode_range.rgb_mode_change_count = 1;
+    if (run_apply(&apply2_rgb_mode_range) != 1) {
+        fprintf(stderr, "run_apply RGB-mode-zone-out-of-range self-test failed\n");
+        return 1;
+    }
+
+    Reply apply2_rgb_mode_unknown_replies[80];
+    memcpy(apply2_rgb_mode_unknown_replies, apply2_loaded_replies,
+           apply2_loaded_prefix_count * sizeof(Reply));
+    ChannelRequestTestContext apply2_rgb_mode_unknown_channel = {
+        .replies = apply2_rgb_mode_unknown_replies,
+        .reply_count = apply2_loaded_prefix_count,
+        .calls = 0};
+    g_channel_request_test_context = &apply2_rgb_mode_unknown_channel;
+    Options apply2_rgb_mode_unknown = {0};
+    apply2_rgb_mode_unknown.profile = 1;
+    apply2_rgb_mode_unknown.device_index = -1;
+    apply2_rgb_mode_unknown.dpi_default = -1;
+    apply2_rgb_mode_unknown.dpi_shift = -1;
+    apply2_rgb_mode_unknown.rgb_mode_changes[0] = "1:99";
+    apply2_rgb_mode_unknown.rgb_mode_change_count = 1;
+    if (run_apply(&apply2_rgb_mode_unknown) != 1) {
+        fprintf(stderr, "run_apply RGB-mode-unknown-effect self-test failed\n");
         return 1;
     }
 
@@ -1406,6 +1482,12 @@ int test_commands_apply(void) {
         fprintf(stderr, "run_apply self-test failed to prepare the expected RGB write\n");
         return 1;
     }
+    uint8_t apply2_combo_modes[1] = {0x03};
+    if (!write_rgb_zone_modes(apply2_combo_after, &apply2_scratch, apply2_combo_zones,
+                              apply2_combo_modes, 1)) {
+        fprintf(stderr, "run_apply self-test failed to prepare the expected RGB mode write\n");
+        return 1;
+    }
     uint16_t apply2_combo_dpi[2] = {800, 1600};
     if (!write_dpi_stage_table(apply2_combo_after, &apply2_scratch, apply2_combo_dpi, 2)) {
         fprintf(stderr, "run_apply self-test failed to prepare the expected DPI write\n");
@@ -1472,6 +1554,8 @@ int test_commands_apply(void) {
     apply2_combo.device_index = -1;
     apply2_combo.rgb_changes[0] = "1:AABBCC";
     apply2_combo.rgb_change_count = 1;
+    apply2_combo.rgb_mode_changes[0] = "1:03";
+    apply2_combo.rgb_mode_change_count = 1;
     apply2_combo.dpi_values = "800,1600";
     apply2_combo.dpi_default = 1;
     apply2_combo.dpi_shift = 1;

@@ -57,6 +57,8 @@ void detect_rgb_layout(Profile *profile);
 
 bool write_rgb_zone_colors(uint8_t *data, const Profile *profile, const uint8_t zones[],
                            const uint8_t colors[][3], size_t count);
+bool write_rgb_zone_modes(uint8_t *data, const Profile *profile, const uint8_t zones[],
+                          const uint8_t modes[], size_t count);
 bool write_dpi_stage_table(uint8_t *data, const Profile *profile, const uint16_t *stages,
                            size_t stage_count);
 int adjustable_dpi_values(Device *device, uint16_t *values, size_t *value_count,

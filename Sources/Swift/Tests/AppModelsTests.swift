@@ -95,6 +95,22 @@ final class AppModelsTests: XCTestCase {
     XCTAssertFalse(notWired.isWiredDevice)
   }
 
+  func testDeviceChoiceUsesCatalogFullNameForUserFacingIdentity() {
+    let spectrum = DeviceChoice(
+      id: 1, name: "G502", connection: "Wired", productID: "0xC332", deviceKey: "spectrum")
+    let core = DeviceChoice(
+      id: 2, name: "G502", connection: "Wired", productID: "0xC07D", deviceKey: "core")
+    let hero = DeviceChoice(
+      id: 3, name: "G502", connection: "Wired", productID: "0xC08B", deviceKey: "hero")
+
+    XCTAssertEqual(spectrum.displayName, "G502 Proteus Spectrum")
+    XCTAssertEqual(spectrum.title, "G502 Proteus Spectrum — Wired")
+    XCTAssertEqual(core.displayName, "G502 Proteus Core")
+    XCTAssertEqual(core.title, "G502 Proteus Core — Wired")
+    XCTAssertEqual(hero.displayName, "G502 HERO")
+    XCTAssertEqual(hero.title, "G502 HERO — Wired")
+  }
+
   func testPairedGenericNameIsReplacedBySpecificModelIdentity() {
     let generic = DeviceChoice(
       id: 1, name: "Paired Logitech Mouse - Lightspeed", connection: "Wireless",

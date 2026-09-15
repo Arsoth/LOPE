@@ -148,11 +148,11 @@ final class AppModelParsingTests: XCTestCase {
 
   func testParseDeviceChoicesCanonicalizesBaseG502MarketingName() {
     let text =
-      "[1] Wired  Tunable RGB Gaming Mouse G502 (HID++ 4.5, product 0xC08B, key abc502)"
+      "[1] Wired  Tunable RGB Gaming Mouse G502 (HID++ 4.5, product 0xC332, key abc502)"
 
     let device = AppModel.parseDeviceChoices(text).first
     XCTAssertEqual(device?.name, "G502")
-    XCTAssertEqual(device?.title, "G502 — Wired")
+    XCTAssertEqual(device?.title, "G502 Proteus Spectrum — Wired")
   }
 
   func testReportedDeviceNamePrefersSpecificPairedModelOverGenericLabel() {

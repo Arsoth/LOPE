@@ -71,6 +71,24 @@ final class AppModelEditingRGBTests: XCTestCase {
     XCTAssertEqual(model.baselineRGBColors, [0: primary, 1: logo])
   }
 
+  func testApplyRGBZonesPopulatesCurrentAndDraftModeFromParsedInput() {
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBCapableDevice(model)
+
+    model.applyRGBZones(
+      [
+        ParsedRGBZone(index: 0, color: LOPECore.RGBColor(red: 1, green: 2, blue: 3), mode: .cycle),
+        ParsedRGBZone(
+          index: 1, color: LOPECore.RGBColor(red: 4, green: 5, blue: 6), mode: .breathe),
+      ],
+      profileFormat: 5
+    )
+
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.currentMode, .cycle)
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.draftMode, .cycle)
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 1 })?.currentMode, .breathe)
+  }
+
   func testApplyRGBZonesPopulatesBaseG502Zones() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -97,7 +115,7 @@ final class AppModelEditingRGBTests: XCTestCase {
     )
 
     XCTAssertTrue(model.shouldShowRGBEditor)
-    XCTAssertEqual(model.rgbZones.map(\.name), ["DPI", "Logo"])
+    XCTAssertEqual(model.rgbZones.map(\.name), ["Logo", "DPI"])
   }
 
   func testApplyRGBZonesSkipsDescriptorZonesMissingFromParsedInput() {
@@ -213,5 +231,42 @@ final class AppModelEditingRGBTests: XCTestCase {
     model.setRGBColor(zoneID: 0, color: chosen)
 
     XCTAssertEqual(model.rgbZones.map(\.draft), [chosen, chosen])
+  }
+
+  func testSetRGBModeUpdatesOnlyTargetZoneWhenNotEditingAllZones() {
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBCapableDevice(model)
+    model.rgbZones = [
+      RGBZoneState(
+        id: 0, name: "Primary", current: LOPECore.RGBColor(red: 1, green: 2, blue: 3),
+        draft: LOPECore.RGBColor(red: 1, green: 2, blue: 3)),
+      RGBZoneState(
+        id: 1, name: "Logo", current: LOPECore.RGBColor(red: 4, green: 5, blue: 6),
+        draft: LOPECore.RGBColor(red: 4, green: 5, blue: 6)),
+    ]
+    model.beginRGBEdit(zoneID: 0, allZones: false)
+
+    model.setRGBMode(zoneID: 0, mode: .cycle)
+
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.draftMode, .cycle)
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 1 })?.draftMode, .solid)
+  }
+
+  func testSetRGBModeUpdatesAllZonesWhenEditingAllZones() {
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBCapableDevice(model)
+    model.rgbZones = [
+      RGBZoneState(
+        id: 0, name: "Primary", current: LOPECore.RGBColor(red: 1, green: 2, blue: 3),
+        draft: LOPECore.RGBColor(red: 1, green: 2, blue: 3)),
+      RGBZoneState(
+        id: 1, name: "Logo", current: LOPECore.RGBColor(red: 4, green: 5, blue: 6),
+        draft: LOPECore.RGBColor(red: 4, green: 5, blue: 6)),
+    ]
+    model.beginRGBEdit(zoneID: 0, allZones: true)
+
+    model.setRGBMode(zoneID: 0, mode: .wave)
+
+    XCTAssertEqual(model.rgbZones.map(\.draftMode), [.wave, .wave])
   }
 }

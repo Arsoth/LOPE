@@ -11,15 +11,17 @@ extension AppModel {
     baselineRGBColors.removeAll()
     guard let capability = rgbCapabilities(profileFormat: profileFormat) else { return }
 
-    let parsedByIndex = Dictionary(uniqueKeysWithValues: parsedZones.map { ($0.index, $0.color) })
+    let parsedByIndex = Dictionary(uniqueKeysWithValues: parsedZones.map { ($0.index, $0) })
     for descriptor in capability.zones {
-      guard let color = parsedByIndex[descriptor.index] else { continue }
+      guard let parsed = parsedByIndex[descriptor.index] else { continue }
       rgbZones.append(
         RGBZoneState(
           id: descriptor.index,
           name: descriptor.name,
-          current: color,
-          draft: color
+          current: parsed.color,
+          draft: parsed.color,
+          currentMode: parsed.mode,
+          draftMode: parsed.mode
         ))
     }
     baselineRGBColors = Dictionary(uniqueKeysWithValues: rgbZones.map { ($0.id, $0.current) })
@@ -38,6 +40,15 @@ extension AppModel {
       in: rgbZones,
       zoneID: zoneID,
       color: color,
+      allZones: rgbEditingAllZones
+    )
+  }
+
+  func setRGBMode(zoneID: Int, mode: RGBEffectMode) {
+    rgbZones = RGBEditorLogic.settingMode(
+      in: rgbZones,
+      zoneID: zoneID,
+      mode: mode,
       allZones: rgbEditingAllZones
     )
   }

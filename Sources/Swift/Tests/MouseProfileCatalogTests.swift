@@ -107,10 +107,18 @@ final class MouseProfileCatalogTests: XCTestCase {
       g502.rgbCapabilities(
         deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332", profileFormat: 5
       )?.zones.map(\.name),
-      ["DPI", "Logo"])
+      ["Logo", "DPI"])
     XCTAssertNotNil(
       g502.rgbCapabilities(
         deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332", profileFormat: 2))
+  }
+
+  func testG502ProductIDOutranksLegacyG5NameSubstring() {
+    let spectrum = MouseProfileCatalog.shared.profile(deviceName: "G502", productID: "0xC332")
+    let hero = MouseProfileCatalog.shared.profile(deviceName: "G502", productID: "0xC08B")
+
+    XCTAssertEqual(spectrum.id, "g502-proteus-spectrum")
+    XCTAssertEqual(hero.id, "g502-hero")
   }
 
   func testG502ProteusCoreIsSeparateAndHasNoRGBCapability() {
