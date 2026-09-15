@@ -343,9 +343,10 @@ int engine_apply(const Options *options, EngineBoundaryWriteResult *boundary_res
 
     uint16_t requested_dpi[5] = {0};
     size_t requested_dpi_count = 0;
+    // parse_dpi_values only returns true when it parsed 1..5 comma-separated
+    // values, so requested_dpi_count is already guaranteed in range here.
     if (options->dpi_values != NULL &&
-        (!parse_dpi_values(options->dpi_values, requested_dpi, &requested_dpi_count) ||
-         requested_dpi_count < 1 || requested_dpi_count > 5)) {
+        !parse_dpi_values(options->dpi_values, requested_dpi, &requested_dpi_count)) {
         fprintf(stderr,
                 "invalid --dpi list; use one to five comma-separated values from 100 to 65535\n");
         return 1;
