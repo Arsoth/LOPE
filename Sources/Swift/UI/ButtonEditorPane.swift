@@ -11,12 +11,11 @@ struct ButtonEditorPane: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      recoveryNotice
-      readOnlyNotice
-      generatedProfileNotice
-
       ScrollView {
         VStack(alignment: .leading, spacing: 10) {
+          recoveryNotice
+          readOnlyNotice
+          generatedProfileNotice
           ProfileControlsView(model: model)
           if model.hasGShiftLayer {
             HStack(spacing: 10) {
@@ -75,7 +74,6 @@ struct ButtonEditorPane: View {
       }
       .padding(8)
       .background(theme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
-      .padding(.horizontal, 20)
     }
   }
 
@@ -87,7 +85,6 @@ struct ButtonEditorPane: View {
       )
       .font(.caption)
       .foregroundStyle(theme.warning)
-      .padding(.horizontal, 20)
     }
   }
 
@@ -105,7 +102,6 @@ struct ButtonEditorPane: View {
       }
       .padding(8)
       .background(theme.card.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
-      .padding(.horizontal, 20)
     }
   }
 }

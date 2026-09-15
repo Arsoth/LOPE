@@ -21,6 +21,9 @@ extension AppModel {
 
   func setModifier(buttonIndex: Int, bit: UInt8, enabled: Bool) {
     guard var chord = keyboardBytes(buttonIndex) else { return }
+    if enabled && keyboardModifierBit(for: chord.key) == bit {
+      return
+    }
     if enabled {
       chord.modifier |= bit
     } else {
@@ -101,6 +104,11 @@ extension AppModel {
     capturedKeyboardButtonIndices.insert(buttonIndex)
     recordingKeyboardButtonID = nil
     status = "Recorded \(key.label)."
+  }
+
+  func isModifierToggleDisabled(buttonIndex: Int, bit: UInt8) -> Bool {
+    guard let chord = keyboardBytes(buttonIndex) else { return false }
+    return keyboardModifierBit(for: chord.key) == bit
   }
 
   func keyboardUsage(forMacKeyCode keyCode: UInt16) -> UInt8? {
@@ -186,7 +194,8 @@ extension AppModel {
   }
 
   func setKeyboardChord(buttonIndex: Int, modifier: UInt8, key: UInt8) {
-    setRaw(buttonIndex: buttonIndex, raw: String(format: "8002%02X%02X", modifier, key))
+    let safeModifier = modifier & ~(keyboardModifierBit(for: key) ?? 0)
+    setRaw(buttonIndex: buttonIndex, raw: String(format: "8002%02X%02X", safeModifier, key))
   }
 
   private func keyboardBytes(_ buttonIndex: Int) -> (modifier: UInt8, key: UInt8)? {
@@ -194,7 +203,22 @@ extension AppModel {
       let bytes = rawBytes(buttons[buttonIndex].draftRaw),
       bytes[0] == 0x80, bytes[1] == 0x02
     else { return nil }
-    return (bytes[2], bytes[3])
+    return (bytes[2] & ~(keyboardModifierBit(for: bytes[3]) ?? 0), bytes[3])
+  }
+
+  private func keyboardModifierBit(for key: UInt8) -> UInt8? {
+    switch key {
+    case 0xE0, 0xE4:
+      return 0x01
+    case 0xE1, 0xE5:
+      return 0x02
+    case 0xE2, 0xE6:
+      return 0x04
+    case 0xE3, 0xE7:
+      return 0x08
+    default:
+      return nil
+    }
   }
 
   func keyboardKeyLabel(_ code: UInt8) -> String {

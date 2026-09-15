@@ -3,6 +3,7 @@
 
 enum KeyboardKeyGroup: String, CaseIterable, Hashable, Sendable {
   case standard = "Standard full-size keyboard keys"
+  case modifier = "Modifier keys"
   case function = "F13 and later keys"
   case media = "Media keys"
   case other = "Other unusual keys"

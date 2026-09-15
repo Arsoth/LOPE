@@ -164,7 +164,11 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
 
   static func normalizedReportedName(_ name: String) -> String {
     var normalized = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    let genericSuffixes = [" Wireless Gaming Mouse"]
+    let genericSuffixes = [
+      " Wireless Gaming Mouse",
+      " Wired Gaming Mouse",
+      " Gaming Mouse",
+    ]
     for suffix in genericSuffixes {
       guard normalized.count > suffix.count,
         normalized.lowercased().hasSuffix(suffix.lowercased())
@@ -173,7 +177,18 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
       normalized = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
       break
     }
-    return normalized
+
+    // Logitech's HID label for the base G502 can include marketing text
+    // before the actual model identifier (for example, "Tunable RGB Gaming
+    // Mouse G502"). Keep the model identifier and any meaningful variant
+    // suffix, but discard the inconsistent prefix so every picker state uses
+    // the same name.
+    guard let modelRange = normalized.range(of: "G502", options: .caseInsensitive)
+    else { return normalized }
+    let variant = normalized[modelRange.upperBound...]
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !variant.isEmpty else { return "G502" }
+    return "G502 \(variant.uppercased())"
   }
 
   func matchesReconnectIdentity(_ other: DeviceChoice) -> Bool {

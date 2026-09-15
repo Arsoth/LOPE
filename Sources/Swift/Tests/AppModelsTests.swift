@@ -123,6 +123,21 @@ final class AppModelsTests: XCTestCase {
       "G603")
   }
 
+  func testPreferredNameCanonicalizesG502MarketingLabelsAndVariants() {
+    XCTAssertEqual(
+      DeviceChoice.preferredName(
+        reported: "Tunable RGB Gaming Mouse G502", fallback: "G502"),
+      "G502")
+    XCTAssertEqual(
+      DeviceChoice.preferredName(
+        reported: "Tunable RGB Gaming Mouse G502 X LIGHTSPEED", fallback: "G502"),
+      "G502 X LIGHTSPEED")
+    XCTAssertEqual(
+      DeviceChoice.preferredName(
+        reported: "G502 X PLUS Wireless Gaming Mouse", fallback: "G502"),
+      "G502 X PLUS")
+  }
+
   func testPairedIdentityMatchesWhenReceiverKeyChanges() {
     let previous = DeviceChoice(
       id: 1, name: "G604", connection: "Wireless", productID: "0x4085", deviceKey: "old-key")

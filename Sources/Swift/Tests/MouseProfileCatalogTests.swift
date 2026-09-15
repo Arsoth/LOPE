@@ -95,4 +95,15 @@ final class MouseProfileCatalogTests: XCTestCase {
       unsupported.rgbCapabilities(
         deviceName: "G603 LIGHTSPEED", productID: "0xB01C", profileFormat: 5))
   }
+
+  func testBaseG502ProfileProvidesWritableRGBCapability() {
+    let g502 = MouseProfileCatalog.shared.profile(deviceName: "G502", productID: "0xC08B")
+
+    XCTAssertEqual(g502.id, "g502")
+    XCTAssertTrue(g502.profileIO.canSave)
+    XCTAssertEqual(
+      g502.rgbCapabilities(deviceName: "G502", productID: "0xC08B", profileFormat: 5)?.zones.map(
+        \.name),
+      ["Primary", "Logo"])
+  }
 }

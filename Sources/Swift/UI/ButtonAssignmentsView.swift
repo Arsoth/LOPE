@@ -131,16 +131,26 @@ struct ButtonAssignmentsView: View {
   private func keyboardModifierControls(_ buttonID: Int) -> some View {
     let buttonIndex = model.buttons.firstIndex(where: { $0.id == buttonID }) ?? 0
     return HStack(spacing: 4) {
-      keyboardModifierToggle(buttonIndex: buttonIndex, label: "Ctrl", bit: 0x01)
-      keyboardModifierToggle(buttonIndex: buttonIndex, label: "Shift", bit: 0x02)
-      keyboardModifierToggle(buttonIndex: buttonIndex, label: "Alt", bit: 0x04)
-      keyboardModifierToggle(buttonIndex: buttonIndex, label: "Cmd", bit: 0x08)
+      keyboardModifierToggle(
+        buttonIndex: buttonIndex, label: "Ctrl", bit: 0x01,
+        disabled: model.isModifierToggleDisabled(buttonIndex: buttonIndex, bit: 0x01))
+      keyboardModifierToggle(
+        buttonIndex: buttonIndex, label: "Shift", bit: 0x02,
+        disabled: model.isModifierToggleDisabled(buttonIndex: buttonIndex, bit: 0x02))
+      keyboardModifierToggle(
+        buttonIndex: buttonIndex, label: "Alt", bit: 0x04,
+        disabled: model.isModifierToggleDisabled(buttonIndex: buttonIndex, bit: 0x04))
+      keyboardModifierToggle(
+        buttonIndex: buttonIndex, label: "Cmd", bit: 0x08,
+        disabled: model.isModifierToggleDisabled(buttonIndex: buttonIndex, bit: 0x08))
     }
     .frame(width: 190, height: 26, alignment: .leading)
     .help("Choose the modifiers to send with the selected extended key.")
   }
 
-  private func keyboardModifierToggle(buttonIndex: Int, label: String, bit: UInt8) -> some View {
+  private func keyboardModifierToggle(
+    buttonIndex: Int, label: String, bit: UInt8, disabled: Bool
+  ) -> some View {
     Toggle(
       label,
       isOn: Binding(
@@ -152,6 +162,7 @@ struct ButtonAssignmentsView: View {
     .controlSize(.small)
     .font(.caption)
     .fixedSize()
+    .disabled(disabled)
     .help(label)
   }
 

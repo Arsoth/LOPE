@@ -6,17 +6,19 @@ import Foundation
 @MainActor
 extension AppModel {
   func startInitialRefresh(cachedDevice: DeviceChoice) {
+    let normalizedDevice = cachedDevice.replacingName(
+      DeviceChoice.normalizedReportedName(cachedDevice.name))
     // Keep the cached device visible while enumeration is in flight. The
     // normal refresh path enumerates first, so the picker can be replaced by
     // the current device list before any profile read or wake flow starts.
-    devices = [cachedDevice]
-    selectedDeviceIndex = cachedDevice.id
-    currentDeviceName = cachedDevice.name
-    deviceSummary = cachedDevice.title
+    devices = [normalizedDevice]
+    selectedDeviceIndex = normalizedDevice.id
+    currentDeviceName = normalizedDevice.name
+    deviceSummary = normalizedDevice.title
     startRefresh(
-      preferredDeviceIndex: cachedDevice.id,
+      preferredDeviceIndex: normalizedDevice.id,
       preferredProfileNumber: profileNumber,
-      expectedDevice: cachedDevice
+      expectedDevice: normalizedDevice
     )
   }
 

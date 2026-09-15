@@ -211,6 +211,32 @@ final class AppModelEditingKeyboardTests: XCTestCase {
     XCTAssertEqual(model.keyboardChordText(buttonIndex: 0), "Insert")
   }
 
+  func testModifierKeyChoiceUsesHumanReadableLabelAndDisablesMatchingChordModifier() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.showNonStandardKeyboardKeys = true
+    model.setKeyboardChord(buttonIndex: 0, modifier: 0x04, key: 0xE2)
+
+    XCTAssertEqual(model.keyboardKeyChoice(buttonIndex: 0), 0xE2)
+    XCTAssertEqual(model.keyboardKeyText(buttonIndex: 0), "Left Alt")
+    XCTAssertEqual(model.keyboardChordText(buttonIndex: 0), "Left Alt")
+    XCTAssertTrue(model.isModifierToggleDisabled(buttonIndex: 0, bit: 0x04))
+    XCTAssertFalse(model.isModifierToggleDisabled(buttonIndex: 0, bit: 0x01))
+    XCTAssertEqual(model.buttons[0].draftRaw, "800200E2")
+  }
+
+  func testRecordedModifierKeyUsesHumanReadableLabelAndDoesNotDoubleShift() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.beginKeyboardRecording(buttonIndex: 0)
+
+    model.recordKeyboardEvent(buttonIndex: 0, keyCode: 0xE2, modifier: 0x04)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "800200E2")
+    XCTAssertEqual(model.keyboardChordText(buttonIndex: 0), "Left Alt")
+    XCTAssertEqual(model.status, "Recorded Left Alt.")
+  }
+
   func testSpecialKeyChoiceIsZeroForOrdinaryKeyEvenWhenShown() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -529,6 +555,7 @@ final class AppModelEditingKeyboardTests: XCTestCase {
 
     XCTAssertEqual(model.keyboardKeyLabel(0), "")
     XCTAssertEqual(model.keyboardKeyLabel(0x04), "A")
+    XCTAssertEqual(model.keyboardKeyLabel(0xE2), "Left Alt")
     XCTAssertEqual(model.keyboardKeyLabel(0xFF), "0xFF")
   }
 }

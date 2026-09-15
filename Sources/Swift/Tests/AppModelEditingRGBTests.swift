@@ -7,9 +7,9 @@ import XCTest
 @testable import LOPECore
 
 // Mirrors AppModel+EditingRGB.swift. The shared fixture device (G502 X) has
-// no RGB profile of its own, so these tests point the model at a device that
-// does (G502 HERO, format 4/5, Primary/Logo zones) to exercise the
-// capability-gated paths.
+// no RGB profile of its own, so these tests point the model at devices that
+// do (base G502 and G502 HERO, format 4/5, Primary/Logo zones) to exercise
+// the capability-gated paths.
 @MainActor
 final class AppModelEditingRGBTests: XCTestCase {
   private func configureRGBCapableDevice(_ model: AppModel) {
@@ -69,6 +69,35 @@ final class AppModelEditingRGBTests: XCTestCase {
     XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.current, primary)
     XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.draft, primary)
     XCTAssertEqual(model.baselineRGBColors, [0: primary, 1: logo])
+  }
+
+  func testApplyRGBZonesPopulatesBaseG502Zones() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.devices = [
+      DeviceChoice(
+        id: 1,
+        name: "G502",
+        connection: "Wired",
+        productID: "0xC08B",
+        deviceKey: "test-device"
+      )
+    ]
+    model.selectedDeviceIndex = 1
+    model.currentDeviceName = "G502"
+
+    let primary = LOPECore.RGBColor(red: 0x10, green: 0x20, blue: 0x30)
+    let logo = LOPECore.RGBColor(red: 0x40, green: 0x50, blue: 0x60)
+    model.applyRGBZones(
+      [
+        ParsedRGBZone(index: 0, color: primary),
+        ParsedRGBZone(index: 1, color: logo),
+      ],
+      profileFormat: 5
+    )
+
+    XCTAssertTrue(model.shouldShowRGBEditor)
+    XCTAssertEqual(model.rgbZones.map(\.name), ["Primary", "Logo"])
   }
 
   func testApplyRGBZonesSkipsDescriptorZonesMissingFromParsedInput() {
