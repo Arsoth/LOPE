@@ -73,7 +73,8 @@ int test_backup_codec(void) {
     BackupCodecSector bad_sector = sources[0];
     bad_sector.data = NULL;
     sector_ok = sector_ok && !backup_codec_sector_crc_ok(&header, &bad_sector) &&
-                !backup_codec_sector_crc_ok(NULL, &sources[0]);
+                !backup_codec_sector_crc_ok(NULL, &sources[0]) &&
+                !backup_codec_sector_crc_ok(&header, NULL);
     bad_sector.data = first_data;
     bad_sector.size = 31;
     sector_ok = sector_ok && !backup_codec_sector_crc_ok(&header, &bad_sector);
@@ -129,6 +130,8 @@ int test_backup_codec(void) {
                        !backup_codec_parse_sector_table(small_table, sizeof(small_table), 1,
                                                         parsed_sectors, &expected_length) &&
                        !backup_codec_parse_sector_table(duplicate_table, sizeof(duplicate_table), 2,
+                                                        parsed_sectors, &expected_length) &&
+                       !backup_codec_parse_sector_table(small_table, sizeof(small_table), 33,
                                                         parsed_sectors, &expected_length);
     if (!table_edges) {
         fprintf(stderr, "backup codec table-boundary self-test failed\n");
@@ -138,6 +141,9 @@ int test_backup_codec(void) {
     uint8_t output[sizeof(encoded)];
     size_t output_length = 0;
     BackupCodecSector invalid_source = {.sector = 1, .size = 31, .data = first_data};
+    BackupCodecSector null_data_source = {.sector = 1, .size = 32, .data = NULL};
+    BackupCodecSector oversized_encode_source = {
+        .sector = 1, .size = BACKUP_CODEC_MAX_SECTOR_BYTES + 1, .data = first_data};
     bool encode_edges =
         !backup_codec_encode(NULL, sources, 2, output, sizeof(output), &output_length) &&
         !backup_codec_encode(&header, NULL, 2, output, sizeof(output), &output_length) &&
@@ -145,7 +151,12 @@ int test_backup_codec(void) {
         !backup_codec_encode(&header, sources, 2, output, sizeof(output) - 1, &output_length) &&
         !backup_codec_encode(&header, sources, 2, NULL, sizeof(output), &output_length) &&
         !backup_codec_encode(&header, sources, 2, output, sizeof(output), NULL) &&
-        !backup_codec_encode(&header, &invalid_source, 1, output, sizeof(output), &output_length);
+        !backup_codec_encode(&header, &invalid_source, 1, output, sizeof(output), &output_length) &&
+        !backup_codec_encode(&header, sources, 33, output, sizeof(output), &output_length) &&
+        !backup_codec_encode(&header, &null_data_source, 1, output, sizeof(output),
+                             &output_length) &&
+        !backup_codec_encode(&header, &oversized_encode_source, 1, output, sizeof(output),
+                             &output_length);
     if (!encode_edges) {
         fprintf(stderr, "backup codec encoding-boundary self-test failed\n");
         return 1;

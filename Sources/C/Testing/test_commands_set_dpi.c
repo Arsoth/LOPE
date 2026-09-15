@@ -492,6 +492,16 @@ int test_commands_set_dpi(void) {
         return 1;
     }
 
+    set_dpi_out_of_range_channel.calls = 0;
+    g_channel_request_test_context = &set_dpi_out_of_range_channel;
+    Options set_dpi_shift_too_high = set_dpi_out_of_range;
+    set_dpi_shift_too_high.dpi_default = 1;
+    set_dpi_shift_too_high.dpi_shift = 5;
+    if (run_set_dpi(&set_dpi_shift_too_high) != 1) {
+        fprintf(stderr, "run_set_dpi shift-index-too-high self-test failed\n");
+        return 1;
+    }
+
     uint8_t set_dpi_wrong_readback[255];
     memcpy(set_dpi_wrong_readback, mock_sector, sizeof(set_dpi_wrong_readback));
     set_dpi_wrong_readback[3] ^= 0x01;

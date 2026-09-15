@@ -210,6 +210,10 @@ int test_backup(void) {
     }
     close(combined_fd);
     unlink(combined_path);
+    if (package_write_multi(combined_path, &dummy_device, 5, combined_sources, 33, true)) {
+        free(profile.data);
+        return 1;
+    }
     bool combined_package_ok =
         package_write_multi(combined_path, &dummy_device, 5, combined_sources, 2, true);
     if (combined_package_ok) {
@@ -421,6 +425,10 @@ int test_backup(void) {
     validation_ok = validation_ok && !validate_profile_for_write(&invalid_profile);
     invalid_profile.valid_specs = 4;
     validation_ok = validation_ok && validate_profile_for_write(&invalid_profile);
+    invalid_profile.data_length = 1;
+    invalid_profile.button_offset = 0;
+    invalid_profile.info.button_count = 1;
+    validation_ok = validation_ok && !validate_profile_for_write(&invalid_profile);
     if (!malformed_ok || !validation_ok) {
         free(profile.data);
         fprintf(stderr, "backup validation self-test failed\n");

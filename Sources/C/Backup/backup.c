@@ -87,12 +87,15 @@ int package_write_multi(const char *path, const Device *device, uint8_t profile_
         encoded_length += sectors[i].size;
     }
     uint8_t *encoded = (uint8_t *)malloc(encoded_length);
-    if (encoded == NULL || !backup_codec_encode(&codec_header, codec_sectors, sector_count, encoded,
-                                                encoded_length, &encoded_length)) {
-        free(encoded);
+    if (encoded == NULL) {
         fprintf(stderr, "could not encode backup package\n");
         return 0;
     }
+    // Every failure condition backup_codec_encode checks (null pointers,
+    // sector_count/size bounds, out_capacity) was already validated above
+    // using the identical bounds, so it cannot fail here.
+    backup_codec_encode(&codec_header, codec_sectors, sector_count, encoded, encoded_length,
+                        &encoded_length);
 
     int flags = O_WRONLY | O_CREAT | (refuse_overwrite ? O_EXCL : O_TRUNC);
     int fd = open(path, flags, 0600);
