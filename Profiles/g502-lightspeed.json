@@ -4,7 +4,7 @@
 	"name": "G502 LIGHTSPEED",
 	"match": {
 		"nameContains": ["G502 LIGHTSPEED"],
-		"productIDs": ["0xC332"]
+		"productIDs": ["0xC539"]
 	},
 	"buttons": [
 		{

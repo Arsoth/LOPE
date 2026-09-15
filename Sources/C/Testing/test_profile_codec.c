@@ -214,6 +214,9 @@ int test_profile_codec(void) {
                                                   &rgb_zone, rgb_color, 0);
     rgb_data[PROFILE_CODEC_RGB_BASE_OFFSET] = 2;
     profile_codec_detect_rgb_layout(rgb_data, sizeof(rgb_data), 5, &rgb_layout);
+    rgb_ok = rgb_ok && rgb_layout.supported && rgb_layout.zone_count == 1;
+    rgb_data[PROFILE_CODEC_RGB_BASE_OFFSET] = 0x7F;
+    profile_codec_detect_rgb_layout(rgb_data, sizeof(rgb_data), 5, &rgb_layout);
     rgb_ok = rgb_ok && !rgb_layout.supported;
     profile_codec_detect_rgb_layout(rgb_data, sizeof(rgb_data), 3, &rgb_layout);
     rgb_ok = rgb_ok && !rgb_layout.supported;

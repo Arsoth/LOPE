@@ -159,8 +159,9 @@ but remain read-only. Adding a descriptor is not by itself authorization to
 write: its profile layout and save path must be validated first.
 
 The base G502 descriptor uses the original G502 button layout and validated
-legacy RGB zones. More specific G502 variants such as HERO, LIGHTSPEED, and X
-win catalog matching when their names are present.
+legacy RGB zones (DPI and Logo on the wired C332 model). More specific G502
+variants such as HERO, LIGHTSPEED, and X win catalog matching when their names
+are present.
 
 MX-series devices are classified by name and known product ID before the
 fallback editor is rendered. They can remain visible in discovery, but LOPE

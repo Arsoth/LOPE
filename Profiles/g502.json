@@ -4,7 +4,7 @@
 	"name": "G502",
 	"match": {
 		"nameContains": ["G502"],
-		"productIDs": ["0xC08B"]
+		"productIDs": ["0xC332"]
 	},
 	"buttons": [
 		{
@@ -117,7 +117,7 @@
 		"zones": [
 			{
 				"index": 0,
-				"name": "Primary"
+				"name": "DPI"
 			},
 			{
 				"index": 1,
@@ -125,7 +125,7 @@
 			}
 		],
 		"notes": [
-			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the Primary/DPI and Logo zones. Only the three-byte solid-color field is edited."
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the DPI and Logo zones. Only the three-byte solid-color field is edited."
 		]
 	},
 	"sources": [

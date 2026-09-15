@@ -8,7 +8,7 @@ import XCTest
 
 // Mirrors AppModel+EditingRGB.swift. The shared fixture device (G502 X) has
 // no RGB profile of its own, so these tests point the model at devices that
-// do (base G502 and G502 HERO, format 4/5, Primary/Logo zones) to exercise
+// do (base G502 and G502 HERO, format 4/5, DPI/Logo or Primary/Logo zones) to exercise
 // the capability-gated paths.
 @MainActor
 final class AppModelEditingRGBTests: XCTestCase {
@@ -79,7 +79,7 @@ final class AppModelEditingRGBTests: XCTestCase {
         id: 1,
         name: "G502",
         connection: "Wired",
-        productID: "0xC08B",
+        productID: "0xC332",
         deviceKey: "test-device"
       )
     ]
@@ -97,7 +97,7 @@ final class AppModelEditingRGBTests: XCTestCase {
     )
 
     XCTAssertTrue(model.shouldShowRGBEditor)
-    XCTAssertEqual(model.rgbZones.map(\.name), ["Primary", "Logo"])
+    XCTAssertEqual(model.rgbZones.map(\.name), ["DPI", "Logo"])
   }
 
   func testApplyRGBZonesSkipsDescriptorZonesMissingFromParsedInput() {

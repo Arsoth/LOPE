@@ -97,13 +97,13 @@ final class MouseProfileCatalogTests: XCTestCase {
   }
 
   func testBaseG502ProfileProvidesWritableRGBCapability() {
-    let g502 = MouseProfileCatalog.shared.profile(deviceName: "G502", productID: "0xC08B")
+    let g502 = MouseProfileCatalog.shared.profile(deviceName: "G502", productID: "0xC332")
 
     XCTAssertEqual(g502.id, "g502")
     XCTAssertTrue(g502.profileIO.canSave)
     XCTAssertEqual(
-      g502.rgbCapabilities(deviceName: "G502", productID: "0xC08B", profileFormat: 5)?.zones.map(
+      g502.rgbCapabilities(deviceName: "G502", productID: "0xC332", profileFormat: 5)?.zones.map(
         \.name),
-      ["Primary", "Logo"])
+      ["DPI", "Logo"])
   }
 }
