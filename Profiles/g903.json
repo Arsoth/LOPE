@@ -1,0 +1,136 @@
+{
+	"schemaVersion": 1,
+	"id": "g903",
+	"name": "G903 LIGHTSPEED",
+	"match": {
+		"nameContains": ["G903"],
+		"productIDs": ["0xC086"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Left side rear",
+			"aliases": ["Removable side button"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Left side front",
+			"aliases": ["Removable side button"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Right side rear",
+			"aliases": ["Removable side button"],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Right side front",
+			"aliases": ["Removable side button"],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Top left",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Top right",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 11,
+			"control": "Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 25600
+	},
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES · ambidextrous layout",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"optionalSideButtons": "records remain present only when installed/firmware exposes them",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": [
+			"The profile array is ordered independently of which side-button caps are installed. The label describes the record position, not a guaranteed installed cap."
+		]
+	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 0,
+				"name": "DPI indicator"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the DPI-indicator and Logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
+	"sources": [
+		"https://github.com/truemogician/Logitech-GHUB-Key-Combination/blob/main/src/index.lua",
+		"https://lightspeed.logitechg.com/moba/"
+	]
+}

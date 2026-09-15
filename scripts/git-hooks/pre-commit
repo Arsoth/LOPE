@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Installed via `make install-hooks`. Formats code before checking the staged
+# commit, then blocks commits that fail formatting or the focused tests and
+# coverage checks for staged source changes. Pull requests and the nightly
+# workflow run the full repository gate.
+
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$script_dir"
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+mixed_staged_files="$(
+  comm -12 \
+    <(printf '%s\n' "$staged_files" | LC_ALL=C sort) \
+    <(git diff --name-only --diff-filter=ACMR | LC_ALL=C sort)
+)"
+
+if [[ -n "$mixed_staged_files" ]]; then
+  echo "pre-commit: refusing to auto-format paths with both staged and unstaged changes:" >&2
+  printf '  %s\n' "$mixed_staged_files" >&2
+  echo "Stage or stash those paths, then retry the commit." >&2
+  exit 1
+fi
+
+echo "pre-commit: formatting Swift and C..."
+make format
+
+# Re-stage only paths that were already part of this commit. Formatting other
+# working-tree files is useful for consistency but must not pull unrelated
+# changes into the commit.
+while IFS= read -r path; do
+  [[ -n "$path" ]] && git add -- "$path"
+done <<< "$staged_files"
+
+echo "pre-commit: checking formatting and lint..."
+make format-check
+
+echo "pre-commit: running staged-file test and coverage gate..."
+MODIFIED_TESTS_STAGED_ONLY=1 make test-modified

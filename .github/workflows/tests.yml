@@ -1,0 +1,104 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Apple toolchain
+        run: |
+          set -euo pipefail
+          quiet() {
+            local output status
+            output="$(mktemp)"
+            if "$@" >"$output" 2>&1; then
+              status=0
+            else
+              status=$?
+              cat "$output" >&2
+            fi
+            rm -f "$output"
+            return "$status"
+          }
+
+          quiet xcodebuild -version
+          quiet xcrun --find clang
+          quiet xcrun --find swift
+          quiet xcrun swift --version
+
+      - name: Run unit and self-tests
+        run: |
+          set -uo pipefail
+
+          output="$RUNNER_TEMP/lope-test-output.txt"
+          make test >"$output" 2>&1
+          status=$?
+
+          c_tests=1
+          c_passed=0
+          c_failed=1
+          if grep -q '^C self-tests: passed$' "$output"; then
+            c_passed=1
+            c_failed=0
+          fi
+
+          swift_tests=0
+          swift_passed=0
+          swift_failed=0
+          swift_summary="$(grep -E 'Executed [0-9]+ tests, with [0-9]+ failures?' "$output" | tail -1 || true)"
+          if [[ "$swift_summary" =~ Executed[[:space:]]+([0-9]+)[[:space:]]+tests,[[:space:]]+with[[:space:]]+([0-9]+)[[:space:]]+failures? ]]; then
+            swift_tests="${BASH_REMATCH[1]}"
+            swift_failed="${BASH_REMATCH[2]}"
+            swift_passed=$((swift_tests - swift_failed))
+          elif (( status != 0 && c_failed == 0 )); then
+            # A SwiftPM build/setup failure has no XCTest execution summary,
+            # but it still needs to appear as a failed suite in the rollup.
+            swift_tests=1
+            swift_failed=1
+          fi
+
+          total_tests=$((c_tests + swift_tests))
+          total_passed=$((c_passed + swift_passed))
+          total_failed=$((c_failed + swift_failed))
+
+          if (( status != 0 )); then
+            echo '::group::Test failure output'
+            cat "$output"
+            echo '::endgroup::'
+          fi
+
+          {
+            echo '## Test report'
+            echo
+            echo '| Suite | Tests | Passed | Failed |'
+            echo '| --- | ---: | ---: | ---: |'
+            printf '| C self-test suite | %d | %d | %d |\n' "$c_tests" "$c_passed" "$c_failed"
+            if (( swift_tests > 0 )); then
+              printf '| Swift XCTest | %d | %d | %d |\n' "$swift_tests" "$swift_passed" "$swift_failed"
+            else
+              echo '| Swift XCTest | 0 | 0 | 0 |'
+            fi
+            printf '| **Total** | **%d** | **%d** | **%d** |\n' "$total_tests" "$total_passed" "$total_failed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status"

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "dark",
+  "name": "Dark",
+  "appearance": "dark",
+  "colors": {
+    "header": "#1E1E1E",
+    "footer": "#1E1E1E",
+    "recentEventsHeader": "#1E1E1E",
+    "buttonActive": "#0A84FF",
+    "buttonInactive": "#FFFFFF",
+    "checkboxActive": "#0A84FF",
+    "checkboxInactive": "#FFFFFF80",
+    "mainBackground": "#1E1E1E",
+    "primaryText": "#FFFFFF",
+    "secondaryText": "#FFFFFF80",
+    "tertiaryText": "#FFFFFF66",
+    "card": "#FFFFFF0B",
+    "cardBorder": "#FFFFFF0E",
+    "controlBackground": "#2C2C2E",
+    "controlBorder": "#FFFFFF26",
+    "dpiBar": "#6B7380",
+    "dpiBackground": "#FFFFFF14",
+    "accent": "#0A84FF",
+    "success": "#30D158",
+    "warning": "#FF9F0A",
+    "error": "#FF453A",
+    "separator": "#FFFFFF26",
+    "shadow": "#0000003D",
+    "hover": "#FFFFFF0D",
+    "selected": "#0A84FF33",
+    "disabled": "#FFFFFF80"
+  },
+  "dragHandles": {
+    "defaultStage": {
+      "color": "#E83D40",
+      "outline": "#E83D40",
+      "textColor": "#000000",
+      "shape": "circle"
+    },
+    "shiftStage": {
+      "color": "#3385F0",
+      "outline": "#3385F0",
+      "textColor": "#000000",
+      "shape": "pentagon"
+    },
+    "otherStage": {
+      "color": "#F2B326",
+      "outline": "#F2B326",
+      "textColor": "#000000",
+      "shape": "roundedRectangle"
+    }
+  }
+}

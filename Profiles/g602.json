@@ -1,0 +1,112 @@
+{
+	"schemaVersion": 1,
+	"id": "g602",
+	"name": "G602",
+	"match": {
+		"nameContains": ["G602"],
+		"productIDs": ["0xC537"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Thumb button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Thumb button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Thumb button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Thumb button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "G10 · Thumb button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 11,
+			"control": "G11 · Thumb button",
+			"aliases": [],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 250,
+		"maximum": 2500
+	},
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": [
+			"G602's additional thumb controls are intentionally neutral labels because the mouse is no longer documented with a G4-G11 diagram."
+		]
+	},
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+}

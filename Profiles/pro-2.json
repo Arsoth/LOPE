@@ -1,0 +1,74 @@
+{
+	"schemaVersion": 1,
+	"id": "pro-2",
+	"name": "PRO 2 LIGHTSPEED",
+	"match": {
+		"nameContains": ["PRO 2 LIGHTSPEED", "PRO 2"],
+		"productIDs": []
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Left side button",
+			"aliases": ["Removable side button"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Right side button",
+			"aliases": ["Removable side button"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 32000
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "HID++ profile transport unverified",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "runtime-detected",
+			"readSector": "runtime-detected",
+			"controlSector": "runtime-detected",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Confirm the PRO 2 firmware's profile format before enabling writes",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "runtime-validated",
+			"optionalSideButtons": "physical caps determine installed controls",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The ambidextrous five-button logical mapping is separate from the older G PRO Wireless eight-record map."
+		]
+	},
+	"sources": ["https://www.logitechg.com/en-us/shop/c/gaming-mice"]
+}

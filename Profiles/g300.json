@@ -1,0 +1,100 @@
+{
+	"schemaVersion": 1,
+	"id": "g300",
+	"name": "G300",
+	"match": {
+		"nameContains": ["G300"],
+		"productIDs": ["0xC246"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Top left",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Top middle",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Top right",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Mode switch",
+			"aliases": ["Profile cycle"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 2500
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy G300 onboard layout",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy/runtime",
+			"readSector": "runtime-detected",
+			"controlSector": "runtime-detected",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "G300 mode-switch/profile layout needs a dedicated legacy writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "runtime-validated",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"G300 uses a mode/profile switch and a mirrored ambidextrous shell; the mapping is kept separate from the standard six-button family. Shares a USB product ID with G300s; the revisions were not assigned distinct IDs."
+		]
+	},
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://www.logitech.com/assets/51813/26/lgs-guide.pdf"
+	]
+}

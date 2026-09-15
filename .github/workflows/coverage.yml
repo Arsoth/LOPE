@@ -1,0 +1,78 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Coverage
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Apple toolchain
+        run: |
+          set -euo pipefail
+          quiet() {
+            local output status
+            output="$(mktemp)"
+            if "$@" >"$output" 2>&1; then
+              status=0
+            else
+              status=$?
+              cat "$output" >&2
+            fi
+            rm -f "$output"
+            return "$status"
+          }
+
+          quiet xcodebuild -version
+          quiet xcrun --find clang
+          quiet xcrun --find llvm-cov
+          quiet xcrun --find llvm-profdata
+          quiet xcrun --find swift
+          quiet xcrun swift --version
+
+      - name: Publish coverage tables and enforce minimums
+        run: |
+          set -uo pipefail
+
+          report="$RUNNER_TEMP/lope-coverage-report.txt"
+          make coverage >"$report" 2>&1
+          report_status=$?
+          cat "$report"
+
+          {
+            echo "## Coverage report"
+            echo
+            echo '```text'
+            cat "$report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( report_status != 0 )); then
+            exit "$report_status"
+          fi
+
+          gate="$RUNNER_TEMP/lope-coverage-gate.txt"
+          make coverage-check >"$gate" 2>&1
+          gate_status=$?
+          if (( gate_status != 0 )); then
+            cat "$gate"
+            exit "$gate_status"
+          fi

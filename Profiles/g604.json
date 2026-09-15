@@ -1,0 +1,137 @@
+{
+	"schemaVersion": 1,
+	"id": "g604",
+	"name": "G604 LIGHTSPEED",
+	"match": {
+		"nameContains": ["G604"],
+		"productIDs": ["0x4085"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Thumb row rear/down",
+			"aliases": ["Side button"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Thumb row middle/down",
+			"aliases": ["Side button"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Thumb row front/down",
+			"aliases": ["Side button"],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Thumb row rear/up",
+			"aliases": ["Side button"],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Thumb row middle/up",
+			"aliases": ["Side button"],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Thumb row front/up",
+			"aliases": ["Side button"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "G10 · Auxiliary rear",
+			"aliases": ["Top button"],
+			"notes": null
+		},
+		{
+			"number": 11,
+			"control": "G11 · Auxiliary front",
+			"aliases": ["Top button"],
+			"notes": null
+		},
+		{
+			"number": 12,
+			"control": "Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 13,
+			"control": "Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		}
+	],
+	"scrollWheelButtonLabels": {
+		"14": "Scroll down",
+		"15": "Scroll up"
+	},
+	"hiddenProfileButtonNumbers": [16],
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 16000
+	},
+	"refreshGuidance": {
+		"sleepDescription": "The G604 can enter a low-power sleep state after several minutes without activity.",
+		"wakeInstructions": "Keep moving the mouse while LOPE reads it. If it is asleep, turn it on or move/click it, then choose Refresh."
+	},
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES · 13 physical G604 controls plus virtual wheel records",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"wheelMotion": "up/down are exposed as virtual profile records 14/15; keep them visible and editable",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": [
+			"The six thumb buttons are represented as two rows of three. The physical profile record list has 13 controls plus editable virtual wheel records 14/15."
+		]
+	},
+	"sources": [
+		"https://github.com/truemogician/Logitech-GHUB-Key-Combination/blob/main/src/index.lua",
+		"https://github.com/libratbag/libratbag/wiki/Devices"
+	]
+}
