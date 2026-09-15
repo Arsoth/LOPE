@@ -19,7 +19,7 @@ final class AppModelEditingRGBTests: XCTestCase {
         id: 1,
         name: "G502 HERO",
         connection: "Wired",
-        productID: "0xC07D",
+        productID: "0xC08B",
         deviceKey: "test-device"
       )
     ]

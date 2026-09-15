@@ -2,6 +2,11 @@
 
 Each JSON file describes one exact Logitech G mouse model — not a family. G502 HERO and G502 LIGHTSPEED are separate files, as are G300 and G300s, even where their physical layout is identical: they are different hardware, and one file should never need a slash in its `name` to describe more than one product. The descriptor is deliberately kept outside Swift so a new model can be added without changing the button-label code. For the pull-request workflow, use the [mouse profile contribution guide](../contributing.md#adding-a-mouse-profile).
 
+The G502 generation is split by hardware identity: `g502-proteus-spectrum.json`
+is the RGB wired C332 model, `g502-proteus-core.json` is the non-RGB wired C07D
+model, and `g502-hero.json` is the HERO C08B model. Keep these descriptors
+separate even though their physical button order is similar.
+
 ## Adding a mouse
 
 1. Copy the closest physical layout into a new JSON file, named for the exact model (e.g. `g102.json`, not a combined `g102-g203.json`).
