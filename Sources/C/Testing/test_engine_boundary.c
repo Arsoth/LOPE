@@ -220,6 +220,15 @@ int test_engine_boundary(void) {
         fprintf(stderr, "engine boundary profile projection self-test failed\n");
         return 1;
     }
+    Profile no_data_profile = profile;
+    no_data_profile.data = NULL;
+    EngineBoundaryProfile no_data_boundary_profile;
+    if (!engine_boundary_profile_from_profile(&no_data_profile, &no_data_boundary_profile,
+                                              &error) ||
+        no_data_boundary_profile.button_count != 0) {
+        fprintf(stderr, "engine boundary no-data-buffer self-test failed\n");
+        return 1;
+    }
     EngineBoundaryProfile valid_boundary_profile = boundary_profile;
     profile.selected_header = 1;
     if (engine_boundary_profile_from_profile(&profile, &boundary_profile, &error) ||
@@ -348,8 +357,10 @@ int test_engine_boundary(void) {
         return 1;
     }
     EngineBoundaryProfiles invalid_profiles;
+    Options dummy_options_for_null_result = {0};
     if (engine_boundary_list(NULL, NULL, &operation_error) ||
-        engine_boundary_profiles(NULL, &invalid_profiles, &operation_error)) {
+        engine_boundary_profiles(NULL, &invalid_profiles, &operation_error) ||
+        engine_boundary_profiles(&dummy_options_for_null_result, NULL, &operation_error)) {
         fprintf(stderr, "engine boundary invalid-profile-argument self-test failed\n");
         return 1;
     }
@@ -865,6 +876,11 @@ int test_engine_boundary(void) {
 
     if (engine_boundary_run(NULL) != 2) {
         fprintf(stderr, "engine boundary invalid-request self-test failed\n");
+        return 1;
+    }
+    Options null_command = {0};
+    if (engine_boundary_run(&null_command) != 2) {
+        fprintf(stderr, "engine boundary null-command self-test failed\n");
         return 1;
     }
     Options unsupported = {.command = "unsupported"};
