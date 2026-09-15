@@ -121,7 +121,7 @@ int test_watch_cli(void) {
         parse_decimal("42", &decimal_value) && decimal_value == 42 &&
         !parse_decimal(NULL, &decimal_value) && !parse_decimal("", &decimal_value) &&
         !parse_decimal("-1", &decimal_value) && !parse_decimal("100001", &decimal_value) &&
-        !parse_decimal("12x", &decimal_value) &&
+        !parse_decimal("12x", &decimal_value) && !parse_decimal("abc", &decimal_value) &&
         !parse_decimal("999999999999999999999999999999", &decimal_value) &&
         parse_slot("ff", &slot_value) && slot_value == 0xFF && parse_slot("FF", &slot_value) &&
         slot_value == 0xFF && parse_slot("0xff", &slot_value) && slot_value == 0xFF &&
@@ -328,14 +328,30 @@ int test_watch_cli(void) {
     char *invalid_profile_argv[] = {"lope", "info", "--profile", "0"};
     parse_options_ok = parse_options_ok && !parse_options(4, invalid_profile_argv, &parsed);
 
+    char *nonnumeric_profile_argv[] = {"lope", "info", "--profile", "abc"};
+    parse_options_ok = parse_options_ok && !parse_options(4, nonnumeric_profile_argv, &parsed);
+
+    char *valid_profile_argv[] = {"lope", "info", "--profile", "3"};
+    parse_options_ok =
+        parse_options_ok && parse_options(4, valid_profile_argv, &parsed) && parsed.profile == 3;
+
     char *invalid_button_argv[] = {"lope", "bind", "--button", "0", "alt-tab"};
     parse_options_ok = parse_options_ok && !parse_options(5, invalid_button_argv, &parsed);
+
+    char *nonnumeric_button_argv[] = {"lope", "bind", "--button", "abc", "alt-tab"};
+    parse_options_ok = parse_options_ok && !parse_options(5, nonnumeric_button_argv, &parsed);
 
     char *invalid_default_argv[] = {"lope", "set-dpi", "--default", "6", "800"};
     parse_options_ok = parse_options_ok && !parse_options(5, invalid_default_argv, &parsed);
 
+    char *nonnumeric_default_argv[] = {"lope", "set-dpi", "--default", "abc", "800"};
+    parse_options_ok = parse_options_ok && !parse_options(5, nonnumeric_default_argv, &parsed);
+
     char *invalid_shift_argv[] = {"lope", "set-dpi", "--shift", "0", "800"};
     parse_options_ok = parse_options_ok && !parse_options(5, invalid_shift_argv, &parsed);
+
+    char *nonnumeric_shift_argv[] = {"lope", "set-dpi", "--shift", "abc", "800"};
+    parse_options_ok = parse_options_ok && !parse_options(5, nonnumeric_shift_argv, &parsed);
 
     char *shift_too_large_argv[] = {"lope", "set-dpi", "--shift", "6", "800"};
     parse_options_ok = parse_options_ok && !parse_options(5, shift_too_large_argv, &parsed);
@@ -433,11 +449,20 @@ int test_watch_cli(void) {
     char *set_dpi_bad_argv[] = {"lope", "set-dpi"};
     parse_options_ok = parse_options_ok && !parse_options(2, set_dpi_bad_argv, &parsed);
 
+    char *set_dpi_good_argv[] = {"lope", "set-dpi", "800,1600"};
+    parse_options_ok = parse_options_ok && parse_options(3, set_dpi_good_argv, &parsed);
+
     char *set_profile_state_bad_argv[] = {"lope", "set-profile-state", "1"};
     parse_options_ok = parse_options_ok && !parse_options(3, set_profile_state_bad_argv, &parsed);
 
+    char *set_profile_state_good_argv[] = {"lope", "set-profile-state", "1", "enable"};
+    parse_options_ok = parse_options_ok && parse_options(4, set_profile_state_good_argv, &parsed);
+
     char *set_report_rate_bad_argv[] = {"lope", "set-report-rate"};
     parse_options_ok = parse_options_ok && !parse_options(2, set_report_rate_bad_argv, &parsed);
+
+    char *set_report_rate_good_argv[] = {"lope", "set-report-rate", "1000"};
+    parse_options_ok = parse_options_ok && parse_options(3, set_report_rate_good_argv, &parsed);
 
     char *apply_positional_argv[] = {"lope", "apply", "extra"};
     parse_options_ok = parse_options_ok && !parse_options(3, apply_positional_argv, &parsed);

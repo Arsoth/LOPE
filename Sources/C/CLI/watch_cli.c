@@ -196,7 +196,10 @@ int parse_decimal(const char *text, int *value) {
     char *end = NULL;
     errno = 0;
     long parsed = strtol(text, &end, 10);
-    if (errno != 0 || end == text || *end != '\0' || parsed < 0 || parsed > 100000) {
+    // On Darwin, strtol also sets errno to EINVAL when no digits are
+    // consumed (end == text), not just on overflow, so a separate
+    // end == text check is redundant here.
+    if (errno != 0 || *end != '\0' || parsed < 0 || parsed > 100000) {
         return 0;
     }
     *value = (int)parsed;

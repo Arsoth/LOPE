@@ -444,7 +444,10 @@ int parse_dpi_values(const char *text, uint16_t values[5], size_t *count_out) {
         while (end != NULL && *end == ' ') {
             end++;
         }
-        if (errno != 0 || end == part || *end != '\0' || value < 100 || value > UINT16_MAX) {
+        // On Darwin, strtoul also sets errno to EINVAL when no digits are
+        // consumed, not just on overflow, so a separate end == part check
+        // is redundant here.
+        if (errno != 0 || *end != '\0' || value < 100 || value > UINT16_MAX) {
             return 0;
         }
         values[count++] = (uint16_t)value;

@@ -32,6 +32,12 @@ int test_commands_set_profile_state(void) {
         return 1;
     }
 
+    profile_state_bad_number.positionals[0] = "999999999999999999999999999999";
+    if (run_set_profile_state(&profile_state_bad_number) != 1) {
+        fprintf(stderr, "run_set_profile_state overflow-profile-number self-test failed\n");
+        return 1;
+    }
+
     profile_state_bad_number.positionals[0] = "33";
     if (run_set_profile_state(&profile_state_bad_number) != 1) {
         fprintf(stderr, "run_set_profile_state oversized-profile-number self-test failed\n");

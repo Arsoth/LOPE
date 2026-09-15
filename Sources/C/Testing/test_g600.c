@@ -88,6 +88,10 @@ int test_g600(void) {
                       g600_spec_to_native(g600_spec, g600_native) &&
                       memcmp(g600_shift, g600_native, sizeof(g600_native)) == 0 &&
                       g600_profile_sector(1) == 0x00F3 && g600_profile_sector(3) == 0x00F5;
+    uint8_t g600_raw_record[3] = {0x00, 0x00, 0x05};
+    g600_native_to_spec(g600_raw_record, g600_spec);
+    g600_mapping_ok = g600_mapping_ok && g600_spec[0] == 0x80 && g600_spec[1] == 0x02 &&
+                      g600_spec[2] == 0x00 && g600_spec[3] == 0x05;
     if (!g600_mapping_ok) {
         fprintf(stderr, "G600 legacy mapping self-test failed\n");
         return 1;

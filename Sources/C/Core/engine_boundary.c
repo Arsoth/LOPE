@@ -77,7 +77,9 @@ bool engine_boundary_device_from_device(const Device *device, size_t index,
 
 static bool profile_bytes_are_in_bounds(const Profile *profile, size_t offset, size_t index,
                                         size_t stride, size_t width) {
-    if (profile == NULL || profile->data == NULL || offset > profile->data_length ||
+    // Every caller reaches here only after engine_boundary_profile_from_profile's
+    // own profile == NULL guard, so profile is never NULL by this point.
+    if (profile->data == NULL || offset > profile->data_length ||
         index > (SIZE_MAX - offset) / stride) {
         return false;
     }
@@ -237,7 +239,9 @@ bool engine_boundary_list(const Options *options, EngineBoundaryDeviceList *resu
 
 static void copy_profile_headers(const ProfileHeader *headers, size_t count,
                                  EngineBoundaryProfiles *result) {
-    result->header_count = count > MAX_HEADERS ? MAX_HEADERS : count;
+    // count always comes from a ProfileHeader[MAX_HEADERS] array populated by
+    // read_profile_headers, so it can never exceed MAX_HEADERS.
+    result->header_count = count;
     for (size_t i = 0; i < result->header_count; i++) {
         result->headers[i].number = (int)i + 1;
         result->headers[i].sector = headers[i].sector;

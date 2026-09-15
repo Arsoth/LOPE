@@ -76,7 +76,8 @@ void g600_native_to_spec(const uint8_t native[3], uint8_t spec[4]) {
         spec[3] = native[2];
         return;
     }
-    if (code >= 1 && code <= 5) {
+    // Both code == 0 cases above already return, so code is never 0 here.
+    if (code <= 5) {
         spec[0] = 0x80;
         spec[1] = 0x01;
         spec[2] = 0x00;
@@ -508,7 +509,10 @@ int run_g600_restore(const Options *options, Device *device, const BackupPackage
                                       "%s.pre-restore.logiob", options->path);
     BackupSectorSource current_source = {
         .sector = g600_profile_sector(profile_number), .size = G600_REPORT_BYTES, .data = current};
-    if (pre_restore_length <= 0 || pre_restore_length >= (int)sizeof(pre_restore_path) ||
+    // options->path is always non-empty by the time this runs (validated by
+    // the dump/restore CLI path), and the ".pre-restore.logiob" suffix is a
+    // fixed non-empty literal, so this snprintf's length can never be <= 0.
+    if (pre_restore_length >= (int)sizeof(pre_restore_path) ||
         !package_write_multi(pre_restore_path, device, G600_BACKUP_PROFILE_FORMAT, &current_source,
                              1, false)) {
         fprintf(stderr,

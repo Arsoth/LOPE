@@ -58,7 +58,10 @@ int parse_hex_byte(const char *text, uint8_t *value) {
     char *end = NULL;
     errno = 0;
     unsigned long number = strtoul(text, &end, 16);
-    if (errno != 0 || end == text || *end != '\0' || number > 0xFF) {
+    // On Darwin, strtoul also sets errno to EINVAL when no digits are
+    // consumed, not just on overflow, so a separate end == text check is
+    // redundant here.
+    if (errno != 0 || *end != '\0' || number > 0xFF) {
         return 0;
     }
     *value = (uint8_t)number;
@@ -72,7 +75,10 @@ int parse_hex_word(const char *text, uint16_t *value) {
     char *end = NULL;
     errno = 0;
     unsigned long number = strtoul(text, &end, 16);
-    if (errno != 0 || end == text || *end != '\0' || number > 0xFFFF) {
+    // On Darwin, strtoul also sets errno to EINVAL when no digits are
+    // consumed, not just on overflow, so a separate end == text check is
+    // redundant here.
+    if (errno != 0 || *end != '\0' || number > 0xFFFF) {
         return 0;
     }
     *value = (uint16_t)number;

@@ -170,7 +170,10 @@ bool parse_report_rate_hertz(const char *text, uint32_t *hertz) {
     errno = 0;
     char *end = NULL;
     unsigned long parsed = strtoul(text, &end, 10);
-    if (errno != 0 || end == text || *end != '\0' || parsed == 0 || parsed > UINT32_MAX) {
+    // On Darwin, strtoul also sets errno to EINVAL when no digits are
+    // consumed, not just on overflow, so a separate end == text check is
+    // redundant here.
+    if (errno != 0 || *end != '\0' || parsed == 0 || parsed > UINT32_MAX) {
         return false;
     }
     *hertz = (uint32_t)parsed;

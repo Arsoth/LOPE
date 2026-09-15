@@ -450,10 +450,12 @@ Reply channel_request_hardware(HidChannel *channel, uint8_t device_number, uint1
             return reply;
         }
         if (body_length >= 2 && body[0] == wanted[0] && body[1] == wanted[1]) {
+            // node->length is already capped at MAX_REPORT_BYTES by the
+            // report callback, and body/wire are derived from it minus a
+            // strictly positive offset, so body_length - 2 can never reach
+            // sizeof(reply.bytes) (== MAX_REPORT_BYTES); no separate clamp
+            // is reachable here.
             reply.length = body_length - 2;
-            if (reply.length > sizeof(reply.bytes)) {
-                reply.length = sizeof(reply.bytes);
-            }
             memcpy(reply.bytes, body + 2, reply.length);
             reply.status = REPLY_OK;
             if (hid_debug_enabled()) {

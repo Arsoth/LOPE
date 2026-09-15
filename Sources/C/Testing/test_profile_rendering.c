@@ -366,6 +366,9 @@ int test_profile_rendering(void) {
     rear_edge_ok = rear_edge_ok && find_rear_thumb_button(&rear_profile) == 0;
     rear_profile.crc_ok = false;
     rear_edge_ok = rear_edge_ok && find_rear_thumb_button(&rear_profile) == 0;
+    rear_profile.crc_ok = true;
+    rear_profile.layout_supported = false;
+    rear_edge_ok = rear_edge_ok && find_rear_thumb_button(&rear_profile) == 0;
     if (!edge_ok || !rear_edge_ok) {
         fprintf(stderr, "profile rendering edge-case self-test failed\n");
         return 1;

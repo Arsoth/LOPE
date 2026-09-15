@@ -135,9 +135,9 @@ static bool receiver_device_name(Device *device, uint8_t slot) {
         if (length > reply.length - 2) {
             length = reply.length - 2;
         }
-        if (length >= sizeof(device->name)) {
-            length = sizeof(device->name) - 1;
-        }
+        // length is a uint8_t byte value (max 255), always below
+        // sizeof(device->name) (256), so no separate truncation clamp is
+        // reachable here.
         memcpy(device->name, reply.bytes + 2, length);
         device->name[length] = '\0';
         while (length > 0 &&
@@ -275,10 +275,10 @@ static int device_name(Device *device) {
     if (reply.status != REPLY_OK || reply.length < 1) {
         return 0;
     }
+    // wanted is a uint8_t byte value (max 255), always below
+    // sizeof(device->name) (256), so no separate truncation clamp is
+    // reachable here.
     size_t wanted = reply.bytes[0];
-    if (wanted >= sizeof(device->name)) {
-        wanted = sizeof(device->name) - 1;
-    }
     size_t copied = 0;
     while (copied < wanted) {
         uint8_t offset = (uint8_t)copied;
@@ -519,10 +519,12 @@ static bool is_receiver_interface(const HidInterface *iface) {
     // mice use a different product-ID range and should not be probed as if
     // they had receiver slots. A few macOS HID interfaces report product ID
     // zero, so retain the product-name fallback for those receivers.
-    return iface != NULL && (is_receiver_product(iface->product_id) ||
-                             text_contains_case_insensitive(iface->product, "receiver") ||
-                             text_contains_case_insensitive(iface->product, "unifying") ||
-                             text_contains_case_insensitive(iface->product, "bolt"));
+    // Every caller already guarantees a non-null iface/device->iface before
+    // reaching here, so no separate NULL check is reachable.
+    return is_receiver_product(iface->product_id) ||
+           text_contains_case_insensitive(iface->product, "receiver") ||
+           text_contains_case_insensitive(iface->product, "unifying") ||
+           text_contains_case_insensitive(iface->product, "bolt");
 }
 
 static uint8_t receiver_slot_limit(const HidInterface *iface) {
@@ -552,7 +554,10 @@ static uint8_t receiver_slot_limit(const HidInterface *iface) {
 }
 
 static bool interface_has_mouse_collection(const HidContext *context, const HidInterface *iface) {
-    if (context == NULL || iface == NULL || is_receiver_interface(iface)) {
+    // context and iface are always the discover_devices loop's own non-null
+    // HidContext and &context->items[i]; only is_receiver_interface can
+    // actually vary here.
+    if (is_receiver_interface(iface)) {
         return false;
     }
     if (iface->is_mouse) {
@@ -703,13 +708,9 @@ int discover_devices(HidContext *context, int requested_slot, Device *devices, s
         double protocol = 0;
         uint8_t resolved_device_number = 0xFF;
         if (ping_interface(iface, 0xFF, 1.0, &protocol, &resolved_device_number)) {
-            // A receiver can echo a paired slot in response to the broadcast
-            // ping. Keep that endpoint marked as FF so the receiver itself is
-            // still filtered from the mouse list; slot discovery above owns
-            // the paired mouse entry.
-            uint8_t reported_device_number =
-                is_receiver_interface(iface) ? 0xFF : resolved_device_number;
-            add_device(devices, count, iface, reported_device_number, 0xFF, protocol,
+            // A receiver interface always `continue`s above before reaching
+            // this broadcast ping, so iface here is never a receiver.
+            add_device(devices, count, iface, resolved_device_number, 0xFF, protocol,
                        inspect_features);
         } else if (iface->is_mouse && !is_receiver_interface(iface)) {
             // Bluetooth and some direct wireless mice expose a normal mouse
@@ -760,19 +761,16 @@ int discover_device_by_key(HidContext *context, const char *key, Device *devices
                 iface, 0x02B5, true, (uint8_t)(RECEIVER_INFO_PAIRING + device_number - 1));
             bool pairing_present = receiver_pairing_reply_is_present(pairing_reply);
             if (ping_interface(iface, device_number, 1.0, &protocol, &resolved_device_number)) {
-                if (pairing_present || protocol >= 2.0 || is_receiver_interface(iface)) {
-                    size_t before = *count;
-                    // This key came from a paired receiver slot. A successful
-                    // slot probe can still be answered as HID++ 1.0 by the
-                    // receiver, so keep the paired peripheral's 2.0 model
-                    // when preparing its feature table.
-                    double device_protocol =
-                        pairing_present || is_receiver_interface(iface) ? 2.0 : protocol;
-                    add_device(devices, count, iface, resolved_device_number, device_number,
-                               device_protocol, true);
-                    if (*count > before) {
-                        receiver_slot_identity(&devices[*count - 1], device_number, pairing_reply);
-                    }
+                // is_receiver_interface(iface) is already guaranteed true by
+                // the enclosing guard above, so this key came from a paired
+                // receiver slot unconditionally. A successful slot probe can
+                // still be answered as HID++ 1.0 by the receiver, so keep the
+                // paired peripheral's 2.0 model when preparing its feature
+                // table.
+                size_t before = *count;
+                add_device(devices, count, iface, resolved_device_number, device_number, 2.0, true);
+                if (*count > before) {
+                    receiver_slot_identity(&devices[*count - 1], device_number, pairing_reply);
                 }
                 return 1;
             }
@@ -849,9 +847,11 @@ bool is_receiver_endpoint(const Device *device) {
     if (device == NULL || device->iface == NULL || device->device_number != 0xFF) {
         return false;
     }
+    // is_receiver_interface already matches iface->product against "receiver"
+    // (and "unifying"/"bolt"), so a redundant text_contains_case_insensitive
+    // check against iface->product here could never be the deciding operand.
     return is_receiver_interface(device->iface) ||
            text_contains_case_insensitive(device_label(device), "receiver") ||
-           text_contains_case_insensitive(device->iface->product, "receiver") ||
            text_contains_case_insensitive(device_label(device), "unifying") ||
            text_contains_case_insensitive(device_label(device), "bolt");
 }

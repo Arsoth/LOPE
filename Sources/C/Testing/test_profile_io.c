@@ -111,13 +111,17 @@ int test_profile_io(void) {
     io_device.features[0] = (Feature){.id = FEATURE_ONBOARD_PROFILES, .index = 5};
     ProfileInfo io_info = {.sector_size = 32};
     uint8_t zero_sector[32] = {0};
+    uint8_t ff_sector[32];
+    memset(ff_sector, 0xFF, sizeof(ff_sector));
     uint8_t first_sector[32] = {0};
     first_sector[0] = 0x01;
     first_sector[1] = 0x23;
     Reply zero_chunks[4];
+    Reply ff_chunks[4];
     Reply first_chunks[4];
     size_t zero_chunk_count =
         build_sector_read_replies(zero_sector, sizeof(zero_sector), zero_chunks, 4);
+    size_t ff_chunk_count = build_sector_read_replies(ff_sector, sizeof(ff_sector), ff_chunks, 4);
     size_t first_chunk_count =
         build_sector_read_replies(first_sector, sizeof(first_sector), first_chunks, 4);
     Reply fallback_replies[4];
@@ -126,6 +130,14 @@ int test_profile_io(void) {
     ChannelRequestTestContext fallback_context = {
         .replies = fallback_replies,
         .reply_count = zero_chunk_count + first_chunk_count,
+        .calls = 0,
+    };
+    Reply ff_fallback_replies[8];
+    memcpy(ff_fallback_replies, ff_chunks, ff_chunk_count * sizeof(Reply));
+    memcpy(ff_fallback_replies + ff_chunk_count, first_chunks, first_chunk_count * sizeof(Reply));
+    ChannelRequestTestContext ff_fallback_context = {
+        .replies = ff_fallback_replies,
+        .reply_count = ff_chunk_count + first_chunk_count,
         .calls = 0,
     };
     channel_request_impl = channel_request_test_double;
@@ -138,9 +150,21 @@ int test_profile_io(void) {
         control_sector == 1 && control_readback[0] == 0x01 &&
         read_profile_control(NULL, &io_info, NULL, control_readback, sizeof(control_readback)) ==
             0 &&
-        read_profile_control(&io_device, &io_info, NULL, NULL, sizeof(control_readback)) == 0;
+        read_profile_control(&io_device, &io_info, NULL, NULL, sizeof(control_readback)) == 0 &&
+        read_profile_control(&io_device, NULL, NULL, control_readback, sizeof(control_readback)) ==
+            0;
     if (!control_read_ok) {
         fprintf(stderr, "profile control-sector read self-test failed\n");
+        return 1;
+    }
+    g_channel_request_test_context = &ff_fallback_context;
+    uint16_t ff_control_sector = 99;
+    bool ff_control_read_ok =
+        read_profile_control(&io_device, &io_info, &ff_control_sector, control_readback,
+                             sizeof(control_readback)) == 1 &&
+        ff_control_sector == 1 && control_readback[0] == 0x01;
+    if (!ff_control_read_ok) {
+        fprintf(stderr, "profile control-sector all-FF fallback self-test failed\n");
         return 1;
     }
 

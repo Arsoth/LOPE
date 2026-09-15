@@ -85,7 +85,8 @@ int test_report_rate(void) {
         !parse_report_rate_hertz("abc", &parsed_hertz) &&
         !parse_report_rate_hertz("12x", &parsed_hertz) &&
         !parse_report_rate_hertz("4294967296", &parsed_hertz) &&
-        !parse_report_rate_hertz("-1", &parsed_hertz);
+        !parse_report_rate_hertz("-1", &parsed_hertz) &&
+        !parse_report_rate_hertz("999999999999999999999999999999", &parsed_hertz);
     if (!hertz_parser_ok) {
         fprintf(stderr, "report-rate hertz parser self-test failed\n");
         return 1;

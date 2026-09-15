@@ -104,9 +104,13 @@ int test_commands_backup_bind(void) {
         parse_hex_byte("2B", &hex_byte_value) && hex_byte_value == 0x2B &&
         !parse_hex_byte("2G", &hex_byte_value) && !parse_hex_byte("", &hex_byte_value) &&
         !parse_hex_byte(NULL, &hex_byte_value) && !parse_hex_byte("100", &hex_byte_value) &&
+        !parse_hex_byte("GG", &hex_byte_value) &&
+        !parse_hex_byte("FFFFFFFFFFFFFFFFFFFF", &hex_byte_value) &&
         parse_hex_word("00E9", &hex_word_value) && hex_word_value == 0x00E9 &&
         !parse_hex_word("ZZZZ", &hex_word_value) && !parse_hex_word("", &hex_word_value) &&
-        !parse_hex_word(NULL, &hex_word_value) && !parse_hex_word("10000", &hex_word_value);
+        !parse_hex_word(NULL, &hex_word_value) && !parse_hex_word("10000", &hex_word_value) &&
+        !parse_hex_word("FFFFFFFFFFFFFFFFFFFF", &hex_word_value) &&
+        !parse_hex_word("00E9G", &hex_word_value);
     if (!hex_parser_ok) {
         fprintf(stderr, "parse_hex_byte/parse_hex_word self-test failed\n");
         return 1;
@@ -145,6 +149,7 @@ int test_commands_backup_bind(void) {
         parse_target("cycle-profile", target_spec) && target_spec[1] == 0x0A &&
         parse_target("g-shift", target_spec) && target_spec[1] == 0x0B &&
         parse_target("nav-back", target_spec) && target_spec[3] == 0x2F &&
+        parse_target("cmd-[", target_spec) && target_spec[3] == 0x2F &&
         parse_target("nav-forward", target_spec) && target_spec[3] == 0x30 &&
         parse_target("cmd-]", target_spec) && target_spec[3] == 0x30 &&
         parse_target("disable", target_spec) && target_spec[0] == 0xFF && target_spec[3] == 0xFF &&

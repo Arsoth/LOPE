@@ -506,6 +506,11 @@ int test_hid_transport(void) {
     feature_ok = feature_ok &&
                  channel_set_feature_report(&feature_channel, REPORT_LONG, feature_report, 4) &&
                  feature_report[0] == REPORT_LONG;
+    feature_ok = feature_ok &&
+                 !channel_set_feature_report(&feature_channel, REPORT_LONG, NULL, 4) &&
+                 !channel_set_feature_report(&feature_channel, REPORT_LONG, feature_report, 0) &&
+                 !channel_set_feature_report(&feature_channel, REPORT_LONG, feature_report,
+                                             MAX_FEATURE_REPORT_BYTES + 1);
     g_set_report_result = kIOReturnError;
     feature_ok =
         feature_ok && !channel_set_feature_report(&feature_channel, REPORT_LONG, feature_report, 4);
