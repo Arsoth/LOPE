@@ -6,7 +6,12 @@
 
 set -euo pipefail
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Resolve the invoking worktree's root, not the hook file's own location:
+# this file is installed into the shared .git/hooks directory, which lives
+# under the main worktree even when a linked worktree is the one committing,
+# so deriving the root from ${BASH_SOURCE[0]} would always land on the main
+# worktree and diff staged changes against the wrong on-disk files.
+script_dir="$(git rev-parse --show-toplevel)"
 cd "$script_dir"
 
 staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
