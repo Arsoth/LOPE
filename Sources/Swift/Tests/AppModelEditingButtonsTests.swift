@@ -251,4 +251,106 @@ final class AppModelEditingButtonsTests: XCTestCase {
 
     XCTAssertEqual(model.gShiftButtonRows.map(\.draftRaw), gShiftRows.map(\.draftRaw))
   }
+
+  // MARK: - G-Shift key layer synchronization (TODO #5)
+
+  private func twoButtonRows(layer: ButtonLayer) -> [ButtonRow] {
+    [
+      ButtonRow(
+        id: 1,
+        label: "G1 · Primary click (Left)",
+        currentRaw: "80010002",
+        draftRaw: "80010002",
+        draftChoice: "80010002",
+        layer: layer
+      ),
+      ButtonRow(
+        id: 2,
+        label: "G2",
+        currentRaw: "80010004",
+        draftRaw: "80010004",
+        draftChoice: "80010004",
+        layer: layer
+      ),
+    ]
+  }
+
+  func testSetRawOnActiveNormalLayerMirrorsGShiftBindingToGShiftLayerSameIndex() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: twoButtonRows(layer: .normal), gShift: twoButtonRows(layer: .gShift))
+
+    model.setRaw(buttonIndex: 1, raw: ProfileWriteValidation.gShiftBindingRaw)
+
+    XCTAssertEqual(model.buttons[1].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+    XCTAssertEqual(model.gShiftButtonRows[1].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+    // The unrelated index is untouched by the mirror.
+    XCTAssertEqual(model.gShiftButtonRows[0].draftRaw, "80010002")
+  }
+
+  func testSetRawOnActiveGShiftLayerMirrorsGShiftBindingToNormalLayerSameIndex() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: twoButtonRows(layer: .normal), gShift: twoButtonRows(layer: .gShift))
+    model.selectButtonLayer(.gShift)
+
+    model.setRaw(buttonIndex: 0, raw: ProfileWriteValidation.gShiftBindingRaw)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+    XCTAssertEqual(model.normalButtonRows[0].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+  }
+
+  func testSetRawWithExplicitLayerMirrorsGShiftBindingWhileTargetingInactiveLayer() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: twoButtonRows(layer: .normal), gShift: twoButtonRows(layer: .gShift))
+    // buttonLayer is .normal, so this explicit .gShift write lands on the
+    // stored (inactive) gShiftButtonRows array rather than `buttons`.
+    model.setRaw(layer: .gShift, buttonIndex: 0, raw: ProfileWriteValidation.gShiftBindingRaw)
+
+    XCTAssertEqual(model.gShiftButtonRows[0].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+    XCTAssertEqual(model.buttons[0].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+  }
+
+  func testChangingPairedGShiftBindingAwayMirrorsNewRawToOtherLayer() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: twoButtonRows(layer: .normal), gShift: twoButtonRows(layer: .gShift))
+    model.setRaw(buttonIndex: 0, raw: ProfileWriteValidation.gShiftBindingRaw)
+    XCTAssertEqual(model.gShiftButtonRows[0].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+
+    // The physical G-Shift button is reassigned to something else; both
+    // layers should stop pointing at G-Shift for that button and agree on
+    // the new binding instead.
+    model.setRaw(buttonIndex: 0, raw: "80010008")
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "80010008")
+    XCTAssertEqual(model.gShiftButtonRows[0].draftRaw, "80010008")
+  }
+
+  func testSettingNonGShiftBindingDoesNotMirrorWhenNeitherLayerWasPaired() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: twoButtonRows(layer: .normal), gShift: twoButtonRows(layer: .gShift))
+
+    model.setRaw(buttonIndex: 0, raw: "80010008")
+
+    XCTAssertEqual(model.buttons[0].draftRaw, "80010008")
+    XCTAssertEqual(model.gShiftButtonRows[0].draftRaw, "80010002")
+  }
+
+  func testSetRawSkipsMirrorWhenNoGShiftLayerIsLoaded() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.setRaw(buttonIndex: 0, raw: ProfileWriteValidation.gShiftBindingRaw)
+
+    XCTAssertEqual(model.buttons[0].draftRaw, ProfileWriteValidation.gShiftBindingRaw)
+    XCTAssertTrue(model.gShiftButtonRows.isEmpty)
+  }
 }
