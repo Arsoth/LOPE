@@ -3,7 +3,7 @@
 	"id": "g502-proteus-spectrum",
 	"name": "G502 Proteus Spectrum",
 	"match": {
-		"nameContains": ["G502 Proteus Spectrum"],
+		"nameContains": ["G502 Proteus Spectrum", "Tunable RGB Gaming Mouse G502", "G502"],
 		"productIDs": ["0xC332"]
 	},
 	"buttons": [
