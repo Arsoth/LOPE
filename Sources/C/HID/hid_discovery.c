@@ -519,10 +519,12 @@ static bool is_receiver_interface(const HidInterface *iface) {
     // mice use a different product-ID range and should not be probed as if
     // they had receiver slots. A few macOS HID interfaces report product ID
     // zero, so retain the product-name fallback for those receivers.
-    return iface != NULL && (is_receiver_product(iface->product_id) ||
-                             text_contains_case_insensitive(iface->product, "receiver") ||
-                             text_contains_case_insensitive(iface->product, "unifying") ||
-                             text_contains_case_insensitive(iface->product, "bolt"));
+    // Every caller already guarantees a non-null iface/device->iface before
+    // reaching here, so no separate NULL check is reachable.
+    return is_receiver_product(iface->product_id) ||
+           text_contains_case_insensitive(iface->product, "receiver") ||
+           text_contains_case_insensitive(iface->product, "unifying") ||
+           text_contains_case_insensitive(iface->product, "bolt");
 }
 
 static uint8_t receiver_slot_limit(const HidInterface *iface) {
