@@ -97,15 +97,30 @@ final class MouseProfileCatalogTests: XCTestCase {
   }
 
   func testBaseG502ProfileProvidesWritableRGBCapability() {
-    let g502 = MouseProfileCatalog.shared.profile(deviceName: "G502", productID: "0xC332")
+    let g502 = MouseProfileCatalog.shared.profile(
+      deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332")
 
-    XCTAssertEqual(g502.id, "g502")
+    XCTAssertEqual(g502.id, "g502-proteus-spectrum")
+    XCTAssertEqual(g502.name, "G502 Proteus Spectrum")
     XCTAssertTrue(g502.profileIO.canSave)
     XCTAssertEqual(
-      g502.rgbCapabilities(deviceName: "G502", productID: "0xC332", profileFormat: 5)?.zones.map(
-        \.name),
+      g502.rgbCapabilities(
+        deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332", profileFormat: 5
+      )?.zones.map(\.name),
       ["DPI", "Logo"])
     XCTAssertNotNil(
-      g502.rgbCapabilities(deviceName: "G502", productID: "0xC332", profileFormat: 2))
+      g502.rgbCapabilities(
+        deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332", profileFormat: 2))
+  }
+
+  func testG502ProteusCoreIsSeparateAndHasNoRGBCapability() {
+    let core = MouseProfileCatalog.shared.profile(
+      deviceName: "G502 Proteus Core", productID: "0xC07D")
+
+    XCTAssertEqual(core.id, "g502-proteus-core")
+    XCTAssertEqual(core.name, "G502 Proteus Core")
+    XCTAssertTrue(core.profileIO.canSave)
+    XCTAssertNil(
+      core.rgbCapabilities(deviceName: "G502 Proteus Core", productID: "0xC07D", profileFormat: 5))
   }
 }

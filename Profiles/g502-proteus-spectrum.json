@@ -1,9 +1,9 @@
 {
 	"schemaVersion": 1,
-	"id": "g502",
-	"name": "G502",
+	"id": "g502-proteus-spectrum",
+	"name": "G502 Proteus Spectrum",
 	"match": {
-		"nameContains": ["G502"],
+		"nameContains": ["G502 Proteus Spectrum", "Tunable RGB Gaming Mouse G502", "G502"],
 		"productIDs": ["0xC332"]
 	},
 	"buttons": [
@@ -75,8 +75,8 @@
 		}
 	],
 	"dpiRange": {
-		"minimum": 100,
-		"maximum": 25600
+		"minimum": 200,
+		"maximum": 12000
 	},
 	"profileIO": {
 		"supported": true,
@@ -105,7 +105,7 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"This is the base G502 record order, shared with G502 HERO and G502 LIGHTSPEED. Do not reuse it for G502 X: that family moves the DPI and tilt records."
+			"This is the wired G502 Proteus Spectrum record order for product 0xC332. It shares the physical button order with G502 HERO and G502 LIGHTSPEED; do not reuse it for G502 X, which moves the DPI and tilt records."
 		]
 	},
 	"rgbProfile": {
@@ -125,11 +125,11 @@
 			}
 		],
 		"notes": [
-			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the DPI and Logo zones. Only the three-byte solid-color field is edited."
+			"Validated on the wired G502 Spectrum (product 0xC332): four 11-byte legacy onboard RGB records begin at offset 208, with DPI and Logo zones. Only the three-byte solid-color field is edited."
 		]
 	},
 	"sources": [
-		"https://secure.logitech.com/assets/50955/g502-proteus-core-setup-guide.pdf",
+		"https://www.logitech.com/assets/64235/2/logitech-g502-proteus-spectrum.pdf",
 		"https://github.com/libratbag/libratbag/wiki/Devices"
 	]
 }

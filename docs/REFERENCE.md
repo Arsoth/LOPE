@@ -158,10 +158,11 @@ devices with an unverified format are discoverable and readable where possible
 but remain read-only. Adding a descriptor is not by itself authorization to
 write: its profile layout and save path must be validated first.
 
-The base G502 descriptor uses the original G502 button layout and validated
-legacy RGB zones (DPI and Logo on the wired C332 model). More specific G502
-variants such as HERO, LIGHTSPEED, and X win catalog matching when their names
-are present.
+The `G502 Proteus Spectrum` descriptor represents the wired Spectrum model
+(product 0xC332), using its original button layout and validated legacy RGB
+zones (DPI and Logo). The catalog keeps `G502 Proteus Core` (0xC07D), `G502
+HERO` (0xC08B), LIGHTSPEED, and X as separate descriptors so their product
+identities and capabilities cannot be confused.
 
 MX-series devices are classified by name and known product ID before the
 fallback editor is rendered. They can remain visible in discovery, but LOPE

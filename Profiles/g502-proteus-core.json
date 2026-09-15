@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g502-hero",
-	"name": "G502 HERO",
+	"id": "g502-proteus-core",
+	"name": "G502 Proteus Core",
 	"match": {
-		"nameContains": ["G502 HERO"],
-		"productIDs": ["0xC08B"]
+		"nameContains": ["G502 Proteus Core"],
+		"productIDs": ["0xC07D"]
 	},
 	"buttons": [
 		{
@@ -75,8 +75,8 @@
 		}
 	],
 	"dpiRange": {
-		"minimum": 100,
-		"maximum": 25600
+		"minimum": 200,
+		"maximum": 12000
 	},
 	"profileIO": {
 		"supported": true,
@@ -105,31 +105,13 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"This is the original G502 record order, shared with G502 LIGHTSPEED. Do not reuse it for G502 X: that family moves the DPI and tilt records."
+			"This descriptor is for the original wired G502 Proteus Core (product 0xC07D). It has the original G502 button order but no Spectrum RGB zones."
 		]
 	},
-	"rgbProfile": {
-		"supported": true,
-		"profileFormats": [4, 5],
-		"baseOffset": 208,
-		"recordBytes": 11,
-		"colorOffset": 1,
-		"zones": [
-			{
-				"index": 0,
-				"name": "Primary"
-			},
-			{
-				"index": 1,
-				"name": "Logo"
-			}
-		],
-		"notes": [
-			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the Primary/DPI and Logo zones. Only the three-byte solid-color field is edited."
-		]
-	},
+	"rgbProfile": null,
 	"sources": [
-		"https://www.logitech.com/assets/65517/2/g502-hero.pdf",
+		"https://secure.logitech.com/assets/50955/6/g502-proteus-core-setup-guide.pdf",
+		"https://support.logi.com/hc/en-ca/articles/360023306914-Logitech-G502-Proteus-Core-Technical-Specifications",
 		"https://github.com/libratbag/libratbag/wiki/Devices"
 	]
 }

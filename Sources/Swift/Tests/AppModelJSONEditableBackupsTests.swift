@@ -13,7 +13,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
       "lope-json-editable-backup-\(UUID().uuidString).json")
   }
 
-  /// G502 HERO (product 0xC07D) is the only catalog entry whose RGB
+  /// G502 HERO (product 0xC08B) is the only catalog entry whose RGB
   /// capability has no device-name/product restriction of its own, so it is
   /// used whenever a test needs a device that actually advertises RGB
   /// zones. This intentionally does not reuse `configureFixtureDevice`
@@ -22,7 +22,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
   private func configureRGBFixtureDevice(_ model: AppModel) {
     model.devices = [
       DeviceChoice(
-        id: 1, name: "G502 HERO", connection: "Wired", productID: "0xC07D",
+        id: 1, name: "G502 HERO", connection: "Wired", productID: "0xC08B",
         deviceKey: "rgb-device")
     ]
     model.selectedDeviceIndex = 1
@@ -390,7 +390,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: url) }
     try write(
       makeBaseBackup(
-        deviceProductID: "0xC07D",
+        deviceProductID: "0xC08B",
         rgb: [EditableBackup.Profile.RGB(zone: 9, name: "Nonexistent", color: "0xFF0000")]),
       to: url)
     model.loadEditableBackup(url)
@@ -404,7 +404,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: url) }
     try write(
       makeBaseBackup(
-        deviceProductID: "0xC07D",
+        deviceProductID: "0xC08B",
         rgb: [
           EditableBackup.Profile.RGB(zone: 0, name: "Primary", color: "0xFF0000"),
           EditableBackup.Profile.RGB(zone: 0, name: "Primary", color: "0x00FF00"),
@@ -421,7 +421,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: url) }
     try write(
       makeBaseBackup(
-        deviceProductID: "0xC07D",
+        deviceProductID: "0xC08B",
         rgb: [EditableBackup.Profile.RGB(zone: 0, name: "Primary", color: "not-a-color")]),
       to: url)
     model.loadEditableBackup(url)
@@ -492,7 +492,7 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: url) }
     try write(
       makeBaseBackup(
-        deviceProductID: "0xC07D",
+        deviceProductID: "0xC08B",
         rgb: [
           EditableBackup.Profile.RGB(zone: 0, name: "Primary", color: "0xFF0000"),
           EditableBackup.Profile.RGB(zone: 1, name: "Logo", color: "0x00FF00"),
