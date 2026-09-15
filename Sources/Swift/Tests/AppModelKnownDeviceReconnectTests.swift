@@ -288,9 +288,11 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
 
   func testBeginKnownDeviceRefreshPollLoopGivesUpAfterMaximumAttempts() async {
     // Covers the tail after the for loop runs out of attempts without a
-    // match: waiting state clears, the poll task is dropped, and the
-    // status switches to its expired wording. Shrinks the policy so the
-    // test does not have to wait out the real ~60-second default.
+    // match: the poll task is dropped and the status switches to its
+    // expired wording, but `waitingForKnownDevice` stays true so the wake
+    // modal keeps showing a Retry option instead of disappearing. Shrinks
+    // the policy so the test does not have to wait out the real ~60-second
+    // default.
     let model = makeModel()
     model.knownDevicePollPolicy = (intervalNanoseconds: 10_000_000, maximumAttempts: 2)
     let device = DeviceChoice(
@@ -300,15 +302,20 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     model.beginKnownDeviceRefresh(device)
     await model.knownDevicePollTask?.value
 
-    XCTAssertFalse(model.waitingForKnownDevice)
+    XCTAssertTrue(model.waitingForKnownDevice)
+    XCTAssertTrue(model.knownDeviceWakeExpired)
     XCTAssertFalse(model.busy)
     XCTAssertNil(model.knownDevicePollTask)
     XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: true))
-    XCTAssertTrue(model.devices.isEmpty)
-    XCTAssertEqual(model.currentDeviceName, "")
+    XCTAssertEqual(model.knownDisconnectedDevice, device)
+    XCTAssertEqual(model.currentDeviceName, device.name)
   }
 
   func testBeginKnownDeviceRefreshExpirationKeepsOtherDevices() async {
+    // The device picker and current-device fields must survive expiration
+    // unchanged: giving up polling no longer tears down the picker, since
+    // Retry needs the same device/picker state the dialog was already
+    // showing.
     let model = makeModel()
     model.knownDevicePollPolicy = (intervalNanoseconds: 10_000_000, maximumAttempts: 1)
     let device = DeviceChoice(
@@ -322,9 +329,66 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     model.beginKnownDeviceRefresh(device)
     await model.knownDevicePollTask?.value
 
-    XCTAssertEqual(model.devices, [other])
-    XCTAssertEqual(model.deviceSummary, "Choose a Logitech mouse to continue")
-    XCTAssertEqual(model.selectedDeviceIndex, 0)
+    XCTAssertEqual(model.devices, [device, other])
+    XCTAssertEqual(model.deviceSummary, "\(device.title) — waiting for the mouse")
+    XCTAssertEqual(model.currentDeviceName, device.name)
+  }
+
+  // MARK: - retryKnownDeviceWake
+
+  func testRetryKnownDeviceWakeRestartsPollingAfterExpiration() async {
+    let model = makeModel()
+    model.knownDevicePollPolicy = (intervalNanoseconds: 10_000_000, maximumAttempts: 1)
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+
+    model.beginKnownDeviceRefresh(device)
+    await model.knownDevicePollTask?.value
+    XCTAssertTrue(model.knownDeviceWakeExpired, "test relies on the first poll loop expiring")
+
+    model.retryKnownDeviceWake()
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+
+    XCTAssertFalse(model.knownDeviceWakeExpired)
+    XCTAssertTrue(model.waitingForKnownDevice)
+    XCTAssertEqual(model.knownDevicePollAttempts, 0)
+    XCTAssertTrue(model.busy)
+    XCTAssertEqual(model.status, model.knownDeviceRefreshStatus(for: device, expired: false))
+    XCTAssertNotNil(model.knownDevicePollTask)
+  }
+
+  func testRetryKnownDeviceWakeIsNoOpWhenNotExpired() {
+    let model = makeModel()
+    let device = DeviceChoice(
+      id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
+      deviceKey: "aaaa-0001")
+    model.beginKnownDeviceRefresh(device)
+    defer {
+      model.knownDevicePollTask?.cancel()
+      model.knownDevicePollTask = nil
+    }
+    XCTAssertNotNil(model.knownDevicePollTask, "test relies on the poll loop still being active")
+
+    model.retryKnownDeviceWake()
+
+    XCTAssertFalse(model.knownDeviceWakeExpired)
+    XCTAssertNotNil(
+      model.knownDevicePollTask,
+      "a non-expired retry call must not disturb the already-running poll loop")
+  }
+
+  func testRetryKnownDeviceWakeIsNoOpWithoutAKnownDisconnectedDevice() {
+    let model = makeModel()
+
+    model.retryKnownDeviceWake()
+
+    XCTAssertFalse(model.knownDeviceWakeExpired)
+    XCTAssertFalse(model.waitingForKnownDevice)
+    XCTAssertNil(model.knownDevicePollTask)
   }
 
   func testBeginKnownDeviceRefreshSkipsProbeWhenRefreshIsAlreadyInFlight() async {
@@ -339,7 +403,8 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     await model.knownDevicePollTask?.value
 
     XCTAssertEqual(model.knownDevicePollAttempts, 1)
-    XCTAssertFalse(model.waitingForKnownDevice)
+    XCTAssertTrue(model.waitingForKnownDevice)
+    XCTAssertTrue(model.knownDeviceWakeExpired)
     XCTAssertNil(model.refreshTask)
   }
 
@@ -397,6 +462,7 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     model.knownDevicePollTask = Task {}
     model.waitingForKnownDevice = true
     model.knownDevicePollAttempts = 4
+    model.knownDeviceWakeExpired = true
     model.knownDisconnectedDevice = device
 
     model.stopKnownDevicePolling(clearDevice: false)
@@ -404,6 +470,7 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     XCTAssertNil(model.knownDevicePollTask)
     XCTAssertFalse(model.waitingForKnownDevice)
     XCTAssertEqual(model.knownDevicePollAttempts, 0)
+    XCTAssertFalse(model.knownDeviceWakeExpired)
     XCTAssertEqual(model.knownDisconnectedDevice, device)
   }
 
