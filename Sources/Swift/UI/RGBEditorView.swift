@@ -36,21 +36,25 @@ struct RGBEditorView: View {
       theme.card.opacity(0.75), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
   }
 
+  /// A profile with a single advertised zone lights the whole mouse as one
+  /// unit (e.g. `Profiles/g-pro.json`'s "Logo and side lighting"), while a
+  /// profile with more than one zone names distinct regions (e.g.
+  /// `Profiles/g502-hero.json`'s "Primary"/"Logo"). The zone list carries no
+  /// explicit scope flag, but that count already distinguishes the two
+  /// cases, so the mode-button layout is derived from it rather than adding
+  /// a new descriptor field.
+  private var isPerRegionScope: Bool {
+    model.rgbZones.count > 1
+  }
+
   private func rgbZoneRow(_ zone: RGBZoneState) -> some View {
     let hoverVisible = hoveredZoneID == zone.id && presentedZoneID == nil
-    return Button {
-      let allZones = NSEvent.modifierFlags.contains(.shift)
-      model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
-      presentedZoneID = zone.id
-    } label: {
+    return VStack(alignment: .leading, spacing: 6) {
       HStack(spacing: 9) {
-        RoundedRectangle(cornerRadius: 4, style: .continuous)
-          .fill(swiftUIColor(zone.draft))
-          .frame(width: 28, height: 24)
-          .overlay {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-              .stroke(theme.controlBorder, lineWidth: 0.75)
-          }
+        colorSwatchButton(zone)
+        if isPerRegionScope {
+          modeButtonsRow(zone)
+        }
         Text(zone.name)
           .font(.callout.weight(.medium))
         Spacer()
@@ -58,11 +62,13 @@ struct RGBEditorView: View {
           .font(.caption.monospaced())
           .foregroundStyle(theme.secondaryText)
       }
-      .padding(.horizontal, 9)
-      .padding(.vertical, 7)
-      .contentShape(Rectangle())
+      if !isPerRegionScope {
+        modeButtonsRow(zone)
+          .padding(.leading, 37)
+      }
     }
-    .buttonStyle(.plain)
+    .padding(.horizontal, 9)
+    .padding(.vertical, 7)
     .background(
       hoverVisible ? theme.hover : theme.controlBackground,
       in: RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -71,7 +77,6 @@ struct RGBEditorView: View {
       RoundedRectangle(cornerRadius: 8, style: .continuous)
         .stroke(theme.cardBorder, lineWidth: 0.5)
     }
-    .pointingHandCursor()
     .onHover { isHovering in
       if isHovering {
         hoveredZoneID = zone.id
@@ -80,6 +85,25 @@ struct RGBEditorView: View {
       }
     }
     .animation(.easeInOut(duration: 0.12), value: hoverVisible)
+  }
+
+  private func colorSwatchButton(_ zone: RGBZoneState) -> some View {
+    Button {
+      let allZones = NSEvent.modifierFlags.contains(.shift)
+      model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
+      presentedZoneID = zone.id
+    } label: {
+      RoundedRectangle(cornerRadius: 4, style: .continuous)
+        .fill(swiftUIColor(zone.draft))
+        .frame(width: 28, height: 24)
+        .overlay {
+          RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .stroke(theme.controlBorder, lineWidth: 0.75)
+        }
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .pointingHandCursor()
     .help("Click to choose a color. Shift-click to apply the chosen color to all RGB zones.")
     .popover(
       isPresented: Binding(
@@ -93,19 +117,63 @@ struct RGBEditorView: View {
       ),
       arrowEdge: .trailing
     ) {
-      VStack(alignment: .leading, spacing: 10) {
-        Text(model.rgbEditingAllZones ? "All RGB zones" : zone.name)
-          .font(.headline)
-        ColorPicker("Color", selection: rgbColorBinding(zoneID: zone.id), supportsOpacity: false)
-        if let current = model.rgbZones.first(where: { $0.id == zone.id })?.draft {
-          Text(current.hex)
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
-        }
-      }
-      .padding(14)
-      .frame(width: 220)
+      rgbColorPopoverContent(zone)
     }
+  }
+
+  private func rgbColorPopoverContent(_ zone: RGBZoneState) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(model.rgbEditingAllZones ? "All RGB zones" : zone.name)
+        .font(.headline)
+      HStack(alignment: .center, spacing: 14) {
+        RGBColorWheel(color: rgbColorBinding(zoneID: zone.id))
+          .frame(width: 140, height: 140)
+        RGBBrightnessSlider(color: rgbColorBinding(zoneID: zone.id))
+          .frame(width: 22, height: 140)
+      }
+      if let current = model.rgbZones.first(where: { $0.id == zone.id })?.draft {
+        Text(current.hex)
+          .font(.caption.monospaced())
+          .foregroundStyle(.secondary)
+      }
+    }
+    .padding(14)
+    .frame(width: 232)
+  }
+
+  private func modeButtonsRow(_ zone: RGBZoneState) -> some View {
+    HStack(spacing: 4) {
+      ForEach(RGBEffectMode.allCases, id: \.self) { mode in
+        modeButton(zone, mode: mode)
+      }
+    }
+  }
+
+  private func modeButton(_ zone: RGBZoneState, mode: RGBEffectMode) -> some View {
+    let isSelected = zone.draftMode == mode
+    return Button {
+      let allZones = NSEvent.modifierFlags.contains(.shift)
+      model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
+      model.setRGBMode(zoneID: zone.id, mode: mode)
+    } label: {
+      Text(mode.label)
+        .font(.caption2.weight(isSelected ? .semibold : .regular))
+        .foregroundStyle(isSelected ? theme.accent : theme.secondaryText)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .background(
+      isSelected ? theme.selected : theme.controlBackground,
+      in: RoundedRectangle(cornerRadius: 5, style: .continuous)
+    )
+    .overlay {
+      RoundedRectangle(cornerRadius: 5, style: .continuous)
+        .stroke(theme.cardBorder, lineWidth: 0.5)
+    }
+    .pointingHandCursor()
+    .help("Set \(zone.name) lighting mode to \(mode.label). Shift-click to apply to all zones.")
   }
 
   private func swiftUIColor(_ color: RGBColor) -> Color {
@@ -137,5 +205,160 @@ struct RGBEditorView: View {
         )
       }
     )
+  }
+}
+
+/// HSB triple shared by the color wheel and the brightness slider below. Kept
+/// as a plain tuple rather than a model type since it only exists to drive
+/// these two in-app controls; the persisted representation stays the plain
+/// `RGBColor` in `RGBModel.swift`.
+private typealias HSBComponents = (hue: CGFloat, saturation: CGFloat, brightness: CGFloat)
+
+/// Converts a SwiftUI `Color` to hue/saturation/brightness via AppKit's
+/// device RGB colorspace, matching the conversion `RGBEditorView` already
+/// performs when writing a picked color back to the model.
+private func hsbComponents(of color: Color) -> HSBComponents {
+  guard let converted = NSColor(color).usingColorSpace(.deviceRGB) else {
+    return (0, 0, 1)
+  }
+  var hue: CGFloat = 0
+  var saturation: CGFloat = 0
+  var brightness: CGFloat = 0
+  var alpha: CGFloat = 0
+  converted.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+  return (hue, saturation, brightness)
+}
+
+/// An in-app hue/saturation wheel: dragging anywhere in the circle picks a
+/// hue (angle, clockwise from the top, matching `AngularGradient`'s default
+/// sweep direction) and a saturation (distance from center). Brightness is
+/// left untouched here and is controlled separately by `RGBBrightnessSlider`
+/// alongside it, mirroring the wheel/slider split in macOS's own color
+/// panel.
+private struct RGBColorWheel: View {
+  @Binding var color: Color
+
+  private static let hueStops: [Color] = (0...12).map { step in
+    Color(hue: Double(step) / 12.0, saturation: 1, brightness: 1)
+  }
+
+  var body: some View {
+    GeometryReader { proxy in
+      let size = min(proxy.size.width, proxy.size.height)
+      let radius = size / 2
+      let hsb = hsbComponents(of: color)
+      ZStack {
+        Circle()
+          .fill(AngularGradient(gradient: Gradient(colors: Self.hueStops), center: .center))
+          .overlay(
+            Circle()
+              .fill(
+                RadialGradient(
+                  gradient: Gradient(colors: [.white, .white.opacity(0)]),
+                  center: .center,
+                  startRadius: 0,
+                  endRadius: radius
+                )
+              )
+          )
+          .clipShape(Circle())
+          .overlay(Circle().stroke(Color.black.opacity(0.15), lineWidth: 1))
+        thumb(hsb: hsb, radius: radius)
+      }
+      .frame(width: size, height: size)
+      .contentShape(Circle())
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in
+            update(at: value.location, radius: radius, brightness: hsb.brightness)
+          }
+      )
+    }
+  }
+
+  private func thumb(hsb: HSBComponents, radius: CGFloat) -> some View {
+    let angle = hsb.hue * 2 * .pi
+    let distance = hsb.saturation * radius
+    let x = radius + sin(angle) * distance
+    let y = radius - cos(angle) * distance
+    return Circle()
+      .fill(Color(hue: hsb.hue, saturation: hsb.saturation, brightness: 1))
+      .frame(width: 14, height: 14)
+      .overlay(Circle().stroke(Color.white, lineWidth: 2))
+      .shadow(radius: 1)
+      .position(x: x, y: y)
+  }
+
+  /// `dx`/`dy` follow the same clockwise-from-top convention as `thumb`:
+  /// `dy` grows downward (screen space) and angle 0 points up.
+  private func update(at point: CGPoint, radius: CGFloat, brightness: CGFloat) {
+    guard radius > 0 else { return }
+    let dx = point.x - radius
+    let dy = point.y - radius
+    let distance = min(sqrt(dx * dx + dy * dy), radius)
+    let saturation = distance / radius
+    var angle = atan2(dx, -dy)
+    if angle < 0 { angle += 2 * .pi }
+    let hue = angle / (2 * .pi)
+    color = Color(hue: hue, saturation: saturation, brightness: brightness)
+  }
+}
+
+/// A vertical brightness bar for the hue/saturation picked in
+/// `RGBColorWheel`: top is full brightness at the current hue/saturation,
+/// bottom is black. Implemented as a plain drag-tracked gradient rather than
+/// a rotated `Slider`, since a `Slider` rotated with `.rotationEffect` does
+/// not reliably hit-test in AppKit-backed SwiftUI.
+private struct RGBBrightnessSlider: View {
+  @Binding var color: Color
+
+  var body: some View {
+    GeometryReader { proxy in
+      let hsb = hsbComponents(of: color)
+      let width = proxy.size.width
+      let height = proxy.size.height
+      ZStack(alignment: .top) {
+        RoundedRectangle(cornerRadius: width / 2, style: .continuous)
+          .fill(
+            LinearGradient(
+              colors: [
+                Color(hue: hsb.hue, saturation: hsb.saturation, brightness: 1),
+                Color.black,
+              ],
+              startPoint: .top,
+              endPoint: .bottom
+            )
+          )
+          .overlay(
+            RoundedRectangle(cornerRadius: width / 2, style: .continuous)
+              .stroke(Color.black.opacity(0.15), lineWidth: 1)
+          )
+        thumb(hsb: hsb, width: width, height: height)
+      }
+      .frame(width: width, height: height)
+      .contentShape(Rectangle())
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in
+            update(at: value.location, height: height, hue: hsb.hue, saturation: hsb.saturation)
+          }
+      )
+    }
+  }
+
+  private func thumb(hsb: HSBComponents, width: CGFloat, height: CGFloat) -> some View {
+    let y = (1 - hsb.brightness) * height
+    return RoundedRectangle(cornerRadius: 2, style: .continuous)
+      .stroke(Color.white, lineWidth: 2)
+      .frame(width: width + 4, height: 4)
+      .shadow(radius: 1)
+      .position(x: width / 2, y: min(max(y, 2), height - 2))
+  }
+
+  private func update(at point: CGPoint, height: CGFloat, hue: CGFloat, saturation: CGFloat) {
+    guard height > 0 else { return }
+    let clamped = min(max(point.y, 0), height)
+    let brightness = 1 - (clamped / height)
+    color = Color(hue: hue, saturation: saturation, brightness: brightness)
   }
 }
