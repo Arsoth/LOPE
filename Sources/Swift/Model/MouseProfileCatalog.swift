@@ -52,16 +52,16 @@ struct MouseProfileCatalog: Sendable {
       }
       guard nameHit || productHit else { return nil }
 
-      // A name match is more reliable than a shared receiver/product
-      // ID. Among name matches, the longest matching token wins, so a
-      // more specific model name (e.g. "G9X") automatically outranks a
-      // shorter one it happens to contain (e.g. "G9").
+      // An exact product match must outrank an incidental name substring
+      // (for example, the legacy G5 token inside G502). When several
+      // descriptors share a receiver/product ID, the name match remains the
+      // useful tie-breaker, and the longest matching token wins.
       let matchingNameLength =
         descriptor.match.nameContains
         .filter { normalizedName.contains($0.lowercased()) }
         .map(\.count)
         .max() ?? 0
-      let specificity = (nameHit ? 10_000 : 0) + matchingNameLength
+      let specificity = (productHit ? 20_000 : 0) + (nameHit ? 10_000 : 0) + matchingNameLength
       return (descriptor, specificity)
     }
 

@@ -62,9 +62,12 @@ extension AppModel {
       dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
       if snapshot.profileError != nil {
         status = profileReadStatus(
-          for: selected.name, accessWarning: snapshot.accessWarning && selected.isWiredDevice)
+          for: selected.displayName,
+          accessWarning: snapshot.accessWarning && selected.isWiredDevice
+        )
       } else {
-        status = "Connected to \(selected.name), but no compatible onboard profile was found."
+        status =
+          "Connected to \(selected.displayName), but no compatible onboard profile was found."
       }
       return
     }
