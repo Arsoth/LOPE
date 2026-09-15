@@ -45,12 +45,26 @@ extension AppModel {
   /// profileIO fields and a best-effort scroll-wheel guess from each
   /// button's current live output -- when none matches. Called whenever
   /// `setButtonRows` runs, so the editor tracks the same live button list
-  /// as the Configure tab and, like the rest of the app's edit state,
-  /// resets on every refresh rather than surviving across a device change.
+  /// as the Configure tab.
+  ///
+  /// `profileEditorBase` (and, for a brand-new device, the id/name/sources
+  /// fields) always re-primes here, since those describe the device the
+  /// draft targets rather than unsaved user text. The per-button name/alias
+  /// fields only get overwritten wholesale when `profileEditorDeviceIdentity`
+  /// (device name + product ID) actually changes -- a genuine device swap.
+  /// Otherwise this only backfills entries for button numbers that do not
+  /// already have one (e.g. a G-Shift layer that just became available),
+  /// leaving any in-progress edit untouched. This is what keeps unsaved
+  /// Profile Editor text alive across a same-device refresh triggered while
+  /// another tab is showing -- a profile-slot change, a reconnect poll, or
+  /// pressing Refresh -- while still resetting for an actual device change.
   func resetProfileEditorDraft() {
     let selected = devices.first(where: { $0.id == selectedDeviceIndex })
     let deviceName = currentDeviceName.isEmpty ? (selected?.name ?? "") : currentDeviceName
     let productID = selected?.productID ?? ""
+    let identity = "\(deviceName)|\(productID)"
+    let identityChanged = identity != profileEditorDeviceIdentity
+    profileEditorDeviceIdentity = identity
 
     let base: MouseProfileDescriptor
     if hasSpecificMouseProfile {
@@ -85,34 +99,45 @@ extension AppModel {
     }
     profileEditorBase = base
 
-    let fallbackIdentifier = BackupStorage.sanitizedMouseIdentifier(
-      deviceName.isEmpty ? productID : deviceName,
-      fallback: "mouse"
-    )
-    profileEditorID = hasSpecificMouseProfile ? base.id : fallbackIdentifier
-    profileEditorName =
-      hasSpecificMouseProfile
-      ? base.name
-      : (deviceName.isEmpty ? "Unnamed mouse" : deviceName)
-    profileEditorSources = base.sources.joined(separator: "\n")
+    if identityChanged {
+      let fallbackIdentifier = BackupStorage.sanitizedMouseIdentifier(
+        deviceName.isEmpty ? productID : deviceName,
+        fallback: "mouse"
+      )
+      profileEditorID = hasSpecificMouseProfile ? base.id : fallbackIdentifier
+      profileEditorName =
+        hasSpecificMouseProfile
+        ? base.name
+        : (deviceName.isEmpty ? "Unnamed mouse" : deviceName)
+      profileEditorSources = base.sources.joined(separator: "\n")
+      profileEditorButtonNames = [:]
+      profileEditorButtonAliases = [:]
+    }
 
-    var names: [Int: String] = [:]
+    var names = profileEditorButtonNames
+    var aliases = profileEditorButtonAliases
     for number in profileEditorButtonNumbers {
-      names[number] =
-        base.button(for: number)?.control
-        ?? base.scrollWheelButtonLabel(for: number)
-        ?? "Button \(number)"
+      if names[number] == nil {
+        names[number] =
+          base.button(for: number)?.control
+          ?? base.scrollWheelButtonLabel(for: number)
+          ?? "Button \(number)"
+      }
+      if aliases[number] == nil {
+        let buttonAliases = base.button(for: number)?.aliases ?? []
+        aliases[number] = buttonAliases.joined(separator: ", ")
+      }
     }
     profileEditorButtonNames = names
+    profileEditorButtonAliases = aliases
   }
 
   /// Merges the editable overlay (id, name, match target, sources, dpi
-  /// range, and each button's control name) onto
-  /// `profileEditorBase`, so every other field -- aliases, scroll-wheel
-  /// labels, hidden-button numbers, refresh guidance, RGB zones, and
-  /// profileIO -- survives unchanged. The result is meant to be a complete
-  /// descriptor a contributor could drop into `Profiles/` and open a PR
-  /// with unmodified.
+  /// range, and each button's control name and alias list) onto
+  /// `profileEditorBase`, so every other field -- scroll-wheel labels,
+  /// hidden-button numbers, refresh guidance, RGB zones, and profileIO --
+  /// survives unchanged. The result is meant to be a complete descriptor a
+  /// contributor could drop into `Profiles/` and open a PR with unmodified.
   func buildProfileEditorDescriptor() -> MouseProfileDescriptor? {
     let trimmedID = profileEditorID.trimmingCharacters(in: .whitespaces)
     guard !trimmedID.isEmpty, !profileEditorButtonNumbers.isEmpty, let base = profileEditorBase
@@ -130,11 +155,21 @@ extension AppModel {
       let trimmedControl = (profileEditorButtonNames[number] ?? "").trimmingCharacters(
         in: .whitespaces)
       let existing = base.button(for: number)
+      let aliases: [String]
+      if let aliasesText = profileEditorButtonAliases[number] {
+        aliases =
+          aliasesText
+          .split(separator: ",")
+          .map { $0.trimmingCharacters(in: .whitespaces) }
+          .filter { !$0.isEmpty }
+      } else {
+        aliases = existing?.aliases ?? []
+      }
       return MouseProfileDescriptor.Button(
         number: number,
         control: trimmedControl.isEmpty
           ? (existing?.control ?? "Button \(number)") : trimmedControl,
-        aliases: existing?.aliases ?? [],
+        aliases: aliases,
         notes: existing?.notes
       )
     }
@@ -242,6 +277,9 @@ extension AppModel {
         ?? descriptor.scrollWheelButtonLabel(for: number)
         ?? profileEditorButtonNames[number]
         ?? "Button \(number)"
+      if let importedAliases = descriptor.button(for: number)?.aliases {
+        profileEditorButtonAliases[number] = importedAliases.joined(separator: ", ")
+      }
     }
     status = "Loaded \(url.lastPathComponent) as a template."
   }
