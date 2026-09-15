@@ -24,7 +24,8 @@ enum ProfileWriteValidation {
     gShiftButtonRaws: [String]
   ) -> String? {
     guard gShiftButtonRaws.contains(where: isPrimaryClick),
-      !normalButtonRaws.contains(where: isGShiftBinding)
+      !normalButtonRaws.contains(where: isGShiftBinding),
+      !normalButtonRaws.contains(where: isPrimaryClick)
     else { return nil }
 
     let trimmedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
