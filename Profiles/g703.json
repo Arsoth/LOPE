@@ -74,7 +74,10 @@
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": ["The wired G403-style shell and G703 LIGHTSPEED share the six-control mapping."]
+		"notes": [
+			"The wired G403-style shell and G703 LIGHTSPEED share the six-control mapping.",
+			"This file is the original G703 LIGHTSPEED (PMW3366 sensor, 200-12000 DPI, PID 0xC087). The HERO-sensor refresh is a separate hardware SKU cataloged in g703-hero.json (PID 0xC090)."
+		]
 	},
 	"rgbProfile": {
 		"supported": true,
@@ -97,7 +100,6 @@
 		]
 	},
 	"sources": [
-		"https://www.logitechg.com/en-my/shop/p/g703-hero-wireless-gaming-mouse.910-005642",
-		"https://github.com/libratbag/libratbag/wiki/Devices"
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g703.device"
 	]
 }

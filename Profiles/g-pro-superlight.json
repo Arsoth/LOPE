@@ -4,7 +4,7 @@
 	"name": "PRO X SUPERLIGHT",
 	"match": {
 		"nameContains": ["PRO X SUPERLIGHT"],
-		"productIDs": []
+		"productIDs": ["0xC094", "0x4093"]
 	},
 	"buttons": [
 		{
@@ -72,5 +72,8 @@
 			"The original SUPERLIGHT layout has five programmable controls and no DPI control in the profile array."
 		]
 	},
-	"sources": ["https://www.logitechg.com/en-us/products/gaming-mice/pro-x-superlight-wireless-mouse.html"]
+	"sources": [
+		"https://www.logitechg.com/en-us/products/gaming-mice/pro-x-superlight-wireless-mouse.html",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g-pro-x-wireless-superlight.device"
+	]
 }

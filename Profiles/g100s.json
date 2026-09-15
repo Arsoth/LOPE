@@ -4,7 +4,7 @@
 	"name": "G100s",
 	"match": {
 		"nameContains": ["G100S"],
-		"productIDs": []
+		"productIDs": ["0xC247"]
 	},
 	"buttons": [
 		{
@@ -73,5 +73,5 @@
 		},
 		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices", "https://the-sz.com/products/usbid/index.php?v=0x046D"]
 }

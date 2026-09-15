@@ -75,8 +75,8 @@
 		}
 	],
 	"dpiRange": {
-		"minimum": 100,
-		"maximum": 25600
+		"minimum": 200,
+		"maximum": 12000
 	},
 	"profileIO": {
 		"supported": true,
@@ -106,7 +106,8 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"The profile array is ordered independently of which side-button caps are installed. The label describes the record position, not a guaranteed installed cap."
+			"The profile array is ordered independently of which side-button caps are installed. The label describes the record position, not a guaranteed installed cap.",
+			"This file is the original G903 LIGHTSPEED (PMW3366 sensor, 200-12000 DPI, PID 0xC086). The HERO-sensor refresh is a separate hardware SKU cataloged in g903-hero.json (PID 0xC091)."
 		]
 	},
 	"rgbProfile": {
@@ -131,6 +132,8 @@
 	},
 	"sources": [
 		"https://github.com/truemogician/Logitech-GHUB-Key-Combination/blob/main/src/index.lua",
-		"https://lightspeed.logitechg.com/moba/"
+		"https://lightspeed.logitechg.com/moba/",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g903.device",
+		"https://www.bhphotovideo.com/c/product/1374579-REG/logitech_910_005083_g903_lightspeed_wireless_gaming.html"
 	]
 }

@@ -4,7 +4,7 @@
 	"name": "G305 LIGHTSPEED",
 	"match": {
 		"nameContains": ["G305"],
-		"productIDs": []
+		"productIDs": ["0x4074"]
 	},
 	"buttons": [
 		{
@@ -76,5 +76,8 @@
 		},
 		"notes": ["G304 is the identical hardware sold under a different regional name; see g304.json."]
 	},
-	"sources": ["https://www.logitechg.com/en-us/shop/p/g305-lightspeed-se-gaming-mouse"]
+	"sources": [
+		"https://www.logitechg.com/en-us/shop/p/g305-lightspeed-se-gaming-mouse",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g305.device"
+	]
 }

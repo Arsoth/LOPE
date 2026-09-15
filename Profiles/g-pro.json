@@ -4,7 +4,7 @@
 	"name": "G PRO wired",
 	"match": {
 		"nameContains": ["G PRO"],
-		"productIDs": ["0xC085"]
+		"productIDs": ["0xC085", "0xC08C"]
 	},
 	"buttons": [
 		{
@@ -92,5 +92,5 @@
 			"Validated legacy onboard RGB record: the combined Logo and side-lighting zone is record 0. Only the three-byte solid-color field is edited."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g-pro.device"]
 }

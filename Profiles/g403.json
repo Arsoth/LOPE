@@ -74,7 +74,9 @@
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
-		"notes": []
+		"notes": [
+			"This file covers PID 0xC082, the original PMW3366-sensor G403 (Wireless-capable) family. The HERO-sensor refresh (PID 0xC08F) and the wired-only Prodigy variant (PID 0xC083) are separate hardware SKUs cataloged in g403-hero.json and g403-prodigy.json."
+		]
 	},
 	"rgbProfile": {
 		"supported": true,
@@ -97,7 +99,7 @@
 		]
 	},
 	"sources": [
-		"https://www.logitechg.com/en-us/products/gaming-mice/g403-hero-gaming-mouse.html",
-		"https://github.com/libratbag/libratbag/wiki/Devices"
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g403-wireless.device",
+		"https://github.com/pwr-Solaar/Solaar/blob/master/lib/logitech_receiver/descriptors.py"
 	]
 }

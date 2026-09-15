@@ -4,7 +4,7 @@
 	"name": "G502 X PLUS",
 	"match": {
 		"nameContains": ["G502 X PLUS"],
-		"productIDs": []
+		"productIDs": ["0xC095", "0x4099"]
 	},
 	"buttons": [
 		{

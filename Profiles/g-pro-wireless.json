@@ -4,7 +4,7 @@
 	"name": "G PRO Wireless",
 	"match": {
 		"nameContains": ["G PRO WIRELESS", "PRO WIRELESS"],
-		"productIDs": ["0xC088"]
+		"productIDs": ["0xC088", "0x4079"]
 	},
 	"buttons": [
 		{
@@ -93,6 +93,6 @@
 	},
 	"sources": [
 		"https://www.logitechg.com/en-us/shop/p/pro-wireless-mouse",
-		"https://github.com/libratbag/libratbag/wiki/Devices"
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g-pro-wireless.device"
 	]
 }

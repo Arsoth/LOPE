@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g303",
-	"name": "G303",
+	"id": "g703-hero",
+	"name": "G703 HERO",
 	"match": {
-		"nameContains": ["G303"],
-		"productIDs": ["0xC080"]
+		"nameContains": ["G703 HERO"],
+		"productIDs": ["0xC090", "0x4086"]
 	},
 	"buttons": [
 		{
@@ -45,8 +45,8 @@
 		}
 	],
 	"dpiRange": {
-		"minimum": 200,
-		"maximum": 12000
+		"minimum": 100,
+		"maximum": 25600
 	},
 	"profileIO": {
 		"supported": true,
@@ -75,8 +75,31 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"The G303 Shroud Edition is a cosmetic/branding variant with its own USB product ID; see g303-shroud.json."
+			"G703 HERO shares the wired G403-style shell and six-control mapping with the original G703 LIGHTSPEED, upgraded to the HERO 25K sensor (100-25600 DPI). This is a separate hardware SKU (PID 0xC090, wireless mode 0x4086) from the original PMW3366 G703 LIGHTSPEED (g703.json, PID 0xC087)."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g303.device"]
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 0,
+				"name": "Scroll wheel"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the scroll-wheel and logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
+	"sources": [
+		"https://www.logitechg.com/en-my/shop/p/g703-hero-wireless-gaming-mouse.910-005642",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g703-hero.device"
+	]
 }

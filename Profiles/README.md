@@ -7,6 +7,20 @@ is the RGB wired C332 model, `g502-proteus-core.json` is the non-RGB wired C07D
 model, and `g502-hero.json` is the HERO C08B model. Keep these descriptors
 separate even though their physical button order is similar.
 
+Several other generations are split the same way, one file per sensor/SKU
+revision even when the physical shell and button order are identical:
+`g403.json` (original PMW3366, C082), `g403-prodigy.json` (wired-only PMW3366
+budget SKU, C083), and `g403-hero.json` (HERO sensor, C08F); `g703.json`
+(original PMW3366, C087) and `g703-hero.json` (HERO sensor, C090); `g903.json`
+(original PMW3366, C086) and `g903-hero.json` (HERO sensor, C091); `g303.json`
+(C080) and `g303-shroud.json` (cosmetic Shroud Edition, C097). A device's
+reported product ID is the only reliable way to tell these apart — do not
+assume a sensor generation from the marketing name alone. Also watch for
+Logitech's own USB *receiver* dongle IDs (e.g. "Lightspeed Receiver" C539,
+"Cordless Mouse Receiver" C537) showing up in research sources: those
+identify the dongle, not any specific paired mouse, and must never be used as
+a descriptor's `productIDs`.
+
 ## Adding a mouse
 
 1. Copy the closest physical layout into a new JSON file, named for the exact model (e.g. `g102.json`, not a combined `g102-g203.json`).

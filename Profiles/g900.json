@@ -4,7 +4,7 @@
 	"name": "G900 CHAOS SPECTRUM",
 	"match": {
 		"nameContains": ["G900"],
-		"productIDs": ["0xC539"]
+		"productIDs": ["0xC081", "0x4053"]
 	},
 	"buttons": [
 		{
@@ -106,7 +106,8 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"G900 shares the ambidextrous 11-record family with G903; installed side-button caps determine which controls are physically present."
+			"G900 shares the ambidextrous 11-record family with G903; installed side-button caps determine which controls are physically present.",
+			"productIDs are the mouse's own reported IDs (0xC081 wired-cable/dongle mode, 0x4053 direct wireless mode), not 0xC539, which is the shared Lightspeed Receiver dongle's own USB ID and does not identify any specific mouse. 0xC539 previously collided with g502-lightspeed.json."
 		]
 	},
 	"rgbProfile": {
@@ -129,5 +130,9 @@
 			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the DPI-indicator and Logo zones. Only the three-byte solid-color field is edited."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices", "https://lightspeed.logitechg.com/moba/"]
+	"sources": [
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g900.device",
+		"https://github.com/pwr-Solaar/Solaar/blob/master/lib/logitech_receiver/descriptors.py",
+		"https://lightspeed.logitechg.com/moba/"
+	]
 }

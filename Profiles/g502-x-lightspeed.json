@@ -4,7 +4,7 @@
 	"name": "G502 X LIGHTSPEED",
 	"match": {
 		"nameContains": ["G502 X LIGHTSPEED"],
-		"productIDs": []
+		"productIDs": ["0xC098", "0x409F"]
 	},
 	"buttons": [
 		{
@@ -111,6 +111,6 @@
 	},
 	"sources": [
 		"https://www.logitechg.com/en-us/discover/learn/g502-hero-vs-g502-x",
-		"https://github.com/libratbag/libratbag/blob/master/src/driver-hidpp20.c"
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g502-x-wireless.device"
 	]
 }

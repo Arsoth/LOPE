@@ -131,4 +131,80 @@ final class MouseProfileCatalogTests: XCTestCase {
     XCTAssertNil(
       core.rgbCapabilities(deviceName: "G502 Proteus Core", productID: "0xC07D", profileFormat: 5))
   }
+
+  // Regression coverage for a class of bug found in the G-series validation
+  // pass: g502-lightspeed.json and g900.json both previously listed 0xC539,
+  // which is actually the shared "Lightspeed Receiver" dongle's own USB ID,
+  // not either mouse's. G300/G300s are the one documented, intentional
+  // exception (Logitech never assigned G300s a distinct product ID), so they
+  // are excluded here rather than treated as a failure.
+  func testNoUnexpectedDuplicateProductIDsAcrossBuiltInCatalog() {
+    var idsToFiles: [String: [String]] = [:]
+    for profile in MouseProfileCatalog.shared.profiles where !profile.isGenerated {
+      for productID in profile.match.productIDs {
+        idsToFiles[productID.uppercased(), default: []].append(profile.id)
+      }
+    }
+
+    let documentedSharedIDExceptions: Set<String> = ["0XC246"]  // G300 / G300s
+    let unexpectedCollisions = idsToFiles.filter {
+      $0.value.count > 1 && !documentedSharedIDExceptions.contains($0.key)
+    }
+
+    XCTAssertTrue(
+      unexpectedCollisions.isEmpty,
+      "Unexpected shared product IDs across distinct profiles: \(unexpectedCollisions)")
+  }
+
+  func testG502LightspeedAndG900NoLongerCollideOnReceiverProductID() {
+    let lightspeed = MouseProfileCatalog.shared.profile(
+      deviceName: "G502 LIGHTSPEED", productID: "0xC08D")
+    let g900 = MouseProfileCatalog.shared.profile(deviceName: "G900", productID: "0xC081")
+
+    XCTAssertEqual(lightspeed.id, "g502-lightspeed")
+    XCTAssertEqual(g900.id, "g900")
+    XCTAssertFalse(lightspeed.match.productIDs.contains { $0.uppercased() == "0XC539" })
+    XCTAssertFalse(g900.match.productIDs.contains { $0.uppercased() == "0XC539" })
+  }
+
+  func testG602MatchesItsOwnProductIDNotTheCordlessReceiver() {
+    let g602 = MouseProfileCatalog.shared.profile(deviceName: "G602", productID: "0x402C")
+
+    XCTAssertEqual(g602.id, "g602")
+    XCTAssertFalse(g602.match.productIDs.contains { $0.uppercased() == "0XC537" })
+  }
+
+  func testG403FamilyResolvesToDistinctHardwareSKUs() {
+    let wireless = MouseProfileCatalog.shared.profile(deviceName: "G403", productID: "0xC082")
+    let prodigy = MouseProfileCatalog.shared.profile(
+      deviceName: "G403 Prodigy", productID: "0xC083")
+    let hero = MouseProfileCatalog.shared.profile(deviceName: "G403 HERO", productID: "0xC08F")
+
+    XCTAssertEqual(wireless.id, "g403")
+    XCTAssertEqual(prodigy.id, "g403-prodigy")
+    XCTAssertEqual(hero.id, "g403-hero")
+    XCTAssertEqual(hero.dpiRange?.maximum, 25600)
+    XCTAssertEqual(prodigy.dpiRange?.maximum, 12000)
+  }
+
+  func testG703AndG903HeroVariantsAreSeparateFromOriginalSensor() {
+    let g703 = MouseProfileCatalog.shared.profile(deviceName: "G703", productID: "0xC087")
+    let g703Hero = MouseProfileCatalog.shared.profile(
+      deviceName: "G703 HERO", productID: "0xC090")
+    let g903 = MouseProfileCatalog.shared.profile(deviceName: "G903", productID: "0xC086")
+    let g903Hero = MouseProfileCatalog.shared.profile(
+      deviceName: "G903 HERO", productID: "0xC091")
+
+    XCTAssertEqual(g703.id, "g703")
+    XCTAssertEqual(g703Hero.id, "g703-hero")
+    XCTAssertEqual(g903.id, "g903")
+    XCTAssertEqual(g903Hero.id, "g903-hero")
+    // Original PMW3366 sensors top out at 12000 DPI; only the HERO refresh
+    // reaches higher. Both g903.json and g903-hero.json previously shared
+    // an incorrect 25600 ceiling before this validation pass.
+    XCTAssertEqual(g703.dpiRange?.maximum, 12000)
+    XCTAssertEqual(g903.dpiRange?.maximum, 12000)
+    XCTAssertEqual(g703Hero.dpiRange?.maximum, 25600)
+    XCTAssertEqual(g903Hero.dpiRange?.maximum, 16000)
+  }
 }

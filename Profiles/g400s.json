@@ -4,7 +4,7 @@
 	"name": "G400s",
 	"match": {
 		"nameContains": ["G400S"],
-		"productIDs": []
+		"productIDs": ["0xC24C"]
 	},
 	"buttons": [
 		{
@@ -87,5 +87,5 @@
 			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices", "https://the-sz.com/products/usbid/index.php?v=0x046D"]
 }

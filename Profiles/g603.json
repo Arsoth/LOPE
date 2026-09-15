@@ -4,7 +4,7 @@
 	"name": "G603 LIGHTSPEED",
 	"match": {
 		"nameContains": ["G603"],
-		"productIDs": ["0xB01C"]
+		"productIDs": ["0xB01C", "0x406C"]
 	},
 	"buttons": [
 		{
@@ -84,5 +84,5 @@
 			"The engine accepts both zero-filled and 0xFFFF unused DPI slots for this family; retry a sleeping wireless device before reporting a missing profile."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": ["https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g603.device"]
 }

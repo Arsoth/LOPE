@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g502-lightspeed",
-	"name": "G502 LIGHTSPEED",
+	"id": "g903-hero",
+	"name": "G903 HERO",
 	"match": {
-		"nameContains": ["G502 LIGHTSPEED"],
-		"productIDs": ["0xC08D", "0x407F"]
+		"nameContains": ["G903 HERO"],
+		"productIDs": ["0xC091", "0x4087"]
 	},
 	"buttons": [
 		{
@@ -27,60 +27,60 @@
 		},
 		{
 			"number": 4,
-			"control": "G4 · Back",
-			"aliases": ["Rear thumb"],
+			"control": "G4 · Left side rear",
+			"aliases": ["Removable side button"],
 			"notes": null
 		},
 		{
 			"number": 5,
-			"control": "G5 · Forward",
-			"aliases": ["Front thumb"],
+			"control": "G5 · Left side front",
+			"aliases": ["Removable side button"],
 			"notes": null
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI Shift",
-			"aliases": ["Sniper"],
+			"control": "G6 · Right side rear",
+			"aliases": ["Removable side button"],
 			"notes": null
 		},
 		{
 			"number": 7,
-			"control": "G7 · DPI down",
-			"aliases": [],
+			"control": "G7 · Right side front",
+			"aliases": ["Removable side button"],
 			"notes": null
 		},
 		{
 			"number": 8,
-			"control": "G8 · DPI up",
+			"control": "G8 · Top left",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 9,
+			"control": "G9 · Top right",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 10,
 			"control": "Wheel tilt left",
 			"aliases": ["Scroll left"],
 			"notes": null
 		},
 		{
-			"number": 10,
+			"number": 11,
 			"control": "Wheel tilt right",
 			"aliases": ["Scroll right"],
-			"notes": null
-		},
-		{
-			"number": 11,
-			"control": "G9 · Profile",
-			"aliases": ["Profile cycle"],
 			"notes": null
 		}
 	],
 	"dpiRange": {
 		"minimum": 100,
-		"maximum": 25600
+		"maximum": 16000
 	},
 	"profileIO": {
 		"supported": true,
-		"capability": "HID++ 2.0 ONBOARD_PROFILES",
+		"capability": "HID++ 2.0 ONBOARD_PROFILES · ambidextrous layout",
 		"feature": "0x8100",
 		"load": {
 			"command": "profiles",
@@ -102,11 +102,12 @@
 		"layout": {
 			"buttonRecord": "4 bytes per control",
 			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"optionalSideButtons": "records remain present only when installed/firmware exposes them",
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"This is the original G502 record order, shared with G502 HERO. Do not reuse it for G502 X: that family moves the DPI and tilt records.",
-			"productIDs are the mouse's own reported IDs (0xC08D wired-cable/dongle mode, 0x407F direct wireless mode), not 0xC539, which is the shared Lightspeed Receiver dongle's own USB ID and does not identify any specific mouse."
+			"The profile array is ordered independently of which side-button caps are installed. The label describes the record position, not a guaranteed installed cap.",
+			"G903 HERO is a separate hardware SKU (PID 0xC091, wireless mode 0x4087) from the original PMW3366 G903 LIGHTSPEED (g903.json, PID 0xC086), upgraded to the HERO 16K sensor. Later manufacturing runs sold under the same G903 HERO name may use an upgraded HERO 25K sensor without a new PID; this descriptor keeps the widely-documented 16K DPI ceiling until a 25K unit is confirmed separately."
 		]
 	},
 	"rgbProfile": {
@@ -118,7 +119,7 @@
 		"zones": [
 			{
 				"index": 0,
-				"name": "Primary"
+				"name": "DPI indicator"
 			},
 			{
 				"index": 1,
@@ -126,12 +127,12 @@
 			}
 		],
 		"notes": [
-			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the Primary/DPI and Logo zones. Only the three-byte solid-color field is edited."
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the DPI-indicator and Logo zones. Only the three-byte solid-color field is edited."
 		]
 	},
 	"sources": [
-		"https://www.logitechg.com/en-us/shop/p/g502-lightspeed-wireless-gaming-mouse",
-		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g502-hero-wireless.device",
+		"https://www.bhphotovideo.com/c/product/1486567-REG/logitech_910_005670_g903_lightspeed_wireless_gaming.html",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g903-hero.device",
 		"https://github.com/pwr-Solaar/Solaar/blob/master/lib/logitech_receiver/descriptors.py"
 	]
 }

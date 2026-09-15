@@ -4,7 +4,7 @@
 	"name": "G602",
 	"match": {
 		"nameContains": ["G602"],
-		"productIDs": ["0xC537"]
+		"productIDs": ["0x402C"]
 	},
 	"buttons": [
 		{
@@ -105,8 +105,12 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"G602's additional thumb controls are intentionally neutral labels because the mouse is no longer documented with a G4-G11 diagram."
+			"G602's additional thumb controls are intentionally neutral labels because the mouse is no longer documented with a G4-G11 diagram.",
+			"productID is the mouse's own nano-receiver USB ID (0x402C), not 0xC537, which is the separate 'Cordless Mouse Receiver' dongle ID and does not identify this mouse. libratbag models G602 as HID++ 1.0 (Driver=hidpp10); this file keeps the modern feature-0x8100 description pending a real profile read to confirm."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": [
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g602.device",
+		"https://support.logi.com/hc/en-ca/articles/360023258354-Configuring-G602-gaming-mouse-on-board-memory"
+	]
 }

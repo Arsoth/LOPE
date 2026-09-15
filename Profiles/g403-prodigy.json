@@ -1,10 +1,10 @@
 {
 	"schemaVersion": 1,
-	"id": "g303",
-	"name": "G303",
+	"id": "g403-prodigy",
+	"name": "G403 Prodigy",
 	"match": {
-		"nameContains": ["G303"],
-		"productIDs": ["0xC080"]
+		"nameContains": ["G403 PRODIGY"],
+		"productIDs": ["0xC083"]
 	},
 	"buttons": [
 		{
@@ -75,8 +75,32 @@
 			"crc": "CRC-16/CCITT-FALSE"
 		},
 		"notes": [
-			"The G303 Shroud Edition is a cosmetic/branding variant with its own USB product ID; see g303-shroud.json."
+			"G403 Prodigy is the wired-only, PMW3366-sensor budget variant of the G403 shell (200-12000 DPI, PID 0xC083, registered by Logitech as 'G403 Prodigy Gaming Mouse'). It is a separate hardware SKU from the original wireless-capable G403 (g403.json, PID 0xC082) and the HERO-sensor refresh (g403-hero.json, PID 0xC08F), though all three share the same physical six-control mapping and RGB zones."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g303.device"]
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 0,
+				"name": "Scroll wheel"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the scroll-wheel and logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
+	"sources": [
+		"https://the-sz.com/products/usbid/index.php?v=0x046D",
+		"https://www.logitech.com/assets/64771/g403-prodigy.pdf",
+		"https://www.amazon.com/Logitech-G403-Prodigy-Gaming-Mouse/dp/B01KUAMCV4"
+	]
 }
