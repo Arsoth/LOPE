@@ -11,28 +11,52 @@
 
 # LOPE todo list
 
-### 1: Report C self-test totals
-
-- [ ] Refactor the C test runner so each self-test run reports the total number of tests passed and failed, as well as the duration, rather than only a rolled-up yes/no result.
-
-**Done when:** C self-test output includes total passed and failed counts, and the refactored reporting remains correct for both passing and failing tests.
-
-### 2: Increase test coverage
-
-- [ ] Raise test coverage to 95% or better, prioritizing code currently below 92%.
-
-**Done when:** The repository coverage report reaches at least 95%, with work prioritized toward files or areas below 92%.
-
 ### 3: Add a retry action to the mouse-asleep dialog
 
 - [ ] Add a `Retry` button to the mouse-asleep dialog that restarts the 60-second retry clock when the mouse times out after 60 seconds.
 
 **Done when:** After a 60-second timeout, the dialog shows `Retry`; activating it restarts the retry countdown/system and allows the retry flow to continue.
 
+### 4: Enforce valid G-shift primary-click bindings
+
+- [ ] Require a G-shift key on the normal layer when primary click is bound on a G-shift layer, unless primary click is also bound on both layers.
+
+**Done when:** The profile editor prevents or flags the invalid binding and allows the documented exception when primary click is bound on both layers.
+
+### 5: Keep G-shift key bindings synchronized across layers
+
+- [ ] Ensure a configured G-shift key is bound to the same physical key on both layers.
+
+**Done when:** Setting a G-shift binding always produces matching bindings on the normal and G-shift layers.
+
+### 6: Edit profile editor aliases
+
+- [ ] Add profile editor support for editing aliases in addition to primary button names.
+
+**Done when:** Alias fields can be edited alongside primary button names and the changes persist in the profile.
+
+### 7: Preserve profile editor contents across tab changes
+
+- [ ] Prevent changing tabs from resetting the profile editor contents.
+
+**Done when:** Unsaved profile editor values remain intact after switching tabs and returning to the editor.
+
+### 8: Improve RGB color controls
+
+- [ ] Make the color box open an in-app RGB wheel and brightness slider, arranged in a row instead of a column.
+
+**Done when:** Clicking a color box opens the RGB controls in-app, with the wheel and brightness slider displayed side by side.
+
+### 9: Arrange color mode controls according to scope
+
+- [ ] Show per-region color-mode buttons in a row to the right of the related color, or per-mouse buttons in a row below the color.
+
+**Done when:** Color-mode controls use the right-of-color layout for per-region modes and the below-color layout for per-mouse modes.
+
 # Ignore below item(s):
 
 ### NIL: Evaluate an in-process engine API after the C boundaries are clean
 
-- [ ] Measure the cost and complexity of the separate `lope` process after the structured boundary and C layering work are complete, then decide whether the GUI should continue using the process boundary or use a typed in-process C library API.
+- [ ] Measure the cost and complexity of the separate `lope` process after the structured boundary and C layering work are complete, then decide whether the GUI should continue using the process boundary or use a typed in-process C library API. Does keeping the lope engine separate allow for easier multi platform work later?
 
 **Done when:** The decision is documented with evidence covering startup cost, error handling, cancellation, HID-resource ownership, testability, and packaging; no process-boundary rewrite is started without a demonstrated benefit.
