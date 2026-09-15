@@ -83,10 +83,12 @@ struct ConfigureSurfaceView: View {
         title: "Wake \(currentDeviceDisplayName)",
         message: knownDeviceWakeMessage,
         symbol: "computermouse.fill",
+        onDefaultAction: model.knownDeviceWakeExpired ? model.retryKnownDeviceWake : {},
         onCancel: {},
-        showsActions: false
+        showsActions: model.knownDeviceWakeExpired
       ) {
-        EmptyView()
+        Button("Retry", action: model.retryKnownDeviceWake)
+          .buttonStyle(.borderedProminent)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -110,7 +112,10 @@ struct ConfigureSurfaceView: View {
     } else {
       messages.append("Move or click the mouse to wake it while LOPE reads it.")
     }
-    messages.append("LOPE will keep checking in the background.")
+    messages.append(
+      model.knownDeviceWakeExpired
+        ? "LOPE stopped checking after a minute. Choose Retry to keep waiting for the mouse."
+        : "LOPE will keep checking in the background.")
     return messages.joined(separator: "\n\n")
   }
 

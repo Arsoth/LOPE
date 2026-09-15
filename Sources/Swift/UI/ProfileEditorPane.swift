@@ -52,6 +52,14 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
                   )
                 )
                 .textFieldStyle(.roundedBorder)
+                TextField(
+                  "Aliases (comma-separated)",
+                  text: Binding(
+                    get: { model.profileEditorButtonAliases[number] ?? "" },
+                    set: { model.profileEditorButtonAliases[number] = $0 }
+                  )
+                )
+                .textFieldStyle(.roundedBorder)
               }
             }
             Divider()

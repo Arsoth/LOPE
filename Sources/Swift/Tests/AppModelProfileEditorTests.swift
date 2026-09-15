@@ -308,6 +308,163 @@ final class AppModelProfileEditorTests: XCTestCase {
     XCTAssertEqual(model.status, "Loaded imported-profile.json as a template.")
   }
 
+  func testResetProfileEditorDraftPopulatesAliasesFromCatalog() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    XCTAssertTrue(model.hasSpecificMouseProfile)
+
+    model.setButtonRows(normal: model.buttons, gShift: [])
+
+    // g502-x.json lists "Left" as button 1's only cataloged alias.
+    XCTAssertEqual(model.profileEditorButtonAliases[1], "Left")
+  }
+
+  func testSetButtonRowsPreservesUnsavedEditsAcrossSameDeviceRefresh() {
+    // A same-device refresh -- switching onboard profile slots while another
+    // tab is visible, a background reconnect poll, or pressing Refresh --
+    // must not discard unsaved Profile Editor text. Only an actual device
+    // identity change should reset the draft (see the next test).
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(normal: model.buttons, gShift: [])
+
+    model.profileEditorID = "my-draft-id"
+    model.profileEditorName = "My Draft Name"
+    model.profileEditorSources = "https://example.com/my-source"
+    model.profileEditorButtonNames[1] = "My Custom Name"
+    model.profileEditorButtonAliases[1] = "My custom alias"
+
+    // Simulate the same device reporting slightly different live button
+    // data on a later refresh (e.g. a different onboard profile slot).
+    let refreshedRows = [
+      ButtonRow(
+        id: 1, label: "G1 · Primary click (Left)", currentRaw: "80010001",
+        draftRaw: "80010001", draftChoice: "80010001", layer: .normal)
+    ]
+    model.setButtonRows(normal: refreshedRows, gShift: [])
+
+    XCTAssertEqual(model.profileEditorID, "my-draft-id")
+    XCTAssertEqual(model.profileEditorName, "My Draft Name")
+    XCTAssertEqual(model.profileEditorSources, "https://example.com/my-source")
+    XCTAssertEqual(model.profileEditorButtonNames[1], "My Custom Name")
+    XCTAssertEqual(model.profileEditorButtonAliases[1], "My custom alias")
+  }
+
+  func testSetButtonRowsPreservesEditsAcrossTabSwitchStyleReloadThenBackfillsNewButtons() {
+    // Covers the button-numbers-grew case (e.g. a G-Shift layer becoming
+    // readable after a later refresh of the same device): existing edits
+    // are kept, and the newly appeared button number is backfilled from the
+    // catalog rather than left blank.
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(normal: model.buttons, gShift: [])
+    model.profileEditorButtonNames[1] = "Kept name"
+
+    let expandedRows =
+      model.buttons + [
+        ButtonRow(
+          id: 3, label: "G3 · Middle click", currentRaw: "80010003",
+          draftRaw: "80010003", draftChoice: "80010003", layer: .normal)
+      ]
+    model.setButtonRows(normal: expandedRows, gShift: [])
+
+    XCTAssertEqual(model.profileEditorButtonNames[1], "Kept name")
+    XCTAssertEqual(model.profileEditorButtonNames[3], "G3 · Middle click")
+    XCTAssertEqual(model.profileEditorButtonAliases[3], "Wheel click")
+  }
+
+  func testSetButtonRowsResetsDraftOnDeviceIdentityChange() {
+    let model = AppModel(startInitialRefresh: false)
+    model.devices = [
+      DeviceChoice(
+        id: 1, name: "First Unknown Mouse", connection: "Wired", productID: "0xAAAA",
+        deviceKey: "first-test")
+    ]
+    model.selectedDeviceIndex = 1
+    model.currentDeviceName = "First Unknown Mouse"
+    model.setButtonRows(
+      normal: [
+        ButtonRow(
+          id: 1, label: "Button 1", currentRaw: "80010001", draftRaw: "80010001",
+          draftChoice: "80010001", layer: .normal)
+      ], gShift: [])
+    model.profileEditorButtonNames[1] = "My Custom Name"
+    model.profileEditorButtonAliases[1] = "My custom alias"
+    model.profileEditorID = "my-draft-id"
+
+    // A genuinely different device (different name and product ID) must
+    // still reset the draft.
+    model.devices = [
+      DeviceChoice(
+        id: 2, name: "Second Unknown Mouse", connection: "Wired", productID: "0xBBBB",
+        deviceKey: "second-test")
+    ]
+    model.selectedDeviceIndex = 2
+    model.currentDeviceName = "Second Unknown Mouse"
+    model.setButtonRows(
+      normal: [
+        ButtonRow(
+          id: 1, label: "Button 1", currentRaw: "80010001", draftRaw: "80010001",
+          draftChoice: "80010001", layer: .normal)
+      ], gShift: [])
+
+    XCTAssertEqual(model.profileEditorButtonNames[1], "Button 1")
+    XCTAssertEqual(model.profileEditorButtonAliases[1], "")
+    XCTAssertEqual(model.profileEditorID, "Second-Unknown-Mouse")
+  }
+
+  func testBuildProfileEditorDescriptorParsesCommaSeparatedAliases() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(normal: model.buttons, gShift: [])
+    model.profileEditorButtonAliases[1] = " Left , Alt click ,, "
+
+    guard let descriptor = model.buildProfileEditorDescriptor() else {
+      return XCTFail("expected a descriptor")
+    }
+
+    XCTAssertEqual(descriptor.button(for: 1)?.aliases, ["Left", "Alt click"])
+  }
+
+  func testApplyImportedProfileEditorDraftPopulatesAliases() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.setButtonRows(
+      normal: model.buttons
+        + [
+          ButtonRow(
+            id: 2, label: "Button 2", currentRaw: "90100000", draftRaw: "90100000",
+            draftChoice: "90100000", layer: .normal)
+        ], gShift: [])
+    model.profileEditorButtonAliases[2] = "Existing alias"
+
+    let descriptor = MouseProfileDescriptor(
+      schemaVersion: 1,
+      id: "imported-profile",
+      name: "Imported Profile",
+      match: .init(nameContains: [], productIDs: []),
+      buttons: [
+        .init(number: 1, control: "Imported Button 1", aliases: ["Imported alias"], notes: nil)
+      ],
+      scrollWheelButtonLabels: nil,
+      hiddenProfileButtonNumbers: nil,
+      dpiRange: nil,
+      refreshGuidance: nil,
+      profileIO: MouseProfileCatalog.genericProfile.profileIO,
+      rgbProfile: nil,
+      sources: [],
+      generated: false
+    )
+    let url = URL(fileURLWithPath: "/tmp/imported-profile.json")
+
+    model.applyImportedProfileEditorDraft(descriptor, from: url)
+
+    // Button 1: aliases come directly from the imported descriptor.
+    XCTAssertEqual(model.profileEditorButtonAliases[1], "Imported alias")
+    // Button 2: not present in the import, so its prior alias text is kept.
+    XCTAssertEqual(model.profileEditorButtonAliases[2], "Existing alias")
+  }
+
   func testSaveProfileEditorDraftReportsFailureWhenDirectoryCannotBeCreated() throws {
     let model = AppModel(startInitialRefresh: false)
     let directory = useTemporaryConfigurationDirectory(on: model)

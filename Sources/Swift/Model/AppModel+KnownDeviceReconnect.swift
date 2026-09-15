@@ -94,6 +94,7 @@ extension AppModel {
     refreshTask = nil
     knownDisconnectedDevice = device
     waitingForKnownDevice = true
+    knownDeviceWakeExpired = false
     knownDevicePollAttempts = 0
     busy = true
     currentDeviceName = device.name
@@ -125,28 +126,25 @@ extension AppModel {
       guard let self, !Task.isCancelled,
         self.knownDisconnectedDevice == device
       else { return }
-      self.waitingForKnownDevice = false
+      // Give up polling, but keep the wake modal on screen (`waitingForKnownDevice`
+      // is left true) and let the user choose Retry rather than losing the
+      // device/picker state the dialog was already showing.
+      self.knownDeviceWakeExpired = true
       self.knownDevicePollTask = nil
       self.busy = false
       self.loadingProfile = false
       self.refreshTask = nil
-      let remainingDevices = self.devices.filter {
-        !$0.matchesReconnectIdentity(device)
-      }
-      self.publishDevices(remainingDevices)
-      if remainingDevices.isEmpty {
-        self.selectedDeviceIndex = 0
-        self.currentDeviceName = ""
-        self.deviceSummary =
-          "Wake \(device.displayName), then choose Refresh, or select another mouse"
-      } else {
-        self.selectedDeviceIndex = 0
-        self.currentDeviceName = ""
-        self.deviceSummary = "Choose a Logitech mouse to continue"
-      }
       self.resetEditorState()
       self.status = self.knownDeviceRefreshStatus(for: device, expired: true)
     }
+  }
+
+  /// Restarts the ~60-second known-device poll loop after it has timed out.
+  /// Wired to the wake modal's Retry button; a no-op unless a poll loop has
+  /// actually expired and the target device is still known.
+  func retryKnownDeviceWake() {
+    guard knownDeviceWakeExpired, let device = knownDisconnectedDevice else { return }
+    beginKnownDeviceRefresh(device)
   }
 
   func startKnownDeviceProbe(_ device: DeviceChoice) {
@@ -241,6 +239,7 @@ extension AppModel {
     knownDevicePollTask = nil
     waitingForKnownDevice = false
     knownDevicePollAttempts = 0
+    knownDeviceWakeExpired = false
     if clearDevice {
       knownDisconnectedDevice = nil
     }

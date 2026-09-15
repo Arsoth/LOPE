@@ -146,7 +146,7 @@ C_COVERAGE_PROFDATA := $(COVERAGE_DIR)/lope.profdata
 # report, so keep that diagnostic chatter out of the report-only targets.
 SWIFT_BIN_PATH = $(shell swift build --show-bin-path 2>/dev/null)
 SWIFT_COVERAGE_PROFDATA = $(SWIFT_BIN_PATH)/codecov/default.profdata
-SWIFT_TEST_BINARY = $(SWIFT_BIN_PATH)/LOPEPackageTests.xctest/Contents/MacOS/LOPEPackageTests
+SWIFT_TEST_BINARY = $(SWIFT_BIN_PATH)/LOPECoreTests.xctest/Contents/MacOS/LOPECoreTests
 
 # main.m is the hardware-facing process entrypoint. Its dispatch branches
 # require live-device paths and are not part of the in-process C self-test;
