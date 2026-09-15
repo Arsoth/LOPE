@@ -79,34 +79,32 @@
 		"maximum": 2500
 	},
 	"profileIO": {
-		"supported": true,
-		"capability": "HID++ 2.0 ONBOARD_PROFILES",
-		"feature": "0x8100",
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
 		"load": {
 			"command": "profiles",
-			"engineArguments": "--summary-only --with-dpi --profile <number>",
-			"getInfo": "0x00",
-			"readSector": "0x50",
-			"controlSector": "0; fallback 1 when empty",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
 			"explicitProfile": "required when multiple slots"
 		},
 		"save": {
-			"strategy": "standard-hidpp20-sector-write",
-			"startWrite": "0x60",
-			"writeData": "0x70",
-			"endWrite": "0x80",
-			"chunkBytes": "16",
-			"backup": "exact binary sector before write",
-			"verify": "CRC and full-sector readback"
+			"strategy": "read-only",
+			"reason": "G602 is a HID++ 1.0 device (libratbag Driver=hidpp10); it does not expose the modern feature 0x8100 sector protocol this app's writer uses, so writes stay disabled until a real HID++ 1.0 profile read/write path is implemented and verified against hardware",
+			"backup": "required",
+			"verify": "required"
 		},
 		"layout": {
-			"buttonRecord": "4 bytes per control",
-			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
-			"crc": "CRC-16/CCITT-FALSE"
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
 		},
 		"notes": [
 			"G602's additional thumb controls are intentionally neutral labels because the mouse is no longer documented with a G4-G11 diagram.",
-			"productID is the mouse's own nano-receiver USB ID (0x402C), not 0xC537, which is the separate 'Cordless Mouse Receiver' dongle ID and does not identify this mouse. libratbag models G602 as HID++ 1.0 (Driver=hidpp10); this file keeps the modern feature-0x8100 description pending a real profile read to confirm."
+			"productID is the mouse's own nano-receiver USB ID (0x402C), not 0xC537, which is the separate 'Cordless Mouse Receiver' dongle ID and does not identify this mouse.",
+			"This file previously claimed modern feature-0x8100 support pending confirmation; libratbag's driver source (src/hidpp20.c, HIDPP20_QUIRK_G602) confirms G602's only HID++2.0-style feature usage is the separate Adjustable DPI feature (0x2201, with a device-specific sensor-index/value quirk), not onboard profile storage, which stays HID++ 1.0. The live engine already fails this safely today (device_feature_index in hid_transport.c returns REPLY_PROTOCOL_ERROR when feature 0x8100 isn't present), but the JSON should not claim capability the app cannot actually deliver."
 		]
 	},
 	"sources": [

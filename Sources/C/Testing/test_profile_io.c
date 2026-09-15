@@ -174,9 +174,14 @@ int test_profile_io(void) {
     profile_index_interface.product_id = 0xC099; // G502 X
     bool profile_index_ok = current_onboard_profile_number(&profile_index_device, 1) == 1 &&
                             current_onboard_profile_number(&profile_index_device, 2) == 2;
+    // G502 HERO also carries libratbag's INDEX_OFFSET quirk (confirmed
+    // against src/hidpp20.c's quirk usage, not just a device-file comment),
+    // so a raw index of 0 stays 0 and a nonzero raw index passes through
+    // unchanged, the same as the rest of the G502 X family above.
     profile_index_interface.product_id = 0xC08B; // G502 HERO
-    profile_index_ok =
-        profile_index_ok && current_onboard_profile_number(&profile_index_device, 0) == 1;
+    profile_index_ok = profile_index_ok &&
+                       current_onboard_profile_number(&profile_index_device, 0) == 0 &&
+                       current_onboard_profile_number(&profile_index_device, 1) == 1;
     if (!profile_index_ok) {
         fprintf(stderr, "onboard profile-index mapping self-test failed\n");
         return 1;
@@ -1084,6 +1089,21 @@ int test_profile_io(void) {
     mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
     snprintf(mapping_device.name, sizeof(mapping_device.name), "Other mouse");
     mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 0) == 1;
+
+    // The rest of libratbag's INDEX_OFFSET-quirked family: G502 HERO
+    // Wireless/LIGHTSPEED, G502 Proteus Spectrum, and G604 all report a
+    // 1-indexed active profile, matching the G502 X family above.
+    mapping_device.name[0] = '\0';
+    const uint16_t index_offset_products[] = {0xC08D, 0x407F, 0xC332, 0x4085};
+    for (size_t i = 0; i < sizeof(index_offset_products) / sizeof(index_offset_products[0]); i++) {
+        mapping_interface.product_id = index_offset_products[i];
+        mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
+    }
+    mapping_interface.product_id = 0xFFFF;
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G604 LIGHTSPEED");
+    mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
+    snprintf(mapping_device.name, sizeof(mapping_device.name), "G502 Proteus Spectrum");
+    mapping_ok = mapping_ok && current_onboard_profile_number(&mapping_device, 2) == 2;
     edge_coverage_ok = edge_coverage_ok && mapping_ok;
 
     uint8_t variant_dpi_data[255] = {0};

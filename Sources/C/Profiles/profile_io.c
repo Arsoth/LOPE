@@ -234,7 +234,12 @@ bool get_current_onboard_profile(Device *device, uint8_t *profile_index_out) {
     return true;
 }
 
-static bool is_g502x_family_device(const Device *device) {
+// libratbag's HIDPP20_QUIRK_INDEX_OFFSET ("device returns 1-indexed
+// profile, decrement by 1") is applied to the G502 X family, G502 HERO,
+// G502 HERO Wireless (retail name G502 LIGHTSPEED), G502 Proteus Spectrum,
+// and G604 -- confirmed against libratbag's data/devices/*.device files and
+// its quirk usage in src/hidpp20.c. G502 Proteus Core carries no quirk.
+static bool device_returns_one_indexed_active_profile(const Device *device) {
     if (device == NULL || device->iface == NULL) {
         return false;
     }
@@ -244,16 +249,25 @@ static bool is_g502x_family_device(const Device *device) {
     case 0xC099: // G502 X
     case 0x4099: // G502 X PLUS through receiver
     case 0x409F: // G502 X LIGHTSPEED through receiver
+    case 0xC08B: // G502 HERO
+    case 0xC08D: // G502 HERO Wireless / G502 LIGHTSPEED
+    case 0x407F: // G502 HERO Wireless / G502 LIGHTSPEED through receiver
+    case 0xC332: // G502 Proteus Spectrum
+    case 0x4085: // G604 LIGHTSPEED
         return true;
     default:
         break;
     }
     return text_contains_case_insensitive(device_label(device), "G502 X") ||
-           text_contains_case_insensitive(device_label(device), "G502X");
+           text_contains_case_insensitive(device_label(device), "G502X") ||
+           text_contains_case_insensitive(device_label(device), "G502 HERO") ||
+           text_contains_case_insensitive(device_label(device), "G502 LIGHTSPEED") ||
+           text_contains_case_insensitive(device_label(device), "G502 PROTEUS SPECTRUM") ||
+           text_contains_case_insensitive(device_label(device), "G604");
 }
 
 int current_onboard_profile_number(const Device *device, uint8_t raw_index) {
-    if (is_g502x_family_device(device)) {
+    if (device_returns_one_indexed_active_profile(device)) {
         return raw_index == 0 ? 0 : (int)raw_index;
     }
     return (int)raw_index + 1;

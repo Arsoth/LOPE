@@ -81,6 +81,19 @@ final class MouseProfileCatalogTests: XCTestCase {
       "G600 must remain read-only until all legacy profile features are supported")
   }
 
+  // G602 is a HID++ 1.0 device (confirmed via libratbag's driver source),
+  // not a modern feature-0x8100 device as this file previously assumed.
+  // Regression coverage for the profile validation pass that corrected it.
+  func testG602RemainsReadOnlyAsLegacyHIDPP10Device() {
+    let g602Profile = MouseProfileCatalog.shared.profile(deviceName: "G602", productID: "0x402C")
+    XCTAssertEqual(g602Profile.id, "g602")
+    XCTAssertFalse(g602Profile.profileIO.supported)
+    XCTAssertFalse(g602Profile.profileIO.canSave)
+    XCTAssertEqual(
+      g602Profile.profileIO.save["strategy"], "read-only",
+      "G602 must remain read-only until a real HID++ 1.0 profile path is implemented and verified")
+  }
+
   func testG502RGBCapabilityGating() {
     let g502 = MouseProfileCatalog.shared.profile(deviceName: "G502 HERO", productID: "0xC08B")
     let g502RGB = g502.rgbCapabilities(
