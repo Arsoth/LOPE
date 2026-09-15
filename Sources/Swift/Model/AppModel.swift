@@ -102,12 +102,24 @@ final class AppModel: ObservableObject {
   @Published var profileEditorName = ""
   @Published var profileEditorSources = ""
   @Published var profileEditorButtonNames: [Int: String] = [:]
-  // Everything the simple editor fields do not expose (aliases, scroll-wheel
-  // labels, hidden-button numbers, refresh guidance, RGB zones, profileIO):
-  // carried over untouched from the descriptor already covering this device,
-  // an imported file, or a freshly synthesized starting point, so saving or
+  // A comma-separated alias list per button, editable alongside the primary
+  // control name; see `MouseProfileDescriptor.Button.aliases`. Stored as one
+  // string per button (rather than `[Int: [String]]`) so it binds directly
+  // to a single TextField the same way `profileEditorButtonNames` does.
+  @Published var profileEditorButtonAliases: [Int: String] = [:]
+  // Everything the simple editor fields do not expose (scroll-wheel labels,
+  // hidden-button numbers, refresh guidance, RGB zones, profileIO): carried
+  // over untouched from the descriptor already covering this device, an
+  // imported file, or a freshly synthesized starting point, so saving or
   // exporting never silently drops data the UI does not surface.
   var profileEditorBase: MouseProfileDescriptor?
+  // The device identity (name + product ID) the current editor fields were
+  // last primed from. `resetProfileEditorDraft()` only overwrites the
+  // editable fields when this changes, so a same-device refresh -- e.g. a
+  // background reconnect poll, or picking a different onboard profile slot
+  // while the Profile Editor tab is not the one visible -- does not discard
+  // unsaved edits merely because `setButtonRows` ran again.
+  var profileEditorDeviceIdentity: String?
 
   var hasGShiftLayer: Bool {
     !gShiftButtonRows.isEmpty
