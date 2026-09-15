@@ -99,6 +99,17 @@ int test_profile_rendering(void) {
         describe_spec_ok =
             describe_spec_ok && strcmp(key_name(key_cases[i].code), key_cases[i].name) == 0;
     }
+    const struct {
+        uint8_t code;
+        const char *name;
+    } modifier_key_cases[] = {
+        {0xE0, "Left Control"},  {0xE1, "Left Shift"},  {0xE2, "Left Alt"},  {0xE3, "Left GUI"},
+        {0xE4, "Right Control"}, {0xE5, "Right Shift"}, {0xE6, "Right Alt"}, {0xE7, "Right GUI"},
+    };
+    for (size_t i = 0; i < sizeof(modifier_key_cases) / sizeof(modifier_key_cases[0]); i++) {
+        describe_spec_ok = describe_spec_ok && strcmp(key_name(modifier_key_cases[i].code),
+                                                      modifier_key_cases[i].name) == 0;
+    }
     for (uint8_t function = 0; function <= 0x11; function++) {
         describe_spec_ok = describe_spec_ok &&
                            strcmp(function_name(function), function == 0x00   ? "no action"

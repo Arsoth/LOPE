@@ -146,6 +146,15 @@ final class AppModelParsingTests: XCTestCase {
     XCTAssertEqual(AppModel.parseDeviceChoices(text).first?.name, "G604")
   }
 
+  func testParseDeviceChoicesCanonicalizesBaseG502MarketingName() {
+    let text =
+      "[1] Wired  Tunable RGB Gaming Mouse G502 (HID++ 4.5, product 0xC08B, key abc502)"
+
+    let device = AppModel.parseDeviceChoices(text).first
+    XCTAssertEqual(device?.name, "G502")
+    XCTAssertEqual(device?.title, "G502 — Wired")
+  }
+
   func testReportedDeviceNamePrefersSpecificPairedModelOverGenericLabel() {
     let text = """
       Onboard profiles for Paired Logitech Mouse - Lightspeed:

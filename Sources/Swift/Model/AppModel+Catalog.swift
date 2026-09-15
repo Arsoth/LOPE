@@ -124,6 +124,17 @@ extension AppModel {
       KeyboardKeyChoice(id: 0x65, label: "Application"),
       KeyboardKeyChoice(id: 0x66, label: "Power"),
       KeyboardKeyChoice(id: 0x82, label: "Locking Caps Lock"),
+      // HID modifier usages can be assigned as the key itself. They are
+      // separate from the chord modifier bitmap so a mouse button can send
+      // a bare Ctrl, Shift, Alt, or Command key.
+      KeyboardKeyChoice(id: 0xE0, label: "Left Control"),
+      KeyboardKeyChoice(id: 0xE1, label: "Left Shift"),
+      KeyboardKeyChoice(id: 0xE2, label: "Left Alt"),
+      KeyboardKeyChoice(id: 0xE3, label: "Left GUI"),
+      KeyboardKeyChoice(id: 0xE4, label: "Right Control"),
+      KeyboardKeyChoice(id: 0xE5, label: "Right Shift"),
+      KeyboardKeyChoice(id: 0xE6, label: "Right Alt"),
+      KeyboardKeyChoice(id: 0xE7, label: "Right GUI"),
       // Navigation and arrow cluster: navigation keys followed by the
       // physical arrow arrangement (up, then the three-key bottom row).
       KeyboardKeyChoice(id: 0x46, label: "Print Screen"),
@@ -292,6 +303,7 @@ extension AppModel {
       0x68...0x73,  // F13–F24
       0x74...0xA5,  // extended keyboard/page usages
       0xB0...0xB8,  // media usages
+      0xE0...0xE7,  // keyboard modifier usages
       0xF8...0xFA:  // Sleep, Wake, Refresh extensions
       return true
     default:
@@ -301,6 +313,8 @@ extension AppModel {
 
   func keyboardKeyGroup(for key: KeyboardKeyChoice) -> KeyboardKeyGroup {
     switch key.id {
+    case 0xE0...0xE7:
+      return .modifier
     case 0x04...0x67, 0x82...0x86:
       return .standard
     case 0x68...0x73:

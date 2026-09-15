@@ -115,7 +115,7 @@ struct SettingsPane: View {
             .toggleStyle(.checkbox)
             .tint(theme.checkboxActive)
             Text(
-              "Shows the optional extended-key override for usages such as Insert, F13–F24, and Sleep. Recording captures modifiers automatically."
+              "Shows the optional extended-key override for usages such as Insert, F13–F24, modifier keys, and Sleep. Recording captures modifiers automatically."
             )
             .font(.caption)
             .foregroundStyle(.secondary)

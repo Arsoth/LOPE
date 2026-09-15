@@ -174,7 +174,10 @@ extension AppModel {
   func loadLastSelectedDevice() -> DeviceChoice? {
     let key = "\(AppConstants.defaultsPrefix).\(AppConstants.lastSelectedDeviceKey)"
     guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
-    return try? JSONDecoder().decode(DeviceChoice.self, from: data)
+    guard let device = try? JSONDecoder().decode(DeviceChoice.self, from: data) else {
+      return nil
+    }
+    return device.replacingName(DeviceChoice.normalizedReportedName(device.name))
   }
 
   func rememberSelectedDevice(_ device: DeviceChoice) {

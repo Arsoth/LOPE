@@ -158,6 +158,8 @@ final class AppModelCatalogTests: XCTestCase {
     XCTAssertTrue(keys.contains { $0.id == 0x45 && $0.label == "F12" })
     XCTAssertTrue(keys.contains { $0.id == 0x68 && $0.label == "F13" })
     XCTAssertTrue(keys.contains { $0.id == 0x73 && $0.label == "F24" })
+    XCTAssertTrue(keys.contains { $0.id == 0xE2 && $0.label == "Left Alt" })
+    XCTAssertTrue(keys.contains { $0.id == 0xE7 && $0.label == "Right GUI" })
   }
 
   func testExtendedKeyboardKeyClassification() {
@@ -169,6 +171,11 @@ final class AppModelCatalogTests: XCTestCase {
     XCTAssertFalse(model.isExtendedKeyboardKey(letterA))
     XCTAssertTrue(model.extendedKeyboardKeys.contains(printScreen))
     XCTAssertFalse(model.extendedKeyboardKeys.contains(letterA))
+
+    let leftAlt = KeyboardKeyChoice(id: 0xE2, label: "Left Alt")
+    XCTAssertTrue(model.isExtendedKeyboardKey(leftAlt))
+    XCTAssertEqual(model.keyboardKeyGroup(for: leftAlt), .modifier)
+    XCTAssertTrue(model.extendedKeyboardKeys.contains(leftAlt))
   }
 
   func testKeyboardOutputKeysRespectsShowNonStandardKeyboardKeysFlag() {
@@ -255,6 +262,7 @@ final class AppModelCatalogTests: XCTestCase {
       groups.map(\.label),
       [
         "Standard full-size keyboard keys",
+        "Modifier keys",
         "F13 and later keys",
         "Media keys",
         "Other unusual keys",
@@ -284,6 +292,14 @@ final class AppModelCatalogTests: XCTestCase {
       [
         "Eject", "Fast Forward", "Mute", "Pause", "Play", "Record", "Rewind",
         "Scan Next Track", "Scan Previous Track", "Stop", "Volume Down", "Volume Up",
+      ])
+
+    let modifierLabels = groups.first { $0.group == .modifier }?.keys.map(\.label) ?? []
+    XCTAssertEqual(
+      modifierLabels,
+      [
+        "Left Alt", "Left Control", "Left GUI", "Left Shift",
+        "Right Alt", "Right Control", "Right GUI", "Right Shift",
       ])
   }
 

@@ -125,6 +125,22 @@ const char *key_name(uint8_t code) {
         return "F23";
     case 0x73:
         return "F24";
+    case 0xE0:
+        return "Left Control";
+    case 0xE1:
+        return "Left Shift";
+    case 0xE2:
+        return "Left Alt";
+    case 0xE3:
+        return "Left GUI";
+    case 0xE4:
+        return "Right Control";
+    case 0xE5:
+        return "Right Shift";
+    case 0xE6:
+        return "Right Alt";
+    case 0xE7:
+        return "Right GUI";
     default:
         return "unknown key";
     }

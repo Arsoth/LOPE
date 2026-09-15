@@ -65,6 +65,11 @@ device's display name, connection type, product ID, and HID identity are kept
 together so that a refresh cannot accidentally apply one mouse's profile to
 another.
 
+Device names are normalized consistently across the picker, selected-device
+summary, and cached refresh state. In particular, marketing prefixes such as
+"Tunable RGB Gaming Mouse" are removed from G502 labels while meaningful
+variants such as X, PLUS, HERO, and LIGHTSPEED remain.
+
 For receiver-backed mice, the product ID is the paired mouse's WPID from the
 receiver pairing record. The receiver's USB product ID remains transport-only:
 it selects the receiver interface and routing path, but it is not a mouse
@@ -153,6 +158,10 @@ devices with an unverified format are discoverable and readable where possible
 but remain read-only. Adding a descriptor is not by itself authorization to
 write: its profile layout and save path must be validated first.
 
+The base G502 descriptor uses the original G502 button layout and validated
+legacy RGB zones. More specific G502 variants such as HERO, LIGHTSPEED, and X
+win catalog matching when their names are present.
+
 MX-series devices are classified by name and known product ID before the
 fallback editor is rendered. They can remain visible in discovery, but LOPE
 does not invent a G-series physical layout for them and does not show the MX
@@ -203,7 +212,10 @@ plus its Ctrl, Shift, Alt, and Command flags. The highlighted box displays the
 complete chord and exposes an X that cancels without changing the existing
 output. The editor knows the full keyboard usage table for recording, but keeps
 the optional extended-key override hidden until the Settings opt-in is enabled.
-That opt-in adds keys such as Insert, F13–F24, and Sleep.
+That opt-in adds keys such as Insert, F13–F24, bare modifier usages, and Sleep.
+When a modifier usage is selected as the key itself, the matching Ctrl, Shift,
+Alt, or Command chord toggle remains visible but is disabled to prevent sending
+the same modifier twice.
 
 The standard HID++ keyboard record has one usage byte and one modifier bitmap.
 Macro records use a separate format and remain outside this editor's writable
