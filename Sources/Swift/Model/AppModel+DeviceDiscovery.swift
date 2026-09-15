@@ -29,7 +29,7 @@ extension AppModel {
       self.refreshTask = nil
       if let errorMessage = enumeration.errorMessage {
         self.status =
-          "Loaded \(cachedDevice.name). The device list could not be refreshed: \(errorMessage)"
+          "Loaded \(cachedDevice.displayName). The device list could not be refreshed: \(errorMessage)"
         return
       }
       guard

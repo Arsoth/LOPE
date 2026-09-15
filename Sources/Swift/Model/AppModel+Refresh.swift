@@ -108,7 +108,8 @@ extension AppModel {
 
   func presentWiredAccessInstructions(for device: DeviceChoice? = nil) {
     guard !wiredAccessInstructionsPresented else { return }
-    wiredAccessDeviceName = device?.name ?? devices.first(where: { $0.isWiredDevice })?.name
+    wiredAccessDeviceName =
+      device?.displayName ?? devices.first(where: { $0.isWiredDevice })?.displayName
     wiredAccessInstructionsPresented = true
   }
 
@@ -125,7 +126,7 @@ extension AppModel {
     deviceSummary = device.title
     resetEditorState()
     status =
-      "Input Monitoring is required to read \(device.name). Choose the device again to open System Settings."
+      "Input Monitoring is required to read \(device.displayName). Choose the device again to open System Settings."
   }
 
   func reloadSelectedProfile() {

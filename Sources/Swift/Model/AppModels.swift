@@ -119,8 +119,16 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
   let productID: String
   let deviceKey: String
 
+  /// The catalog name is the stable, human-facing hardware identity. Keep
+  /// `name` as the normalized engine value for matching and persistence, but
+  /// show the descriptor's full name wherever a device is presented to the
+  /// user (for example, the three distinct G502 variants).
+  var displayName: String {
+    MouseProfileCatalog.shared.matchingProfile(deviceName: name, productID: productID)?.name ?? name
+  }
+
   var title: String {
-    "\(name) — \(connection)"
+    "\(displayName) — \(connection)"
   }
 
   var isWiredDevice: Bool {

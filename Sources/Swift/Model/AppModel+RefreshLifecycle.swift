@@ -122,7 +122,7 @@ extension AppModel {
       self.rememberSelectedDevice(resolvedSelected)
       self.prepareLoadingEditor(
         profileNumber: preferredProfileNumber == 0 ? 1 : preferredProfileNumber)
-      self.status = "Found \(selected.name). Reading onboard profile…"
+      self.status = "Found \(selected.displayName). Reading onboard profile…"
       let profileReadProgress = self.profileReadProgressHandler(generation: generation)
 
       let devicesForProfileRead = self.devices

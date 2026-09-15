@@ -138,7 +138,7 @@ extension AppModel {
         self.selectedDeviceIndex = 0
         self.currentDeviceName = ""
         self.deviceSummary =
-          "Wake \(device.name), then choose Refresh, or select another mouse"
+          "Wake \(device.displayName), then choose Refresh, or select another mouse"
       } else {
         self.selectedDeviceIndex = 0
         self.currentDeviceName = ""
@@ -304,12 +304,12 @@ extension AppModel {
     )?.refreshGuidance
     guard let guidance else {
       return expired
-        ? "Still waiting for \(device.name). Move or click it to wake it, then choose Refresh."
-        : "Checking for \(device.name)…"
+        ? "Still waiting for \(device.displayName). Move or click it to wake it, then choose Refresh."
+        : "Checking for \(device.displayName)…"
     }
     if expired {
-      return "Still waiting for \(device.name). \(guidance.wakeInstructions)"
+      return "Still waiting for \(device.displayName). \(guidance.wakeInstructions)"
     }
-    return "Checking for \(device.name)…"
+    return "Checking for \(device.displayName)…"
   }
 }

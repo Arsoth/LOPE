@@ -56,9 +56,9 @@ struct ConfigureSurfaceView: View {
         Text("Loading profiles from mouse…")
           .font(.headline)
         Text(
-          model.currentDeviceName.isEmpty
+          currentDeviceDisplayName.isEmpty
             ? "Finding Logitech mice and reading onboard data"
-            : "Reading \(model.currentDeviceName)"
+            : "Reading \(currentDeviceDisplayName)"
         )
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -80,7 +80,7 @@ struct ConfigureSurfaceView: View {
         .accessibilityHidden(true)
 
       CenteredAppModal(
-        title: "Wake \(model.currentDeviceName)",
+        title: "Wake \(currentDeviceDisplayName)",
         message: knownDeviceWakeMessage,
         symbol: "computermouse.fill",
         onCancel: {},
@@ -95,6 +95,11 @@ struct ConfigureSurfaceView: View {
     .accessibilityAddTraits(.isModal)
     .transition(.opacity)
     .zIndex(10)
+  }
+
+  private var currentDeviceDisplayName: String {
+    model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.displayName
+      ?? model.currentDeviceName
   }
 
   private var knownDeviceWakeMessage: String {
@@ -121,13 +126,18 @@ struct LoadingProfileStateView: View {
       Text("Loading profiles from mouse…")
         .font(.headline)
       Text(
-        model.currentDeviceName.isEmpty
-          ? "Finding Logitech mice and reading onboard data" : "Reading \(model.currentDeviceName)"
+        currentDeviceDisplayName.isEmpty
+          ? "Finding Logitech mice and reading onboard data" : "Reading \(currentDeviceDisplayName)"
       )
       .font(.callout)
       .foregroundStyle(.secondary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private var currentDeviceDisplayName: String {
+    model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.displayName
+      ?? model.currentDeviceName
   }
 }
 
@@ -201,7 +211,7 @@ struct EmptyStateView: View {
   }
 
   private var wiredMouseName: String {
-    model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.name
+    model.devices.first(where: { $0.id == model.selectedDeviceIndex })?.displayName
       ?? model.currentDeviceName
   }
 }
