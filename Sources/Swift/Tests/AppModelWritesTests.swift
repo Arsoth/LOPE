@@ -500,6 +500,37 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(model.status.contains("Live default DPI: 800"))
   }
 
+  func testApplyAllWithOnlyRGBModeChangeInvokesWriteEngineWithModeArgument() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
+    model.baselineDPIStages = model.dpiStages
+    model.baselineDPICount = model.dpiCount
+    model.rgbZones = [
+      RGBZoneState(
+        id: 0, name: "Zone 1",
+        current: RGBColor(red: 255, green: 0, blue: 0),
+        draft: RGBColor(red: 255, green: 0, blue: 0),
+        currentMode: .solid,
+        draftMode: .cycle
+      )
+    ]
+    var calls = [[String]]()
+    model.engineRunnerOverride = { arguments in
+      calls.append(arguments)
+      return "Verified sector 0x0100\n"
+    }
+    model.applyAll()
+    guard let applyCall = calls.first(where: { $0.contains("apply") }) else {
+      XCTFail("apply was never invoked")
+      return
+    }
+    XCTAssertTrue(applyCall.contains("--rgb-mode-change"))
+    XCTAssertTrue(applyCall.contains("1:03"))
+    XCTAssertFalse(applyCall.contains("--rgb-change"))
+    XCTAssertTrue(model.status.contains("RGB colors were read back from the profile summary."))
+  }
+
   func testValidPrimaryClickAssignmentInvokesWriteEngine() {
     let validModel = AppModel(startInitialRefresh: false)
     configureFixtureDevice(validModel)

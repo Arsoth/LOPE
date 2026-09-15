@@ -30,7 +30,9 @@ final class MouseProfileDescriptorTests: XCTestCase {
     dpiRange: MouseProfileDescriptor.DPIRange? = nil,
     generated: Bool? = nil,
     buttons: [MouseProfileDescriptor.Button] = [],
-    scrollWheelButtonLabels: [String: String]? = nil
+    scrollWheelButtonLabels: [String: String]? = nil,
+    profileIO: MouseProfileDescriptor.ProfileIO? = nil,
+    referenceProfile: MouseProfileDescriptor.ReferenceProfile? = nil
   ) -> MouseProfileDescriptor {
     MouseProfileDescriptor(
       schemaVersion: 1,
@@ -42,8 +44,9 @@ final class MouseProfileDescriptorTests: XCTestCase {
       hiddenProfileButtonNumbers: nil,
       dpiRange: dpiRange,
       refreshGuidance: nil,
-      profileIO: makeProfileIO(),
+      profileIO: profileIO ?? makeProfileIO(),
       rgbProfile: rgbProfile,
+      referenceProfile: referenceProfile,
       sources: [],
       generated: generated
     )
@@ -52,6 +55,13 @@ final class MouseProfileDescriptorTests: XCTestCase {
   private func decodeRGBProfile(json: String) throws -> MouseProfileDescriptor.RGBProfile {
     try JSONDecoder().decode(
       MouseProfileDescriptor.RGBProfile.self, from: Data(json.utf8))
+  }
+
+  private func decodeReferenceProfile(json: String) throws
+    -> MouseProfileDescriptor.ReferenceProfile
+  {
+    try JSONDecoder().decode(
+      MouseProfileDescriptor.ReferenceProfile.self, from: Data(json.utf8))
   }
 
   // MARK: DPIRange
@@ -295,5 +305,69 @@ final class MouseProfileDescriptorTests: XCTestCase {
     let unsupportedDescriptor = makeDescriptor(rgbProfile: unsupportedRGB)
     XCTAssertNil(
       unsupportedDescriptor.rgbCapabilities(deviceName: "G604", productID: "0xC087"))
+  }
+
+  // MARK: ReferenceProfile
+
+  func testReferenceProfileDecodeDefaultsForMissingKeys() throws {
+    let decoded = try decodeReferenceProfile(json: "{}")
+    XCTAssertEqual(decoded.source, .unknown)
+    XCTAssertEqual(decoded.buttons, [])
+    XCTAssertNil(decoded.dpi)
+    XCTAssertNil(decoded.reportRateHz)
+    XCTAssertNil(decoded.rgbZones)
+    XCTAssertEqual(decoded.notes, [])
+  }
+
+  func testReferenceProfileDecodeUsesProvidedValues() throws {
+    let decoded = try decodeReferenceProfile(
+      json: """
+        {
+          "source": "verifiedFactoryReset",
+          "buttons": [{ "number": 1, "raw": "80010001" }],
+          "dpi": { "stages": [1200, 2400], "defaultStage": 2, "shiftStage": 1 },
+          "reportRateHz": 1000,
+          "rgbZones": [{ "index": 0, "mode": "cycle" }],
+          "notes": ["captured from a real reset"]
+        }
+        """)
+    XCTAssertEqual(decoded.source, .verifiedFactoryReset)
+    XCTAssertEqual(
+      decoded.buttons,
+      [
+        MouseProfileDescriptor.ReferenceProfile.Button(
+          number: 1, raw: "80010001")
+      ])
+    XCTAssertEqual(decoded.dpi?.stages, [1200, 2400])
+    XCTAssertEqual(decoded.dpi?.defaultStage, 2)
+    XCTAssertEqual(decoded.dpi?.shiftStage, 1)
+    XCTAssertEqual(decoded.reportRateHz, 1000)
+    XCTAssertEqual(decoded.rgbZones?.first?.index, 0)
+    XCTAssertEqual(decoded.rgbZones?.first?.mode, "cycle")
+    XCTAssertNil(decoded.rgbZones?.first?.color)
+    XCTAssertEqual(decoded.notes, ["captured from a real reset"])
+  }
+
+  func testCanRestoreReferenceProfileRequiresVerifiedSourceAndSaveSupport() throws {
+    let verified = try decodeReferenceProfile(json: #"{"source": "verifiedFactoryReset"}"#)
+    let userConfig = try decodeReferenceProfile(json: #"{"source": "userConfiguration"}"#)
+
+    let saveable = makeDescriptor(profileIO: makeProfileIO(supported: true))
+    let readOnly = makeDescriptor(profileIO: makeProfileIO(saveStrategy: "read-only"))
+
+    XCTAssertTrue(
+      makeDescriptor(
+        profileIO: makeProfileIO(supported: true), referenceProfile: verified
+      ).canRestoreReferenceProfile)
+    XCTAssertFalse(
+      makeDescriptor(
+        profileIO: makeProfileIO(saveStrategy: "read-only"), referenceProfile: verified
+      ).canRestoreReferenceProfile)
+    XCTAssertFalse(
+      makeDescriptor(
+        profileIO: makeProfileIO(supported: true), referenceProfile: userConfig
+      ).canRestoreReferenceProfile)
+    XCTAssertFalse(saveable.canRestoreReferenceProfile)
+    XCTAssertFalse(readOnly.canRestoreReferenceProfile)
   }
 }

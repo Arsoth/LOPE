@@ -1315,6 +1315,26 @@ int test_profile_io(void) {
     detect_rgb_layout(&rgb_mode_profile);
     edge_coverage_ok = edge_coverage_ok && rgb_mode_profile.rgb_layout_supported;
 
+    uint8_t rgb_mode_write_zone[1] = {0};
+    uint8_t rgb_mode_write_value[1] = {0x03};
+    edge_coverage_ok =
+        edge_coverage_ok &&
+        write_rgb_zone_modes(rgb_mode_data, &rgb_mode_profile, rgb_mode_write_zone,
+                             rgb_mode_write_value, 1) &&
+        rgb_mode_data[RGB_PROFILE_BASE_OFFSET] == 0x03 &&
+        !write_rgb_zone_modes(NULL, &rgb_mode_profile, rgb_mode_write_zone, rgb_mode_write_value,
+                              1) &&
+        !write_rgb_zone_modes(rgb_mode_data, NULL, rgb_mode_write_zone, rgb_mode_write_value, 1);
+    uint8_t rgb_mode_unknown_value[1] = {0x99};
+    edge_coverage_ok =
+        edge_coverage_ok && !write_rgb_zone_modes(rgb_mode_data, &rgb_mode_profile,
+                                                  rgb_mode_write_zone, rgb_mode_unknown_value, 1);
+    Profile rgb_mode_unsupported_profile = rgb_mode_profile;
+    rgb_mode_unsupported_profile.rgb_layout_supported = false;
+    edge_coverage_ok =
+        edge_coverage_ok && !write_rgb_zone_modes(rgb_mode_data, &rgb_mode_unsupported_profile,
+                                                  rgb_mode_write_zone, rgb_mode_write_value, 1);
+
     // A live DPI write can fail transiently, then succeed after the retry
     // delay. Also verify the bounded all-fail case and its loop exit.
     const Reply live_retry_replies[] = {

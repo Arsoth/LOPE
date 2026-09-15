@@ -15,6 +15,7 @@ typedef bool (*BatchSectorWriter)(void *context, const BatchSector *sector);
 bool parse_batch_raw_record(const char *text, uint8_t spec[4]);
 bool parse_batch_button_change(const char *text, int *button, bool *gshift, uint8_t spec[4]);
 bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]);
+bool parse_batch_rgb_mode_change(const char *text, int *zone, uint8_t *mode);
 bool parse_batch_profile_state(const char *text, int *profile, bool *enabled);
 bool batch_operation_id_is_safe(const char *operation_id);
 bool make_batch_backup_path(const char *directory, const char *operation_id, char path[512]);

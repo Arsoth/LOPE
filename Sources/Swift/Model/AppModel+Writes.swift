@@ -64,6 +64,7 @@ extension AppModel {
     let dpiChanged = hasDPIChanges
     let pollingRateChanged = hasPollingRateChanges
     let rgbChanges = rgbZones.filter { $0.current != $0.draft }
+    let rgbModeChanges = rgbZones.filter { $0.currentMode != $0.draftMode }
     let profileChanges =
       profiles
       .filter { $0.enabled != (baselineProfileEnabled[$0.id] ?? $0.enabled) }
@@ -78,7 +79,7 @@ extension AppModel {
     }
     guard
       !buttonChanges.isEmpty || dpiChanged || pollingRateChanged || !rgbChanges.isEmpty
-        || !profileChanges.isEmpty
+        || !rgbModeChanges.isEmpty || !profileChanges.isEmpty
     else {
       status = "No changes to apply."
       return
@@ -90,7 +91,7 @@ extension AppModel {
     guard validatePrimaryClickBeforeWrite() else { return }
     executeBatchSave(
       buttonChanges: buttonChanges, dpiChanged: dpiChanged,
-      rgbChanges: rgbChanges, profileChanges: profileChanges,
+      rgbChanges: rgbChanges, rgbModeChanges: rgbModeChanges, profileChanges: profileChanges,
       pollingRate: pollingRateChanged ? pollingRateDraft : nil)
   }
 
@@ -98,6 +99,7 @@ extension AppModel {
     buttonChanges: [ButtonRow],
     dpiChanged: Bool,
     rgbChanges: [RGBZoneState] = [],
+    rgbModeChanges: [RGBZoneState] = [],
     profileChanges: [ProfileChoice],
     pollingRate: Int? = nil
   ) {
@@ -134,6 +136,9 @@ extension AppModel {
     arguments += rgbChanges.map { ["--rgb-change", "\($0.id + 1):\($0.draft.bareHex)"] }.flatMap {
       $0
     }
+    arguments += rgbModeChanges.map {
+      ["--rgb-mode-change", "\($0.id + 1):\($0.draftMode.bareHex)"]
+    }.flatMap { $0 }
     arguments += profileChanges.flatMap {
       ["--profile-state-change", "\($0.id):\($0.enabled ? "enable" : "disable")"]
     }
@@ -150,7 +155,8 @@ extension AppModel {
         .first { $0.hasPrefix("Live default DPI:") }
       let liveSuffix = liveDPI.map { " \($0)" } ?? ""
       let rgbSuffix =
-        rgbChanges.isEmpty ? "" : " RGB colors were read back from the profile summary."
+        rgbChanges.isEmpty && rgbModeChanges.isEmpty
+        ? "" : " RGB colors were read back from the profile summary."
       status =
         "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back.\(rgbSuffix)\(liveSuffix)"
     } catch {

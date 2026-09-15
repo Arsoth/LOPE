@@ -117,15 +117,47 @@
 		"zones": [
 			{
 				"index": 0,
-				"name": "DPI"
+				"name": "Logo"
 			},
 			{
 				"index": 1,
-				"name": "Logo"
+				"name": "DPI"
 			}
 		],
 		"notes": [
-			"Validated on the wired G502 Spectrum (product 0xC332): four 11-byte legacy onboard RGB records begin at offset 208, with DPI and Logo zones. Only the three-byte solid-color field is edited."
+			"Validated on the wired G502 Spectrum (product 0xC332): four 11-byte legacy onboard RGB records begin at offset 208, with Logo and DPI-indicator zones. Only the three-byte solid-color field is edited.",
+			"Zone indexes were confirmed against the physical LEDs: index 0 drives the Logo LED, index 1 drives the DPI-indicator LED (this was previously reversed)."
+		]
+	},
+	"referenceProfile": {
+		"source": "verifiedFactoryReset",
+		"buttons": [
+			{ "number": 1, "raw": "80010001" },
+			{ "number": 2, "raw": "80010002" },
+			{ "number": 3, "raw": "80010004" },
+			{ "number": 4, "raw": "80010008" },
+			{ "number": 5, "raw": "80010010" },
+			{ "number": 6, "raw": "90070000" },
+			{ "number": 7, "raw": "90040000" },
+			{ "number": 8, "raw": "90030000" },
+			{ "number": 9, "raw": "90010000" },
+			{ "number": 10, "raw": "90020000" },
+			{ "number": 11, "raw": "900A0000" }
+		],
+		"dpi": {
+			"stages": [1200, 2400, 3200, 6400],
+			"defaultStage": 2,
+			"shiftStage": 1
+		},
+		"reportRateHz": 1000,
+		"rgbZones": [
+			{ "index": 0, "mode": "cycle" },
+			{ "index": 1, "mode": "cycle" }
+		],
+		"notes": [
+			"Captured 2026-09 by factory-resetting a wired G502 Proteus Spectrum (0xC332, G HUB internal model id 'g502_spectrum') from Logitech G HUB and reading back the resulting state; G HUB marks this data read-only, matching a manufacturer default rather than a user edit.",
+			"Button raw records reuse this file's own buttonRecord encoding (see profileIO.layout): G1-G5 are mouse-button clicks, G6 is DPI Shift (hold-to-lower/'sniper'), G7/G8 are DPI down/up, G9/G10 are wheel tilt left/right, G9-profile (button 11) cycles the onboard profile.",
+			"RGB zone colors are intentionally omitted here: G HUB's default effect is a full-brightness rainbow cycle, and the color bytes a real device stores while cycling were never directly observed, so only the verified effect mode is recorded. The mode byte position/values (0x03 = cycle) come from this codebase's own profile_codec_rgb_mode_is_known validation, not from G HUB."
 		]
 	},
 	"sources": [

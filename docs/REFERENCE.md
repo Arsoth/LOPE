@@ -160,9 +160,14 @@ write: its profile layout and save path must be validated first.
 
 The `G502 Proteus Spectrum` descriptor represents the wired Spectrum model
 (product 0xC332), using its original button layout and validated legacy RGB
-zones (DPI and Logo). The catalog keeps `G502 Proteus Core` (0xC07D), `G502
-HERO` (0xC08B), LIGHTSPEED, and X as separate descriptors so their product
-identities and capabilities cannot be confused.
+zones (Logo and DPI-indicator, in that zone-index order). The catalog keeps
+`G502 Proteus Core` (0xC07D), `G502 HERO` (0xC08B), LIGHTSPEED, and X as
+separate descriptors so their product identities and capabilities cannot be
+confused. Its descriptor also carries a `referenceProfile` (see
+[Profiles/README.md](../Profiles/README.md#referenceprofile-optional))
+captured by factory-resetting a real device from Logitech G HUB and reading
+back the result — the only data source trusted enough to back the **Restore
+reference profile** button described below.
 
 MX-series devices are classified by name and known product ID before the
 fallback editor is rendered. They can remain visible in discovery, but LOPE
@@ -228,6 +233,27 @@ keyboard-output model.
 The DPI editor supports one to five strictly increasing stages, subject to the
 values reported by the mouse. Default and DPI-shift stages are separate
 one-based selections. Profile toggles cannot disable the final enabled profile.
+
+### RGB editing
+
+For a device whose descriptor advertises writable RGB zones, each zone has an
+independently editable solid color and effect mode (Disabled, Solid, Pulse,
+Cycle, Wave, Breathe, Ripple — see
+[Legacy onboard RGB records](PROTOCOL.md#legacy-onboard-rgb-records)). Color
+and mode are staged and saved separately (`--rgb-change` / `--rgb-mode-change`)
+but land in the same batched sector write as any other pending change. An
+effect ID the device reports but this editor has no name for (a handful of
+unnamed IDs the firmware still accepts) displays as Disabled rather than
+disappearing from the editor.
+
+A descriptor with a `referenceProfile` sourced from an actual verified factory
+reset (see [Profiles/README.md](../Profiles/README.md#referenceprofile-optional))
+offers a **Restore reference profile** action that loads its recorded button
+assignments, DPI table, report rate, and RGB effect modes into the editor's
+drafts for review — it does not write anything until the normal Save action is
+used afterward, and it never touches RGB color, since the recorded reference
+data intentionally omits colors that were never directly confirmed on a real
+device (e.g. the color bytes underlying a cycling rainbow effect).
 
 ### G-Shift button assignments
 

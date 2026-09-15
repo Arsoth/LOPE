@@ -107,7 +107,7 @@ final class MouseProfileCatalogTests: XCTestCase {
       g502.rgbCapabilities(
         deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332", profileFormat: 5
       )?.zones.map(\.name),
-      ["DPI", "Logo"])
+      ["Logo", "DPI"])
     XCTAssertNotNil(
       g502.rgbCapabilities(
         deviceName: "Tunable RGB Gaming Mouse G502", productID: "0xC332", profileFormat: 2))

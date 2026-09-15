@@ -218,6 +218,8 @@ typedef struct {
     size_t button_change_count;
     const char *rgb_changes[MAX_BATCH_RGB_CHANGES];
     size_t rgb_change_count;
+    const char *rgb_mode_changes[MAX_BATCH_RGB_CHANGES];
+    size_t rgb_mode_change_count;
     const char *profile_state_changes[MAX_BATCH_PROFILE_CHANGES];
     size_t profile_state_change_count;
     bool yes;

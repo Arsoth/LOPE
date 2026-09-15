@@ -125,6 +125,44 @@ bool parse_batch_rgb_change(const char *text, int *zone, uint8_t color[3]) {
     return true;
 }
 
+bool parse_batch_rgb_mode_change(const char *text, int *zone, uint8_t *mode) {
+    if (text == NULL) {
+        return false;
+    }
+    const char *separator = strchr(text, ':');
+    if (separator == NULL || separator == text || separator[1] == '\0') {
+        return false;
+    }
+    char number_text[16];
+    size_t number_length = (size_t)(separator - text);
+    if (number_length >= sizeof(number_text)) {
+        return false;
+    }
+    memcpy(number_text, text, number_length);
+    number_text[number_length] = '\0';
+    char *end = NULL;
+    // number_text holds at most 15 digit characters (guarded above), so
+    // strtol's result can never overflow long; no errno check is reachable.
+    long number = strtol(number_text, &end, 10);
+    if (end == number_text || *end != '\0' || number < 1 || number > RGB_PROFILE_RECORD_COUNT) {
+        return false;
+    }
+    const char *hex = separator + 1;
+    if (strlen(hex) != 2) {
+        return false;
+    }
+    char *byte_end = NULL;
+    // hex holds exactly 2 hex digits (guarded above), so strtoul's result can
+    // never overflow unsigned long and can never exceed 0xFF.
+    unsigned long byte_value = strtoul(hex, &byte_end, 16);
+    if (byte_end == hex || *byte_end != '\0') {
+        return false;
+    }
+    *zone = (int)number;
+    *mode = (uint8_t)byte_value;
+    return true;
+}
+
 bool parse_batch_profile_state(const char *text, int *profile, bool *enabled) {
     if (text == NULL) {
         return false;
@@ -269,8 +307,8 @@ int engine_apply(const Options *options, EngineBoundaryWriteResult *boundary_res
         return 1;
     }
     if (options->button_change_count == 0 && options->rgb_change_count == 0 &&
-        options->dpi_values == NULL && options->profile_state_change_count == 0 &&
-        options->report_rate == NULL) {
+        options->rgb_mode_change_count == 0 && options->dpi_values == NULL &&
+        options->profile_state_change_count == 0 && options->report_rate == NULL) {
         fprintf(stderr, "apply requires at least one button, RGB, DPI, polling-rate, or "
                         "profile-state change\n");
         return 1;
@@ -318,6 +356,26 @@ int engine_apply(const Options *options, EngineBoundaryWriteResult *boundary_res
         for (size_t previous = 0; previous < i; previous++) {
             if (requested_rgb_zones[previous] == requested_rgb_zones[i]) {
                 fprintf(stderr, "duplicate --rgb-change for zone %d\n", requested_rgb_zones[i]);
+                return 1;
+            }
+        }
+    }
+
+    int requested_rgb_mode_zones[MAX_BATCH_RGB_CHANGES];
+    uint8_t requested_rgb_modes[MAX_BATCH_RGB_CHANGES];
+    for (size_t i = 0; i < options->rgb_mode_change_count; i++) {
+        if (!parse_batch_rgb_mode_change(options->rgb_mode_changes[i], &requested_rgb_mode_zones[i],
+                                         &requested_rgb_modes[i])) {
+            fprintf(stderr,
+                    "invalid --rgb-mode-change '%s'; use N:MM with a 1-based zone number and a "
+                    "2-hex-digit effect mode\n",
+                    options->rgb_mode_changes[i]);
+            return 1;
+        }
+        for (size_t previous = 0; previous < i; previous++) {
+            if (requested_rgb_mode_zones[previous] == requested_rgb_mode_zones[i]) {
+                fprintf(stderr, "duplicate --rgb-mode-change for zone %d\n",
+                        requested_rgb_mode_zones[i]);
                 return 1;
             }
         }
@@ -472,7 +530,8 @@ int engine_apply(const Options *options, EngineBoundaryWriteResult *boundary_res
     }
 
     bool wants_profile_sector = options->button_change_count > 0 || options->rgb_change_count > 0 ||
-                                options->dpi_values != NULL || options->report_rate != NULL;
+                                options->rgb_mode_change_count > 0 || options->dpi_values != NULL ||
+                                options->report_rate != NULL;
     if (wants_profile_sector) {
         if (!load_profile_with_headers(device, &info, headers, header_count, options->profile,
                                        &profile) ||
@@ -539,6 +598,27 @@ int engine_apply(const Options *options, EngineBoundaryWriteResult *boundary_res
                                        options->rgb_change_count)) {
                 fprintf(stderr,
                         "refusing to apply: the selected profile's RGB layout was not validated\n");
+                goto done;
+            }
+        }
+
+        if (options->rgb_mode_change_count > 0) {
+            uint8_t mode_zones[MAX_BATCH_RGB_CHANGES];
+            for (size_t i = 0; i < options->rgb_mode_change_count; i++) {
+                if (requested_rgb_mode_zones[i] > (int)profile.rgb_zone_count) {
+                    fprintf(stderr,
+                            "refusing to apply: RGB zone %d is not advertised by the validated "
+                            "profile (1..%zu)\n",
+                            requested_rgb_mode_zones[i], profile.rgb_zone_count);
+                    goto done;
+                }
+                mode_zones[i] = (uint8_t)(requested_rgb_mode_zones[i] - 1);
+            }
+            if (!profile.rgb_layout_supported ||
+                !write_rgb_zone_modes(new_profile, &profile, mode_zones, requested_rgb_modes,
+                                      options->rgb_mode_change_count)) {
+                fprintf(stderr, "refusing to apply: the requested RGB effect mode is not one this "
+                                "profile's RGB layout recognizes\n");
                 goto done;
             }
         }

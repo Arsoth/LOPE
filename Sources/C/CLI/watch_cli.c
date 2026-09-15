@@ -179,6 +179,8 @@ void print_usage(const char *program) {
     printf("  --button-change gshift:N:RAW         batch G-Shift-layer record (apply)\n");
     printf(
         "  --rgb-change N:RRGGBB                batch RGB zone color (apply; zone is 1-based)\n");
+    printf("  --rgb-mode-change N:MM               batch RGB zone effect mode (apply; MM is a "
+           "2-hex-digit effect ID)\n");
     printf("  --dpi VALUES                         batch DPI stages, comma-separated\n");
     printf("  --report-rate HZ                     batch profile polling rate (apply)\n");
     printf("  --profile-state-change N:STATE       batch profile state (enable or disable)\n");
@@ -282,8 +284,8 @@ int parse_options(int argc, char **argv, Options *options) {
             strcmp(arg, "--default") == 0 || strcmp(arg, "--shift") == 0 ||
             strcmp(arg, "--dpi") == 0 || strcmp(arg, "--report-rate") == 0 ||
             strcmp(arg, "--button-change") == 0 || strcmp(arg, "--rgb-change") == 0 ||
-            strcmp(arg, "--profile-state-change") == 0 || strcmp(arg, "--backup-directory") == 0 ||
-            strcmp(arg, "--operation-id") == 0) {
+            strcmp(arg, "--rgb-mode-change") == 0 || strcmp(arg, "--profile-state-change") == 0 ||
+            strcmp(arg, "--backup-directory") == 0 || strcmp(arg, "--operation-id") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "%s requires a value\n", arg);
                 return 0;
@@ -339,6 +341,12 @@ int parse_options(int argc, char **argv, Options *options) {
                     return 0;
                 }
                 options->rgb_changes[options->rgb_change_count++] = value;
+            } else if (strcmp(arg, "--rgb-mode-change") == 0) {
+                if (options->rgb_mode_change_count >= MAX_BATCH_RGB_CHANGES) {
+                    fprintf(stderr, "too many --rgb-mode-change values\n");
+                    return 0;
+                }
+                options->rgb_mode_changes[options->rgb_mode_change_count++] = value;
             } else if (strcmp(arg, "--profile-state-change") == 0) {
                 if (options->profile_state_change_count >= MAX_BATCH_PROFILE_CHANGES) {
                     fprintf(stderr, "too many --profile-state-change values\n");

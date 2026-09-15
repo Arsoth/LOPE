@@ -127,6 +127,75 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     }
   }
 
+  /// A known-good set of button/DPI/report-rate/RGB values for this device,
+  /// sourced from somewhere more concrete than a guess. `source` records
+  /// exactly how confident that provenance is: only `verifiedFactoryReset`
+  /// comes from actually triggering the manufacturer's own onboard-memory
+  /// reset and reading the result back from the device, so only that case is
+  /// offered as a one-click "restore" write in the app. The others exist so
+  /// the reference data can still be recorded (and improved later) without
+  /// being presented as something to write to hardware it was never
+  /// confirmed against.
+  struct ReferenceProfile: Codable, Hashable, Sendable {
+    enum Source: String, Codable, Hashable, Sendable {
+      case verifiedFactoryReset
+      case userConfiguration
+      case manufacturerSpec
+      case communityReverseEngineering
+      case unknown
+    }
+
+    struct Button: Codable, Hashable, Sendable {
+      var number: Int
+      var raw: String
+    }
+
+    struct DPI: Codable, Hashable, Sendable {
+      var stages: [Int]
+      var defaultStage: Int
+      var shiftStage: Int
+    }
+
+    struct RGBZone: Codable, Hashable, Sendable {
+      var index: Int
+      var mode: String
+      var color: String?
+    }
+
+    var source: Source
+    var buttons: [Button]
+    var dpi: DPI?
+    var reportRateHz: Int?
+    var rgbZones: [RGBZone]?
+    var notes: [String]
+
+    init(
+      source: Source,
+      buttons: [Button],
+      dpi: DPI?,
+      reportRateHz: Int?,
+      rgbZones: [RGBZone]?,
+      notes: [String]
+    ) {
+      self.source = source
+      self.buttons = buttons
+      self.dpi = dpi
+      self.reportRateHz = reportRateHz
+      self.rgbZones = rgbZones
+      self.notes = notes
+    }
+
+    init(from decoder: Decoder) throws {
+      let values = try decoder.container(keyedBy: CodingKeys.self)
+      source = try values.decodeIfPresent(Source.self, forKey: .source) ?? .unknown
+      buttons = try values.decodeIfPresent([Button].self, forKey: .buttons) ?? []
+      dpi = try values.decodeIfPresent(DPI.self, forKey: .dpi)
+      reportRateHz = try values.decodeIfPresent(Int.self, forKey: .reportRateHz)
+      rgbZones = try values.decodeIfPresent([RGBZone].self, forKey: .rgbZones)
+      notes = try values.decodeIfPresent([String].self, forKey: .notes) ?? []
+    }
+  }
+
   var schemaVersion: Int
   var id: String
   var name: String
@@ -138,8 +207,15 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
   var refreshGuidance: OnboardProfileRefreshGuidance?
   var profileIO: ProfileIO
   var rgbProfile: RGBProfile?
+  var referenceProfile: ReferenceProfile?
   var sources: [String]
   var generated: Bool?
+
+  /// Only a verified factory reset is trustworthy enough to offer as a
+  /// one-click device write; other sources are recorded but not writable.
+  var canRestoreReferenceProfile: Bool {
+    referenceProfile?.source == .verifiedFactoryReset && profileIO.canSave
+  }
 
   var isGenerated: Bool { generated ?? false }
 

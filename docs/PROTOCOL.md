@@ -113,6 +113,24 @@ recalculating and verifying the sector CRC. HID++ `0x8061` values for 125,
 2000/4000/8000 Hz values are connection-level settings and are not representable
 by this profile field.
 
+## Legacy onboard RGB records
+
+Devices using the validated format-2/4/5 profile layout (see each descriptor's
+`rgbProfile`) store up to four 11-byte RGB zone records starting at sector
+offset 208. Byte 0 of each record is the effect-ID byte exposed by the
+device's `COLOR_LED_EFFECTS` feature; `profile_codec_rgb_mode_is_known`
+(`Sources/C/Profiles/profile_codec.c`) accepts `0x00` disabled, `0x01` static,
+`0x02` pulse, `0x03` cycle, `0x04` wave, `0x08` boot, `0x09` demo, `0x0A`
+breathe, `0x0B` ripple, plus a handful of unnamed IDs (`0x0E`, `0x0F`, `0x10`,
+`0x15`, `0x16`, `0x17`) that are accepted as valid but have no known name.
+Bytes 1-3 hold the solid RGB color (`colorOffset`); bytes 4-10 are unparsed —
+no brightness byte position has been confirmed for this record format. The
+`apply` command's `--rgb-change N:RRGGBB` writes only the color bytes;
+`--rgb-mode-change N:MM` (a 1-based zone number and a 2-hex-digit effect ID)
+writes only the mode byte, rejecting any ID `profile_codec_rgb_mode_is_known`
+does not recognize. Both land in the same backed-up sector write as any other
+requested change in that `apply` call.
+
 ## Sources
 
 These are implementation references, not Logitech guarantees for every firmware revision:

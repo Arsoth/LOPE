@@ -38,6 +38,11 @@ final class ProfileOutputParserTests: XCTestCase {
     )
     XCTAssertEqual(parsedRGBLine?.index, 1)
     XCTAssertEqual(parsedRGBLine?.color, RGBColor(red: 0xA1, green: 0xB2, blue: 0xC3))
+    XCTAssertEqual(parsedRGBLine?.mode, .solid)
+    XCTAssertEqual(
+      ProfileOutputParser.rgbZone(from: "  RGB zone 1: 000000 (mode 0x03)")?.mode, .cycle)
+    XCTAssertEqual(
+      ProfileOutputParser.rgbZone(from: "  RGB zone 1: 000000 (mode 0x99)")?.mode, .disabled)
     XCTAssertEqual(
       ProfileOutputParser.profileFormat(from: "  format: 0x05, macro format: 0x01"), 5)
     XCTAssertNil(ProfileOutputParser.rgbZone(from: "RGB zone 0: AABBCC (mode 0x01)"))
