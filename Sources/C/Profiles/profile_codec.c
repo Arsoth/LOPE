@@ -270,8 +270,29 @@ void profile_codec_detect_dpi_layout(const uint8_t *data, size_t data_length,
 }
 
 static bool profile_codec_rgb_mode_is_known(uint8_t mode) {
-    // Legacy onboard RGB records use off, solid, cycling, and breathing.
-    return mode == 0x00 || mode == 0x01 || mode == 0x03 || mode == 0x0A;
+    // Legacy onboard RGB records use the effect identifiers exposed by the
+    // device's COLOR_LED_EFFECTS feature. Keep the list explicit so random
+    // bytes still fail layout validation before a profile can be written.
+    switch (mode) {
+    case 0x00: // disabled
+    case 0x01: // static
+    case 0x02: // pulse
+    case 0x03: // cycle
+    case 0x04: // wave
+    case 0x08: // boot
+    case 0x09: // demo
+    case 0x0A: // breathe
+    case 0x0B: // ripple
+    case 0x0E:
+    case 0x0F:
+    case 0x10:
+    case 0x15:
+    case 0x16:
+    case 0x17:
+        return true;
+    default:
+        return false;
+    }
 }
 
 static bool
