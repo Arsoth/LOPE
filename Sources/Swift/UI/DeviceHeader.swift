@@ -21,7 +21,8 @@ struct DeviceHeader: View {
           )
         ) {
           ForEach(model.devices) { device in
-            Text(device.title).tag(device.id)
+            Label(device.displayName, systemImage: connectionSymbol(for: device.connection))
+              .tag(device.id)
           }
         }
         .labelsHidden()
@@ -44,6 +45,17 @@ struct DeviceHeader: View {
               || (model.hasDPIChanges && !model.canApplyDPI)
           )
       }
+    }
+  }
+
+  private func connectionSymbol(for connection: String) -> String {
+    switch connection.lowercased() {
+    case "wired", "usb":
+      return "cable.connector"
+    case "bluetooth":
+      return "dot.radiowaves.left.and.right"
+    default:
+      return "wifi"
     }
   }
 }

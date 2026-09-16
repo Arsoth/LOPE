@@ -8,6 +8,8 @@ struct RGBEditorView: View {
   @ObservedObject var model: AppModel
   @Binding var presentedZoneID: Int?
   @State private var hoveredZoneID: Int?
+  @State private var hexInput = ""
+  @State private var hexError: String?
   @Environment(\.lopeTheme) private var theme
 
   var body: some View {
@@ -58,9 +60,6 @@ struct RGBEditorView: View {
         Text(zone.name)
           .font(.callout.weight(.medium))
         Spacer()
-        Text(zone.draft.hex)
-          .font(.caption.monospaced())
-          .foregroundStyle(theme.secondaryText)
       }
       if !isPerRegionScope {
         modeButtonsRow(zone)
@@ -91,6 +90,8 @@ struct RGBEditorView: View {
     Button {
       let allZones = NSEvent.modifierFlags.contains(.shift)
       model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
+      hexInput = hexText(for: zone.draft)
+      hexError = nil
       presentedZoneID = zone.id
     } label: {
       RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -131,14 +132,38 @@ struct RGBEditorView: View {
         RGBBrightnessSlider(color: rgbColorBinding(zoneID: zone.id))
           .frame(width: 22, height: 140)
       }
-      if let current = model.rgbZones.first(where: { $0.id == zone.id })?.draft {
-        Text(current.hex)
+      HStack(spacing: 6) {
+        TextField("#RRGGBB", text: $hexInput)
+          .textFieldStyle(.roundedBorder)
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .onSubmit { applyHexInput(zoneID: zone.id) }
+        Button("Apply") {
+          applyHexInput(zoneID: zone.id)
+        }
+        .buttonStyle(.bordered)
+      }
+      if let hexError {
+        Text(hexError)
+          .font(.caption)
+          .foregroundStyle(.red)
       }
     }
     .padding(14)
     .frame(width: 232)
+  }
+
+  private func hexText(for color: RGBColor) -> String {
+    "#\(color.bareHex)"
+  }
+
+  private func applyHexInput(zoneID: Int) {
+    guard let color = RGBColor(hex: hexInput) else {
+      hexError = "Enter a 6-digit hex color, such as #33AAFF."
+      return
+    }
+    model.setRGBColor(zoneID: zoneID, color: color)
+    hexInput = hexText(for: color)
+    hexError = nil
   }
 
   /// Only modes the current device's catalog entry marks as confirmed are
@@ -252,6 +277,10 @@ private func hsbComponents(of color: Color) -> HSBComponents {
 /// the wheel/slider split in macOS's own color panel.
 private struct RGBColorWheel: View {
   @Binding var color: Color
+  // Keep high-frequency drag samples local. Writing through the model-backed
+  // binding for every sample invalidates the whole editor, the same shared
+  // cause that DPIStageBar avoids with its local drag position.
+  @State private var dragHSB: HSBComponents?
 
   private static let hueStops: [Color] = (0...12).map { step in
     Color(hue: Double(step) / 12.0, saturation: 1, brightness: 1)
@@ -261,7 +290,7 @@ private struct RGBColorWheel: View {
     GeometryReader { proxy in
       let size = min(proxy.size.width, proxy.size.height)
       let radius = size / 2
-      let hsb = hsbComponents(of: color)
+      let hsb = dragHSB ?? hsbComponents(of: color)
       ZStack {
         Circle()
           .fill(AngularGradient(gradient: Gradient(colors: Self.hueStops), center: .center))
@@ -287,6 +316,9 @@ private struct RGBColorWheel: View {
           .onChanged { value in
             update(at: value.location, radius: radius, brightness: hsb.brightness)
           }
+          .onEnded { _ in
+            commitDrag()
+          }
       )
     }
   }
@@ -301,6 +333,8 @@ private struct RGBColorWheel: View {
       .frame(width: 14, height: 14)
       .overlay(Circle().stroke(Color.white, lineWidth: 2))
       .shadow(radius: 1)
+      .contentShape(Circle())
+      .pointingHandCursor()
       .position(x: x, y: y)
   }
 
@@ -317,7 +351,21 @@ private struct RGBColorWheel: View {
     var angle = atan2(dx, -dy) - .pi / 2
     if angle < 0 { angle += 2 * .pi }
     let hue = angle / (2 * .pi)
-    color = Color(hue: hue, saturation: saturation, brightness: brightness)
+    dragHSB = (hue, saturation, brightness)
+  }
+
+  private func commitDrag() {
+    guard let dragHSB else { return }
+    var transaction = Transaction()
+    transaction.animation = nil
+    withTransaction(transaction) {
+      color = Color(
+        hue: dragHSB.hue,
+        saturation: dragHSB.saturation,
+        brightness: dragHSB.brightness
+      )
+      self.dragHSB = nil
+    }
   }
 }
 

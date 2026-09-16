@@ -266,6 +266,9 @@ struct EditableBackup: Codable {
       var zone: Int
       var name: String
       var color: String
+      // Optional so JSON exported before RGB effect modes were persisted
+      // remains loadable. New exports always include the draft mode name.
+      var mode: String? = nil
     }
 
     var number: Int
