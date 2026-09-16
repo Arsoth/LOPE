@@ -277,6 +277,10 @@ private func hsbComponents(of color: Color) -> HSBComponents {
 /// the wheel/slider split in macOS's own color panel.
 private struct RGBColorWheel: View {
   @Binding var color: Color
+  // Keep high-frequency drag samples local. Writing through the model-backed
+  // binding for every sample invalidates the whole editor, the same shared
+  // cause that DPIStageBar avoids with its local drag position.
+  @State private var dragHSB: HSBComponents?
 
   private static let hueStops: [Color] = (0...12).map { step in
     Color(hue: Double(step) / 12.0, saturation: 1, brightness: 1)
@@ -286,7 +290,7 @@ private struct RGBColorWheel: View {
     GeometryReader { proxy in
       let size = min(proxy.size.width, proxy.size.height)
       let radius = size / 2
-      let hsb = hsbComponents(of: color)
+      let hsb = dragHSB ?? hsbComponents(of: color)
       ZStack {
         Circle()
           .fill(AngularGradient(gradient: Gradient(colors: Self.hueStops), center: .center))
@@ -311,6 +315,9 @@ private struct RGBColorWheel: View {
         DragGesture(minimumDistance: 0)
           .onChanged { value in
             update(at: value.location, radius: radius, brightness: hsb.brightness)
+          }
+          .onEnded { _ in
+            commitDrag()
           }
       )
     }
@@ -344,7 +351,21 @@ private struct RGBColorWheel: View {
     var angle = atan2(dx, -dy) - .pi / 2
     if angle < 0 { angle += 2 * .pi }
     let hue = angle / (2 * .pi)
-    color = Color(hue: hue, saturation: saturation, brightness: brightness)
+    dragHSB = (hue, saturation, brightness)
+  }
+
+  private func commitDrag() {
+    guard let dragHSB else { return }
+    var transaction = Transaction()
+    transaction.animation = nil
+    withTransaction(transaction) {
+      color = Color(
+        hue: dragHSB.hue,
+        saturation: dragHSB.saturation,
+        brightness: dragHSB.brightness
+      )
+      self.dragHSB = nil
+    }
   }
 }
 
