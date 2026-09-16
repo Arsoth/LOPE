@@ -91,7 +91,22 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     var zones: [Zone]
     var deviceNameContains: [String]?
     var productIDs: [String]?
+    var confirmedModes: [String]?
     var notes: [String]
+
+    /// Only `disabled`/`solid`/`cycle` are confirmed to work on real
+    /// hardware so far (tested on a wired G502 Spectrum); the other
+    /// `RGBEffectMode` cases are accepted by the device's onboard RGB
+    /// record format but unverified in practice. Catalog entries opt in to
+    /// more modes via `confirmedModes` once they've been tested; absent or
+    /// empty, a device gets only this conservative default set.
+    static let defaultConfirmedModes: [RGBEffectMode] = [.disabled, .solid, .cycle]
+
+    var confirmedEffectModes: [RGBEffectMode] {
+      guard let confirmedModes else { return Self.defaultConfirmedModes }
+      let modes = confirmedModes.compactMap { RGBEffectMode(named: $0) }
+      return modes.isEmpty ? Self.defaultConfirmedModes : modes
+    }
 
     func matches(deviceName: String, productID: String) -> Bool {
       let name = deviceName.lowercased()
@@ -123,6 +138,7 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
       zones = try values.decodeIfPresent([Zone].self, forKey: .zones) ?? []
       deviceNameContains = try values.decodeIfPresent([String].self, forKey: .deviceNameContains)
       productIDs = try values.decodeIfPresent([String].self, forKey: .productIDs)
+      confirmedModes = try values.decodeIfPresent([String].self, forKey: .confirmedModes)
       notes = try values.decodeIfPresent([String].self, forKey: .notes) ?? []
     }
   }

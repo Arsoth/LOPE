@@ -124,9 +124,11 @@
 				"name": "DPI"
 			}
 		],
+		"confirmedModes": ["disabled", "solid", "cycle"],
 		"notes": [
 			"Validated on the wired G502 Spectrum (product 0xC332): four 11-byte legacy onboard RGB records begin at offset 208, with Logo and DPI-indicator zones. Only the three-byte solid-color field is edited.",
-			"Zone indexes were confirmed against the physical LEDs: index 0 drives the Logo LED, index 1 drives the DPI-indicator LED (this was previously reversed)."
+			"Zone indexes were confirmed against the physical LEDs: index 0 drives the Logo LED, index 1 drives the DPI-indicator LED (this was previously reversed).",
+			"Of the effect modes the onboard record format accepts, only disabled/solid/cycle were confirmed to actually take effect on this physical unit; pulse/wave/breathe/ripple either had no visible effect or were not tested."
 		]
 	},
 	"referenceProfile": {

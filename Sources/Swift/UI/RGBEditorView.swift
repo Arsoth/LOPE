@@ -141,9 +141,22 @@ struct RGBEditorView: View {
     .frame(width: 232)
   }
 
+  /// Only modes the current device's catalog entry marks as confirmed are
+  /// offered (see `RGBProfile.confirmedEffectModes`), plus whichever mode
+  /// the zone is already set to, so a mode read back from the device never
+  /// disappears from the row just for being unconfirmed.
+  private func availableModes(for zone: RGBZoneState) -> [RGBEffectMode] {
+    let confirmed =
+      model.rgbCapabilities()?.confirmedEffectModes
+      ?? MouseProfileDescriptor.RGBProfile.defaultConfirmedModes
+    return RGBEffectMode.allCases.filter {
+      confirmed.contains($0) || $0 == zone.currentMode || $0 == zone.draftMode
+    }
+  }
+
   private func modeButtonsRow(_ zone: RGBZoneState) -> some View {
     HStack(spacing: 4) {
-      ForEach(RGBEffectMode.allCases, id: \.self) { mode in
+      ForEach(availableModes(for: zone), id: \.self) { mode in
         modeButton(zone, mode: mode)
       }
     }
