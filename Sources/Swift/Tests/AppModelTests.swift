@@ -212,6 +212,24 @@ final class AppModelTests: XCTestCase {
     XCTAssertFalse(model.shouldShowRGBEditor)
   }
 
+  func testHasRGBChangesReflectsModeOnlyEdits() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+
+    model.rgbZones = [
+      RGBZoneState(
+        id: 0, name: "Zone 1",
+        current: RGBColor(red: 255, green: 0, blue: 0),
+        draft: RGBColor(red: 255, green: 0, blue: 0),
+        currentMode: .solid,
+        draftMode: .cycle
+      )
+    ]
+
+    XCTAssertTrue(model.hasRGBChanges)
+    XCTAssertTrue(model.hasPendingChanges)
+  }
+
   func testInitWithStartInitialRefreshTrueAppliesAppearanceAndSchedulesBackgroundWork() async {
     // Covers the `if startInitialRefresh` branch in init(): every other
     // test in this file passes startInitialRefresh: false specifically to

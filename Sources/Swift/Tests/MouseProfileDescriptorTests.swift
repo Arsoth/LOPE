@@ -161,6 +161,49 @@ final class MouseProfileDescriptorTests: XCTestCase {
     XCTAssertEqual(decoded.notes, [])
   }
 
+  func testRGBProfileConfirmedEffectModesDefaultsToDisabledSolidCycle() throws {
+    let profile = try decodeRGBProfile(json: Self.baseRGBJSON)
+    XCTAssertEqual(
+      profile.confirmedEffectModes, MouseProfileDescriptor.RGBProfile.defaultConfirmedModes)
+    XCTAssertEqual(profile.confirmedEffectModes, [.disabled, .solid, .cycle])
+  }
+
+  func testRGBProfileConfirmedEffectModesUsesExplicitCatalogList() throws {
+    let withWave = try decodeRGBProfile(
+      json: """
+        {
+          "supported": true,
+          "zones": [ { "index": 0, "name": "Logo" } ],
+          "confirmedModes": ["disabled", "solid", "wave"]
+        }
+        """)
+    XCTAssertEqual(withWave.confirmedEffectModes, [.disabled, .solid, .wave])
+  }
+
+  func testRGBProfileConfirmedEffectModesFallsBackWhenExplicitListIsEmptyOrUnknown() throws {
+    let empty = try decodeRGBProfile(
+      json: """
+        {
+          "supported": true,
+          "zones": [ { "index": 0, "name": "Logo" } ],
+          "confirmedModes": []
+        }
+        """)
+    XCTAssertEqual(
+      empty.confirmedEffectModes, MouseProfileDescriptor.RGBProfile.defaultConfirmedModes)
+
+    let unknownOnly = try decodeRGBProfile(
+      json: """
+        {
+          "supported": true,
+          "zones": [ { "index": 0, "name": "Logo" } ],
+          "confirmedModes": ["not-a-real-mode"]
+        }
+        """)
+    XCTAssertEqual(
+      unknownOnly.confirmedEffectModes, MouseProfileDescriptor.RGBProfile.defaultConfirmedModes)
+  }
+
   func testRGBProfileMatchesByNameOrProductWithRestriction() throws {
     let profile = try decodeRGBProfile(json: Self.baseRGBJSON)
     XCTAssertTrue(profile.matches(deviceName: "Logitech G604", productID: "irrelevant"))
