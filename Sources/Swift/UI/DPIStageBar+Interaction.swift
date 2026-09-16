@@ -30,26 +30,22 @@ extension DPIStageBar {
   }
 
   func updateDrag(at x: CGFloat, width: CGFloat) {
-    guard let index = draggingStage,
-      let candidate = value(at: x, width: width)
-    else {
-      return
-    }
+    guard draggingStage != nil, let candidate = value(at: x, width: width) else { return }
     setActiveDragX(x, width: width)
-    let update = DPIStageDragUpdate(index: index, value: candidate)
-    guard lastDragUpdate != update else { return }
-    let updatedIndex = onDragValue(index, candidate)
-    draggingStage = updatedIndex
-    lastDragUpdate = DPIStageDragUpdate(index: updatedIndex, value: candidate)
+    guard activeDragValue != candidate else { return }
+    activeDragValue = candidate
   }
 
   func finishDrag() {
+    if let draggingStage, let activeDragValue {
+      _ = onDragValue(draggingStage, activeDragValue)
+    }
     onDragEnded()
     withAnimation(.easeOut(duration: 0.08)) {
       draggingStage = nil
       activeDragX = nil
+      activeDragValue = nil
     }
-    lastDragUpdate = nil
   }
 
   @ViewBuilder

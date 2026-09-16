@@ -82,11 +82,6 @@ enum DPILegendRole: Hashable {
   case other
 }
 
-struct DPIStageDragUpdate: Equatable {
-  let index: Int
-  let value: Int
-}
-
 struct DPIStageSelection: Identifiable, Equatable {
   let index: Int
 

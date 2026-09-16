@@ -52,7 +52,7 @@ extension DPIStageBar {
               dismissStageEditor()
             }
             draggingStage = index
-            lastDragUpdate = nil
+            activeDragValue = nil
             updateDrag(at: x, width: proxy.size.width)
           },
           onDragChanged: { x in

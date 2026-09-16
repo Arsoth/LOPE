@@ -8,8 +8,6 @@ struct RGBEditorView: View {
   @ObservedObject var model: AppModel
   @Binding var presentedZoneID: Int?
   @State private var hoveredZoneID: Int?
-  @State private var hexInput = ""
-  @State private var hexError: String?
   @Environment(\.lopeTheme) private var theme
 
   var body: some View {
@@ -90,8 +88,6 @@ struct RGBEditorView: View {
     Button {
       let allZones = NSEvent.modifierFlags.contains(.shift)
       model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
-      hexInput = hexText(for: zone.draft)
-      hexError = nil
       presentedZoneID = zone.id
     } label: {
       RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -118,52 +114,14 @@ struct RGBEditorView: View {
       ),
       arrowEdge: .trailing
     ) {
-      rgbColorPopoverContent(zone)
-    }
-  }
-
-  private func rgbColorPopoverContent(_ zone: RGBZoneState) -> some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(model.rgbEditingAllZones ? "All RGB zones" : zone.name)
-        .font(.headline)
-      HStack(alignment: .center, spacing: 14) {
-        RGBColorWheel(color: rgbColorBinding(zoneID: zone.id))
-          .frame(width: 140, height: 140)
-        RGBBrightnessSlider(color: rgbColorBinding(zoneID: zone.id))
-          .frame(width: 22, height: 140)
-      }
-      HStack(spacing: 6) {
-        TextField("#RRGGBB", text: $hexInput)
-          .textFieldStyle(.roundedBorder)
-          .font(.caption.monospaced())
-          .onSubmit { applyHexInput(zoneID: zone.id) }
-        Button("Apply") {
-          applyHexInput(zoneID: zone.id)
+      RGBColorPopoverView(
+        title: model.rgbEditingAllZones ? "All RGB zones" : zone.name,
+        initialColor: zone.draft,
+        onCommit: { color in
+          model.setRGBColor(zoneID: zone.id, color: color)
         }
-        .buttonStyle(.bordered)
-      }
-      if let hexError {
-        Text(hexError)
-          .font(.caption)
-          .foregroundStyle(.red)
-      }
+      )
     }
-    .padding(14)
-    .frame(width: 232)
-  }
-
-  private func hexText(for color: RGBColor) -> String {
-    "#\(color.bareHex)"
-  }
-
-  private func applyHexInput(zoneID: Int) {
-    guard let color = RGBColor(hex: hexInput) else {
-      hexError = "Enter a 6-digit hex color, such as #33AAFF."
-      return
-    }
-    model.setRGBColor(zoneID: zoneID, color: color)
-    hexInput = hexText(for: color)
-    hexError = nil
   }
 
   /// Only modes the current device's catalog entry marks as confirmed are
@@ -214,36 +172,14 @@ struct RGBEditorView: View {
     .help("Set \(zone.name) lighting mode to \(mode.label). Shift-click to apply to all zones.")
   }
 
-  private func swiftUIColor(_ color: RGBColor) -> Color {
-    Color(
-      red: Double(color.red) / 255.0,
-      green: Double(color.green) / 255.0,
-      blue: Double(color.blue) / 255.0
-    )
-  }
+}
 
-  private func rgbColorBinding(zoneID: Int) -> Binding<Color> {
-    Binding(
-      get: {
-        let color =
-          model.rgbZones.first(where: { $0.id == zoneID })?.draft
-          ?? RGBColor(red: 255, green: 255, blue: 255)
-        return swiftUIColor(color)
-      },
-      set: { color in
-        let converted = NSColor(color).usingColorSpace(.deviceRGB)
-        guard let converted else { return }
-        model.setRGBColor(
-          zoneID: zoneID,
-          color: RGBColor(
-            red: UInt8((converted.redComponent * 255.0).rounded()),
-            green: UInt8((converted.greenComponent * 255.0).rounded()),
-            blue: UInt8((converted.blueComponent * 255.0).rounded())
-          )
-        )
-      }
-    )
-  }
+private func swiftUIColor(_ color: RGBColor) -> Color {
+  Color(
+    red: Double(color.red) / 255.0,
+    green: Double(color.green) / 255.0,
+    blue: Double(color.blue) / 255.0
+  )
 }
 
 /// HSB triple shared by the color wheel and the brightness slider below. Kept
@@ -275,8 +211,80 @@ private func hsbComponents(of color: Color) -> HSBComponents {
 /// gradient actually paints each hue. Brightness is left untouched here and
 /// is controlled separately by `RGBBrightnessSlider` alongside it, mirroring
 /// the wheel/slider split in macOS's own color panel.
+private struct RGBColorPopoverView: View {
+  let title: String
+  let onCommit: (RGBColor) -> Void
+  @State private var pickerColor: Color
+  @State private var hexInput: String
+  @State private var hexError: String?
+
+  init(title: String, initialColor: RGBColor, onCommit: @escaping (RGBColor) -> Void) {
+    self.title = title
+    self.onCommit = onCommit
+    _pickerColor = State(initialValue: swiftUIColor(initialColor))
+    _hexInput = State(initialValue: "#\(initialColor.bareHex)")
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(title)
+        .font(.headline)
+      HStack(alignment: .center, spacing: 14) {
+        RGBColorWheel(color: $pickerColor, onCommit: commitPickerColor)
+          .frame(width: 140, height: 140)
+        RGBBrightnessSlider(color: $pickerColor, onCommit: commitPickerColor)
+          .frame(width: 22, height: 140)
+      }
+      HStack(spacing: 6) {
+        TextField("#RRGGBB", text: $hexInput)
+          .textFieldStyle(.roundedBorder)
+          .font(.caption.monospaced())
+          .onSubmit(applyHexInput)
+        Button("Apply", action: applyHexInput)
+          .buttonStyle(.bordered)
+      }
+      if let hexError {
+        Text(hexError)
+          .font(.caption)
+          .foregroundStyle(.red)
+      }
+    }
+    .padding(14)
+    .frame(width: 232)
+  }
+
+  private func commitPickerColor(_ color: Color) {
+    guard let converted = rgbColor(from: color) else { return }
+    pickerColor = color
+    hexInput = "#\(converted.bareHex)"
+    hexError = nil
+    onCommit(converted)
+  }
+
+  private func applyHexInput() {
+    guard let color = RGBColor(hex: hexInput) else {
+      hexError = "Enter a 6-digit hex color, such as #33AAFF."
+      return
+    }
+    pickerColor = swiftUIColor(color)
+    hexInput = "#\(color.bareHex)"
+    hexError = nil
+    onCommit(color)
+  }
+}
+
+private func rgbColor(from color: Color) -> RGBColor? {
+  guard let converted = NSColor(color).usingColorSpace(.deviceRGB) else { return nil }
+  return RGBColor(
+    red: UInt8((converted.redComponent * 255.0).rounded()),
+    green: UInt8((converted.greenComponent * 255.0).rounded()),
+    blue: UInt8((converted.blueComponent * 255.0).rounded())
+  )
+}
+
 private struct RGBColorWheel: View {
   @Binding var color: Color
+  let onCommit: (Color) -> Void
   // Keep high-frequency drag samples local. Writing through the model-backed
   // binding for every sample invalidates the whole editor, the same shared
   // cause that DPIStageBar avoids with its local drag position.
@@ -351,21 +359,25 @@ private struct RGBColorWheel: View {
     var angle = atan2(dx, -dy) - .pi / 2
     if angle < 0 { angle += 2 * .pi }
     let hue = angle / (2 * .pi)
+    let nextColor = Color(hue: hue, saturation: saturation, brightness: brightness)
     dragHSB = (hue, saturation, brightness)
+    color = nextColor
   }
 
   private func commitDrag() {
     guard let dragHSB else { return }
+    let committedColor = Color(
+      hue: dragHSB.hue,
+      saturation: dragHSB.saturation,
+      brightness: dragHSB.brightness
+    )
     var transaction = Transaction()
     transaction.animation = nil
     withTransaction(transaction) {
-      color = Color(
-        hue: dragHSB.hue,
-        saturation: dragHSB.saturation,
-        brightness: dragHSB.brightness
-      )
+      color = committedColor
       self.dragHSB = nil
     }
+    onCommit(committedColor)
   }
 }
 
@@ -376,6 +388,7 @@ private struct RGBColorWheel: View {
 /// not reliably hit-test in AppKit-backed SwiftUI.
 private struct RGBBrightnessSlider: View {
   @Binding var color: Color
+  let onCommit: (Color) -> Void
 
   var body: some View {
     GeometryReader { proxy in
@@ -406,6 +419,9 @@ private struct RGBBrightnessSlider: View {
         DragGesture(minimumDistance: 0)
           .onChanged { value in
             update(at: value.location, height: height, hue: hsb.hue, saturation: hsb.saturation)
+          }
+          .onEnded { _ in
+            onCommit(color)
           }
       )
     }

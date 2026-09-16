@@ -6,7 +6,8 @@ import SwiftUI
 extension DPIStageBar {
   func stageHandle(index: Int, text: String, width: CGFloat) -> some View {
     let parsedValue = Int(text)
-    let displayValue = parsedValue.map(formattedDPIValue) ?? "Enter DPI"
+    let liveValue = draggingStage == index ? activeDragValue ?? parsedValue : parsedValue
+    let displayValue = liveValue.map(formattedDPIValue) ?? "Enter DPI"
     let positionValue = parsedValue ?? capabilities.minimum ?? 800
     let isDefault = defaultStage == index + 1
     let isShift = shiftStage == index + 1
@@ -49,7 +50,7 @@ extension DPIStageBar {
     .buttonStyle(.plain)
     .contentShape(Rectangle())
     .accessibilityLabel("DPI stage \(index + 1)")
-    .accessibilityValue(parsedValue.map { "\(formattedDPIValue($0)) DPI" } ?? "Invalid value")
+    .accessibilityValue(liveValue.map { "\(formattedDPIValue($0)) DPI" } ?? "Invalid value")
     .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
     .accessibilityAdjustableAction { direction in
       switch direction {
