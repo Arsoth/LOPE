@@ -90,7 +90,7 @@ extension AppModel {
         proposedDPI = dpi
       }
 
-      var proposedRGB: [Int: RGBColor] = [:]
+      var proposedRGB: [Int: (color: RGBColor, mode: RGBEffectMode)] = [:]
       if let rgb = backup.profile.rgb {
         guard let capability = rgbCapabilities(), !capability.zones.isEmpty else {
           status =
@@ -106,7 +106,19 @@ extension AppModel {
             status = "The JSON RGB zones or colors are invalid for this device."
             return
           }
-          proposedRGB[zone.zone] = color
+          let mode: RGBEffectMode
+          if let modeName = zone.mode {
+            guard let decodedMode = RGBEffectMode(named: modeName) else {
+              status = "The JSON RGB zones or colors are invalid for this device."
+              return
+            }
+            mode = decodedMode
+          } else {
+            // Backups written before RGB effect modes were added represent
+            // the editor's original solid-mode default.
+            mode = .solid
+          }
+          proposedRGB[zone.zone] = (color: color, mode: mode)
         }
       }
 
@@ -126,8 +138,10 @@ extension AppModel {
         defaultStage = dpi.defaultStage
         shiftStage = dpi.shiftStage
       }
-      for (zoneID, color) in proposedRGB {
-        setRGBColor(zoneID: zoneID, color: color)
+      for (zoneID, setting) in proposedRGB {
+        guard let index = rgbZones.firstIndex(where: { $0.id == zoneID }) else { continue }
+        rgbZones[index].draft = setting.color
+        rgbZones[index].draftMode = setting.mode
       }
 
       let sourceWarning =
@@ -182,7 +196,8 @@ extension AppModel {
         return EditableBackup.Profile.RGB(
           zone: zone.id,
           name: zone.name,
-          color: zone.draft.hex
+          color: zone.draft.hex,
+          mode: zone.draftMode.label.lowercased()
         )
       }
       rgb = colors.isEmpty ? nil : colors
