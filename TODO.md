@@ -9,37 +9,9 @@
 
 # LOPE TODO Ingest:
 
+- add language support, replace all labels with a json based input baked into the app, currently only support en-us.json. this will include UI labels and mouse button labels. it will default to using your OS's language, and fall back to english if that is not available.
+
 # LOPE todo list
-
-### 1: Improve color wheel drag responsiveness
-
-- [x] Make dragging the color wheel selector responsive, investigating whether it shares the same lag as the DPI slider.
-
-**Done when:** Color wheel dragging responds smoothly without noticeable lag, and any shared cause with the DPI slider is addressed or documented.
-
-### 2: Show a hand pointer over the color wheel selector
-
-- [x] Use a hand pointer when hovering over the draggable color wheel selector dot.
-
-**Done when:** The pointer changes to a hand over the selector dot and remains the normal pointer elsewhere in the color control.
-
-### 3: Add hex color input without a persistent hex display
-
-- [x] Allow entering a standard hex color value while removing the hex value display from the main color-control UI.
-
-**Done when:** A valid standard hex value can be entered and applied, invalid input is handled clearly, and the main UI no longer shows a persistent hex display.
-
-### 4: Persist color settings in exported backup JSON
-
-- [x] Ensure color settings are included in exported backup JSON files.
-
-**Done when:** Exported backup JSON contains all relevant color settings and importing a backup restores them correctly.
-
-### 5: Show connection-type symbols before device names
-
-- [x] Show a USB, wireless, or Bluetooth symbol before each device name instead of specifying the connection by name at the end of the device list entry.
-
-**Done when:** Each device entry displays the correct connection-type symbol before its name, and the trailing connection-name text is removed.
 
 # Ignore below item(s):
 
