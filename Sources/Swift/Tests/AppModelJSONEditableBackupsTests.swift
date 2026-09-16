@@ -112,10 +112,10 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     model.rgbZones = [
       RGBZoneState(
         id: 0, name: "Primary", current: RGBColor(red: 0, green: 0, blue: 0),
-        draft: RGBColor(red: 255, green: 0, blue: 0)),
+        draft: RGBColor(red: 255, green: 0, blue: 0), draftMode: .cycle),
       RGBZoneState(
         id: 1, name: "Logo", current: RGBColor(red: 0, green: 0, blue: 0),
-        draft: RGBColor(red: 0, green: 255, blue: 0)),
+        draft: RGBColor(red: 0, green: 255, blue: 0), draftMode: .disabled),
     ]
     let url = makeTempJSONURL()
     defer { try? FileManager.default.removeItem(at: url) }
@@ -127,6 +127,10 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
       uniqueKeysWithValues: (decoded.profile.rgb ?? []).map { ($0.zone, $0.color) })
     XCTAssertEqual(colorsByZone[0], RGBColor(red: 255, green: 0, blue: 0).hex)
     XCTAssertEqual(colorsByZone[1], RGBColor(red: 0, green: 255, blue: 0).hex)
+    let modesByZone = Dictionary(
+      uniqueKeysWithValues: (decoded.profile.rgb ?? []).map { ($0.zone, $0.mode) })
+    XCTAssertEqual(modesByZone[0], "cycle")
+    XCTAssertEqual(modesByZone[1], "disabled")
   }
 
   func testExportCurrentJSONIncludesDPIAndFiltersRGBZoneOutsideDeviceCapability() throws {
@@ -506,6 +510,52 @@ final class AppModelJSONEditableBackupsTests: XCTestCase {
     let logo = model.rgbZones.first(where: { $0.id == 1 })
     XCTAssertEqual(primary?.draft, RGBColor(hex: "0xFF0000"))
     XCTAssertEqual(logo?.draft, RGBColor(hex: "0x00FF00"))
+    XCTAssertEqual(primary?.draftMode, .solid)
+    XCTAssertEqual(logo?.draftMode, .solid)
+  }
+
+  func testLoadEditableBackupSuccessAppliesRGBModes() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBFixtureDevice(model)
+    let url = makeTempJSONURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+    try write(
+      makeBaseBackup(
+        deviceProductID: "0xC08B",
+        rgb: [
+          EditableBackup.Profile.RGB(
+            zone: 0, name: "Primary", color: "0xFF0000", mode: "cycle"),
+          EditableBackup.Profile.RGB(
+            zone: 1, name: "Logo", color: "0x00FF00", mode: "disabled"),
+        ]),
+      to: url)
+
+    model.rgbEditingAllZones = true
+    model.loadEditableBackup(url)
+
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.draftMode, .cycle)
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 1 })?.draftMode, .disabled)
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 0 })?.draft, RGBColor(hex: "0xFF0000"))
+    XCTAssertEqual(model.rgbZones.first(where: { $0.id == 1 })?.draft, RGBColor(hex: "0x00FF00"))
+  }
+
+  func testLoadEditableBackupRejectsUnknownRGBMode() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureRGBFixtureDevice(model)
+    let url = makeTempJSONURL()
+    defer { try? FileManager.default.removeItem(at: url) }
+    try write(
+      makeBaseBackup(
+        deviceProductID: "0xC08B",
+        rgb: [
+          EditableBackup.Profile.RGB(
+            zone: 0, name: "Primary", color: "0xFF0000", mode: "strobe")
+        ]),
+      to: url)
+
+    model.loadEditableBackup(url)
+
+    XCTAssertEqual(model.status, "The JSON RGB zones or colors are invalid for this device.")
   }
 
   func testLoadEditableBackupSuccessOnAlternateLayerUpdatesGShiftRows() throws {

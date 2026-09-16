@@ -188,7 +188,9 @@ final class AppModelsTests: XCTestCase {
             }
           ],
           "dpi": { "stages": [800, 1600], "defaultStage": 1, "shiftStage": 2 },
-          "rgb": [ { "zone": 0, "name": "Logo", "color": "#FF0000" } ]
+          "rgb": [
+            { "zone": 0, "name": "Logo", "color": "#FF0000", "mode": "cycle" }
+          ]
         },
         "exactBinaryBackup": "base64data"
       }
@@ -200,6 +202,7 @@ final class AppModelsTests: XCTestCase {
     XCTAssertEqual(decoded.profile.buttons.first?.physicalControl, "Left Click")
     XCTAssertEqual(decoded.profile.dpi?.stages, [800, 1600])
     XCTAssertEqual(decoded.profile.rgb?.first?.color, "#FF0000")
+    XCTAssertEqual(decoded.profile.rgb?.first?.mode, "cycle")
     XCTAssertEqual(decoded.exactBinaryBackup, "base64data")
 
     // Encode and decode again to exercise the synthesized Encodable side
