@@ -51,6 +51,7 @@ jobs:
       - name: Publish coverage tables and enforce minimums
         run: |
           set -uo pipefail
+          set +e
 
           report="$RUNNER_TEMP/lope-coverage-report.txt"
           make coverage >"$report" 2>&1

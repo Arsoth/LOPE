@@ -146,7 +146,11 @@ C_COVERAGE_PROFDATA := $(COVERAGE_DIR)/lope.profdata
 # report, so keep that diagnostic chatter out of the report-only targets.
 SWIFT_BIN_PATH = $(shell swift build --show-bin-path 2>/dev/null)
 SWIFT_COVERAGE_PROFDATA = $(SWIFT_BIN_PATH)/codecov/default.profdata
-SWIFT_TEST_BINARY = $(SWIFT_BIN_PATH)/LOPECoreTests.xctest/Contents/MacOS/LOPECoreTests
+# SwiftPM names the XCTest bundle differently across Apple toolchain versions
+# (for example, LOPEPackageTests.xctest on Xcode 16 and LOPECoreTests.xctest on
+# newer toolchains). Find the executable inside whichever bundle was produced.
+SWIFT_TEST_BUNDLE = $(shell find "$(SWIFT_BIN_PATH)" -maxdepth 2 -type d -name '*.xctest' -print -quit)
+SWIFT_TEST_BINARY = $(shell find "$(SWIFT_TEST_BUNDLE)/Contents/MacOS" -maxdepth 1 -type f -print -quit)
 
 # main.m is the hardware-facing process entrypoint. Its dispatch branches
 # require live-device paths and are not part of the in-process C self-test;
