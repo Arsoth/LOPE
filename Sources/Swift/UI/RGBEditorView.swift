@@ -8,6 +8,8 @@ struct RGBEditorView: View {
   @ObservedObject var model: AppModel
   @Binding var presentedZoneID: Int?
   @State private var hoveredZoneID: Int?
+  @State private var hexInput = ""
+  @State private var hexError: String?
   @Environment(\.lopeTheme) private var theme
 
   var body: some View {
@@ -58,9 +60,6 @@ struct RGBEditorView: View {
         Text(zone.name)
           .font(.callout.weight(.medium))
         Spacer()
-        Text(zone.draft.hex)
-          .font(.caption.monospaced())
-          .foregroundStyle(theme.secondaryText)
       }
       if !isPerRegionScope {
         modeButtonsRow(zone)
@@ -91,6 +90,8 @@ struct RGBEditorView: View {
     Button {
       let allZones = NSEvent.modifierFlags.contains(.shift)
       model.beginRGBEdit(zoneID: zone.id, allZones: allZones)
+      hexInput = hexText(for: zone.draft)
+      hexError = nil
       presentedZoneID = zone.id
     } label: {
       RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -131,14 +132,38 @@ struct RGBEditorView: View {
         RGBBrightnessSlider(color: rgbColorBinding(zoneID: zone.id))
           .frame(width: 22, height: 140)
       }
-      if let current = model.rgbZones.first(where: { $0.id == zone.id })?.draft {
-        Text(current.hex)
+      HStack(spacing: 6) {
+        TextField("#RRGGBB", text: $hexInput)
+          .textFieldStyle(.roundedBorder)
           .font(.caption.monospaced())
-          .foregroundStyle(.secondary)
+          .onSubmit { applyHexInput(zoneID: zone.id) }
+        Button("Apply") {
+          applyHexInput(zoneID: zone.id)
+        }
+        .buttonStyle(.bordered)
+      }
+      if let hexError {
+        Text(hexError)
+          .font(.caption)
+          .foregroundStyle(.red)
       }
     }
     .padding(14)
     .frame(width: 232)
+  }
+
+  private func hexText(for color: RGBColor) -> String {
+    "#\(color.bareHex)"
+  }
+
+  private func applyHexInput(zoneID: Int) {
+    guard let color = RGBColor(hex: hexInput) else {
+      hexError = "Enter a 6-digit hex color, such as #33AAFF."
+      return
+    }
+    model.setRGBColor(zoneID: zoneID, color: color)
+    hexInput = hexText(for: color)
+    hexError = nil
   }
 
   /// Only modes the current device's catalog entry marks as confirmed are
@@ -301,6 +326,8 @@ private struct RGBColorWheel: View {
       .frame(width: 14, height: 14)
       .overlay(Circle().stroke(Color.white, lineWidth: 2))
       .shadow(radius: 1)
+      .contentShape(Circle())
+      .pointingHandCursor()
       .position(x: x, y: y)
   }
 
