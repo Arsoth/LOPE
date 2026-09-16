@@ -163,7 +163,7 @@ coverage-c: $(C_COVERAGE_PROFDATA)
 coverage-swift:
 	@rm -f $(APP) bin/$(APP)
 	@scripts/run-swift-test-quiet.sh --enable-code-coverage
-	@COVERAGE_COLOR=$(COVERAGE_COLOR) bash scripts/colorize-coverage-report.sh "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)" --ignore-filename-regex='/Tests/|/Shims/|\.derived/'
+	@COVERAGE_COLOR=$(COVERAGE_COLOR) bash scripts/colorize-coverage-report.sh "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)" --ignore-filename-regex='/Tests/|/Shims/|/DerivedSources/|\.derived/'
 
 coverage: coverage-c coverage-swift
 
