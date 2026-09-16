@@ -11,47 +11,35 @@
 
 # LOPE todo list
 
-### 3: Add a retry action to the mouse-asleep dialog
+### 1: Improve color wheel drag responsiveness
 
-- [ ] Add a `Retry` button to the mouse-asleep dialog that restarts the 60-second retry clock when the mouse times out after 60 seconds.
+- [ ] Make dragging the color wheel selector responsive, investigating whether it shares the same lag as the DPI slider.
 
-**Done when:** After a 60-second timeout, the dialog shows `Retry`; activating it restarts the retry countdown/system and allows the retry flow to continue.
+**Done when:** Color wheel dragging responds smoothly without noticeable lag, and any shared cause with the DPI slider is addressed or documented.
 
-### 4: Enforce valid G-shift primary-click bindings
+### 2: Show a hand pointer over the color wheel selector
 
-- [ ] Require a G-shift key on the normal layer when primary click is bound on a G-shift layer, unless primary click is also bound on both layers.
+- [ ] Use a hand pointer when hovering over the draggable color wheel selector dot.
 
-**Done when:** The profile editor prevents or flags the invalid binding and allows the documented exception when primary click is bound on both layers.
+**Done when:** The pointer changes to a hand over the selector dot and remains the normal pointer elsewhere in the color control.
 
-### 5: Keep G-shift key bindings synchronized across layers
+### 3: Add hex color input without a persistent hex display
 
-- [ ] Ensure a configured G-shift key is bound to the same physical key on both layers.
+- [ ] Allow entering a standard hex color value while removing the hex value display from the main color-control UI.
 
-**Done when:** Setting a G-shift binding always produces matching bindings on the normal and G-shift layers.
+**Done when:** A valid standard hex value can be entered and applied, invalid input is handled clearly, and the main UI no longer shows a persistent hex display.
 
-### 6: Edit profile editor aliases
+### 4: Persist color settings in exported backup JSON
 
-- [ ] Add profile editor support for editing aliases in addition to primary button names.
+- [ ] Ensure color settings are included in exported backup JSON files.
 
-**Done when:** Alias fields can be edited alongside primary button names and the changes persist in the profile.
+**Done when:** Exported backup JSON contains all relevant color settings and importing a backup restores them correctly.
 
-### 7: Preserve profile editor contents across tab changes
+### 5: Show connection-type symbols before device names
 
-- [ ] Prevent changing tabs from resetting the profile editor contents.
+- [ ] Show a USB, wireless, or Bluetooth symbol before each device name instead of specifying the connection by name at the end of the device list entry.
 
-**Done when:** Unsaved profile editor values remain intact after switching tabs and returning to the editor.
-
-### 8: Improve RGB color controls
-
-- [ ] Make the color box open an in-app RGB wheel and brightness slider, arranged in a row instead of a column.
-
-**Done when:** Clicking a color box opens the RGB controls in-app, with the wheel and brightness slider displayed side by side.
-
-### 9: Arrange color mode controls according to scope
-
-- [ ] Show per-region color-mode buttons in a row to the right of the related color, or per-mouse buttons in a row below the color.
-
-**Done when:** Color-mode controls use the right-of-color layout for per-region modes and the below-color layout for per-mouse modes.
+**Done when:** Each device entry displays the correct connection-type symbol before its name, and the trailing connection-name text is removed.
 
 # Ignore below item(s):
 
