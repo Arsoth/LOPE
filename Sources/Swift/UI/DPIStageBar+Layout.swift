@@ -31,7 +31,7 @@ extension DPIStageBar {
             .position(x: position(for: value, width: proxy.size.width), y: 43)
         }
 
-        ForEach(Array(stages.enumerated()).filter { Int($0.element) != nil }, id: \.offset) {
+        ForEach(Array(visibleStages.enumerated()).filter { Int($0.element) != nil }, id: \.offset) {
           item in
           stageHandle(index: item.offset, text: item.element, width: proxy.size.width)
         }
@@ -51,8 +51,7 @@ extension DPIStageBar {
             if editingStage != nil {
               dismissStageEditor()
             }
-            draggingStage = index
-            activeDragValue = nil
+            beginDrag(at: index)
             updateDrag(at: x, width: proxy.size.width)
           },
           onDragChanged: { x in

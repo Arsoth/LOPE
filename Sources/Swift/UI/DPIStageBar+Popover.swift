@@ -13,8 +13,8 @@ extension DPIStageBar {
   }
 
   func stagePopover(index: Int, isInteractive: Bool) -> some View {
-    let isDefault = defaultStage == index + 1
-    let isShift = shiftStage == index + 1
+    let isDefault = visibleDefaultStage == index + 1
+    let isShift = visibleShiftStage == index + 1
     let canDelete = !isDefault && !isShift
     return VStack(alignment: .leading, spacing: 10) {
       Text("DPI stage \(index + 1)")
@@ -147,17 +147,17 @@ extension DPIStageBar {
   }
 
   var legendOrder: [DPILegendRole] {
-    let lowerRole: DPILegendRole = defaultStage <= shiftStage ? .defaultStage : .shift
-    let upperRole: DPILegendRole = defaultStage <= shiftStage ? .shift : .defaultStage
-    let lowerStage = min(defaultStage, shiftStage)
-    let upperStage = max(defaultStage, shiftStage)
+    let lowerRole: DPILegendRole = visibleDefaultStage <= visibleShiftStage ? .defaultStage : .shift
+    let upperRole: DPILegendRole = visibleDefaultStage <= visibleShiftStage ? .shift : .defaultStage
+    let lowerStage = min(visibleDefaultStage, visibleShiftStage)
+    let upperStage = max(visibleDefaultStage, visibleShiftStage)
     var beforeCount = 0
     var betweenCount = 0
     var afterCount = 0
 
-    for (index, text) in stages.enumerated() where Int(text) != nil {
+    for (index, text) in visibleStages.enumerated() where Int(text) != nil {
       let stage = index + 1
-      guard stage != defaultStage, stage != shiftStage else { continue }
+      guard stage != visibleDefaultStage, stage != visibleShiftStage else { continue }
       if stage < lowerStage {
         beforeCount += 1
       } else if stage > upperStage {

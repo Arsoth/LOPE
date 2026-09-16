@@ -26,6 +26,10 @@ struct DPIStageBar: View {
   @State var draggingStage: Int?
   @State var activeDragX: CGFloat?
   @State var activeDragValue: Int?
+  @State var dragOriginIndex: Int?
+  @State var dragStages: [String]?
+  @State var dragDefaultStage: Int?
+  @State var dragShiftStage: Int?
   @State var hoveredStageIndex: Int?
   @State var popupFrame: CGRect?
   @State var popoverContentOpacity = 1.0
@@ -49,5 +53,17 @@ struct DPIStageBar: View {
   // label, accounting for the label's small visual offset.
   var validationLeadingInset: CGFloat {
     trackInset / 2 - endpointCenterAdjustment - validationIconSize / 2
+  }
+
+  var visibleStages: [String] {
+    dragStages ?? stages
+  }
+
+  var visibleDefaultStage: Int {
+    dragDefaultStage ?? defaultStage
+  }
+
+  var visibleShiftStage: Int {
+    dragShiftStage ?? shiftStage
   }
 }

@@ -4,15 +4,26 @@
 import SwiftUI
 
 extension DPIStageBar {
+  func beginDrag(at index: Int) {
+    draggingStage = index
+    activeDragValue = nil
+    dragOriginIndex = index
+    dragStages = stages
+    dragDefaultStage = defaultStage
+    dragShiftStage = shiftStage
+  }
+
   func interactionTargets(width: CGFloat) -> [DPIStageHitTarget] {
-    stages.enumerated().compactMap { index, text in
+    visibleStages.enumerated().compactMap { index, text in
       guard let value = Int(text) else { return nil }
       let x =
         draggingStage == index
         ? (activeDragX ?? position(for: value, width: width))
         : position(for: value, width: width)
       let role: DPILegendRole =
-        defaultStage == index + 1 ? .defaultStage : (shiftStage == index + 1 ? .shift : .other)
+        visibleDefaultStage == index + 1
+        ? .defaultStage
+        : (visibleShiftStage == index + 1 ? .shift : .other)
       return DPIStageHitTarget(index: index, x: x, role: role)
     }
   }
@@ -30,21 +41,95 @@ extension DPIStageBar {
   }
 
   func updateDrag(at x: CGFloat, width: CGFloat) {
-    guard draggingStage != nil, let candidate = value(at: x, width: width) else { return }
+    guard let index = draggingStage,
+      var localStages = dragStages,
+      let candidate = value(at: x, width: width)
+    else { return }
     setActiveDragX(x, width: width)
-    guard activeDragValue != candidate else { return }
+    guard Int(localStages[index]) != candidate else {
+      activeDragValue = candidate
+      return
+    }
+
+    localStages[index] = String(candidate)
+    var currentIndex = index
+    while currentIndex > 0,
+      let currentValue = Int(localStages[currentIndex]),
+      let previousValue = Int(localStages[currentIndex - 1]),
+      currentValue < previousValue
+    {
+      localStages.swapAt(currentIndex, currentIndex - 1)
+      swapDragRoles(at: currentIndex, and: currentIndex - 1)
+      currentIndex -= 1
+    }
+    while currentIndex + 1 < localStages.count,
+      let currentValue = Int(localStages[currentIndex]),
+      let nextValue = Int(localStages[currentIndex + 1]),
+      currentValue > nextValue
+    {
+      localStages.swapAt(currentIndex, currentIndex + 1)
+      swapDragRoles(at: currentIndex, and: currentIndex + 1)
+      currentIndex += 1
+    }
+
+    dragStages = localStages
+    draggingStage = currentIndex
     activeDragValue = candidate
   }
 
   func finishDrag() {
-    if let draggingStage, let activeDragValue {
-      _ = onDragValue(draggingStage, activeDragValue)
+    finishLocalDrag()
+    if let dragOriginIndex,
+      let draggingStage,
+      let localStages = dragStages,
+      localStages.indices.contains(draggingStage),
+      let finalValue = Int(localStages[draggingStage])
+    {
+      _ = onDragValue(dragOriginIndex, finalValue)
     }
     onDragEnded()
     withAnimation(.easeOut(duration: 0.08)) {
       draggingStage = nil
       activeDragX = nil
       activeDragValue = nil
+      dragOriginIndex = nil
+      dragStages = nil
+      dragDefaultStage = nil
+      dragShiftStage = nil
+    }
+  }
+
+  private func swapDragRoles(at firstIndex: Int, and secondIndex: Int) {
+    let firstStage = firstIndex + 1
+    let secondStage = secondIndex + 1
+    if dragDefaultStage == firstStage {
+      dragDefaultStage = secondStage
+    } else if dragDefaultStage == secondStage {
+      dragDefaultStage = firstStage
+    }
+    if dragShiftStage == firstStage {
+      dragShiftStage = secondStage
+    } else if dragShiftStage == secondStage {
+      dragShiftStage = firstStage
+    }
+  }
+
+  private func finishLocalDrag() {
+    guard var localStages = dragStages else { return }
+    var previousValue: Int?
+    for index in localStages.indices {
+      guard let value = Int(localStages[index]),
+        let adjusted = capabilities.snappedValue(
+          for: value,
+          lowerBound: previousValue.map { $0 + 1 }
+        )
+      else { return }
+      localStages[index] = String(adjusted)
+      previousValue = adjusted
+    }
+    dragStages = localStages
+    if let draggingStage, localStages.indices.contains(draggingStage) {
+      activeDragValue = Int(localStages[draggingStage])
     }
   }
 

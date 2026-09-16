@@ -9,8 +9,8 @@ extension DPIStageBar {
     let liveValue = draggingStage == index ? activeDragValue ?? parsedValue : parsedValue
     let displayValue = liveValue.map(formattedDPIValue) ?? "Enter DPI"
     let positionValue = parsedValue ?? capabilities.minimum ?? 800
-    let isDefault = defaultStage == index + 1
-    let isShift = shiftStage == index + 1
+    let isDefault = visibleDefaultStage == index + 1
+    let isShift = visibleShiftStage == index + 1
     let isHovered = hoveredStageIndex == index && draggingStage == nil && editingStage == nil
     let handleTextColor =
       isDefault
