@@ -372,7 +372,7 @@ final class AppModel: ObservableObject {
   }
 
   var hasRGBChanges: Bool {
-    rgbZones.contains { $0.current != $0.draft }
+    rgbZones.contains { $0.current != $0.draft || $0.currentMode != $0.draftMode }
   }
 
   var canApplyDPI: Bool {

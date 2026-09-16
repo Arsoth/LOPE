@@ -230,11 +230,13 @@ private func hsbComponents(of color: Color) -> HSBComponents {
 }
 
 /// An in-app hue/saturation wheel: dragging anywhere in the circle picks a
-/// hue (angle, clockwise from the top, matching `AngularGradient`'s default
-/// sweep direction) and a saturation (distance from center). Brightness is
-/// left untouched here and is controlled separately by `RGBBrightnessSlider`
-/// alongside it, mirroring the wheel/slider split in macOS's own color
-/// panel.
+/// hue (angle, clockwise from the top) and a saturation (distance from
+/// center). `AngularGradient`'s own 0° reference point renders at 3 o'clock
+/// (east), not at the top, so `thumb`/`update` apply a quarter-turn (`.pi /
+/// 2`) offset to keep the top-based hue math here aligned with where the
+/// gradient actually paints each hue. Brightness is left untouched here and
+/// is controlled separately by `RGBBrightnessSlider` alongside it, mirroring
+/// the wheel/slider split in macOS's own color panel.
 private struct RGBColorWheel: View {
   @Binding var color: Color
 
@@ -277,7 +279,7 @@ private struct RGBColorWheel: View {
   }
 
   private func thumb(hsb: HSBComponents, radius: CGFloat) -> some View {
-    let angle = hsb.hue * 2 * .pi
+    let angle = hsb.hue * 2 * .pi + .pi / 2
     let distance = hsb.saturation * radius
     let x = radius + sin(angle) * distance
     let y = radius - cos(angle) * distance
@@ -290,14 +292,16 @@ private struct RGBColorWheel: View {
   }
 
   /// `dx`/`dy` follow the same clockwise-from-top convention as `thumb`:
-  /// `dy` grows downward (screen space) and angle 0 points up.
+  /// `dy` grows downward (screen space) and angle 0 points up. The `.pi / 2`
+  /// subtraction is the inverse of the offset `thumb` adds, undoing the
+  /// quarter turn needed to match `AngularGradient`'s 3-o'clock-origin hue 0.
   private func update(at point: CGPoint, radius: CGFloat, brightness: CGFloat) {
     guard radius > 0 else { return }
     let dx = point.x - radius
     let dy = point.y - radius
     let distance = min(sqrt(dx * dx + dy * dy), radius)
     let saturation = distance / radius
-    var angle = atan2(dx, -dy)
+    var angle = atan2(dx, -dy) - .pi / 2
     if angle < 0 { angle += 2 * .pi }
     let hue = angle / (2 * .pi)
     color = Color(hue: hue, saturation: saturation, brightness: brightness)
