@@ -142,11 +142,8 @@ C_COVERAGE_BIN := $(COVERAGE_DIR)/lope-coverage
 C_COVERAGE_PROFRAW := $(COVERAGE_DIR)/lope.profraw
 C_COVERAGE_PROFDATA := $(COVERAGE_DIR)/lope.profdata
 # SwiftPM changes both its output directory and XCTest bundle name across Apple
-# toolchain versions. The coverage test has already built these artifacts by
-# the time the report targets expand these variables, so discover them under
-# the package's build directory instead of guessing either name or path.
-SWIFT_COVERAGE_PROFDATA = $(shell find .build -type f -path '*/codecov/default.profdata' -print -quit)
-SWIFT_TEST_BINARY = $(shell find .build -type f -perm -111 -name '*Tests*' -print -quit)
+# toolchain versions. Discover the artifacts in each recipe after `swift test`
+# has produced them; Make expands recipe variables before running the recipe.
 
 # main.m is the hardware-facing process entrypoint. Its dispatch branches
 # require live-device paths and are not part of the in-process C self-test;
@@ -163,7 +160,15 @@ coverage-c: $(C_COVERAGE_PROFDATA)
 coverage-swift:
 	@rm -f $(APP) bin/$(APP)
 	@scripts/run-swift-test-quiet.sh --enable-code-coverage
-	@COVERAGE_COLOR=$(COVERAGE_COLOR) bash scripts/colorize-coverage-report.sh "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)" --ignore-filename-regex='/Tests/|/Shims/|/DerivedSources/|\.derived/'
+	@swift_test_binary="$$(find .build -type f -perm -111 -name '*Tests*' -print -quit)"; \
+	 swift_coverage_profdata="$$(find .build -type f -path '*/codecov/default.profdata' -print -quit)"; \
+	 if [ -z "$$swift_test_binary" ] || [ -z "$$swift_coverage_profdata" ]; then \
+	   echo "coverage-swift: unable to locate Swift test artifacts" >&2; \
+	   echo "coverage-swift: test binary=$$swift_test_binary" >&2; \
+	   echo "coverage-swift: profdata=$$swift_coverage_profdata" >&2; \
+	   exit 1; \
+	 fi; \
+	 COVERAGE_COLOR=$(COVERAGE_COLOR) bash scripts/colorize-coverage-report.sh "$$swift_test_binary" -instr-profile="$$swift_coverage_profdata" --ignore-filename-regex='/Tests/|/Shims/|/DerivedSources/|\.derived/'
 
 coverage: coverage-c coverage-swift
 
@@ -173,7 +178,15 @@ coverage-check-c: $(C_COVERAGE_PROFDATA)
 coverage-check-swift:
 	@rm -f $(APP) bin/$(APP)
 	@scripts/run-swift-test-quiet.sh --enable-code-coverage $(SWIFT_TEST_ARGS)
-	@scripts/check-coverage.sh "Swift" "$(COVERAGE_SWIFT_SOURCES_PATTERN)" $(COVERAGE_MIN_REGION) $(COVERAGE_MIN_FUNCTION) $(COVERAGE_MIN_LINE) -1 -- "$(SWIFT_TEST_BINARY)" -instr-profile="$(SWIFT_COVERAGE_PROFDATA)"
+	@swift_test_binary="$$(find .build -type f -perm -111 -name '*Tests*' -print -quit)"; \
+	 swift_coverage_profdata="$$(find .build -type f -path '*/codecov/default.profdata' -print -quit)"; \
+	 if [ -z "$$swift_test_binary" ] || [ -z "$$swift_coverage_profdata" ]; then \
+	   echo "coverage-check-swift: unable to locate Swift test artifacts" >&2; \
+	   echo "coverage-check-swift: test binary=$$swift_test_binary" >&2; \
+	   echo "coverage-check-swift: profdata=$$swift_coverage_profdata" >&2; \
+	   exit 1; \
+	 fi; \
+	 scripts/check-coverage.sh "Swift" "$(COVERAGE_SWIFT_SOURCES_PATTERN)" $(COVERAGE_MIN_REGION) $(COVERAGE_MIN_FUNCTION) $(COVERAGE_MIN_LINE) -1 -- "$$swift_test_binary" -instr-profile="$$swift_coverage_profdata"
 
 # Run both language gates even when the first one fails, so a single CI run
 # reports the complete coverage picture instead of short-circuiting at C.
