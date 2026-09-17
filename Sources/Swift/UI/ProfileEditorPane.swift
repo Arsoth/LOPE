@@ -16,23 +16,29 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
         emptyState
       } else {
         HStack(spacing: 8) {
-          Text("Profile ID")
+          Text(L10n.text("Profile ID"))
             .font(.callout.weight(.medium))
           TextField("", text: $model.profileEditorID)
             .textFieldStyle(.roundedBorder)
             .frame(width: 130)
-          Text("Display name")
+          Text(L10n.text("Display name"))
             .font(.callout.weight(.medium))
           TextField("", text: $model.profileEditorName)
             .textFieldStyle(.roundedBorder)
             .frame(width: 200)
           Spacer()
-          Button("Import profile…", action: model.importProfileEditorDraft)
-          Button("Export profile…", action: model.exportProfileEditorDraft)
+          Button(L10n.text("Import profile…"), action: model.importProfileEditorDraft)
+          Button(L10n.text("Export profile…"), action: model.exportProfileEditorDraft)
         }
         .padding(.horizontal, 20)
         Text(
-          "Name each control below, then save. The saved profile is matched to \(currentDeviceDisplayName.isEmpty ? "this mouse" : currentDeviceDisplayName) by device name and product ID; a file with the same profile ID as a bundled one replaces it. Export produces a complete descriptor, ready to copy into Profiles/ for a pull request once Sources below is filled in."
+          L10n.text(
+            "Name each control below, then save. The saved profile is matched to {device} by device name and product ID; a file with the same profile ID as a bundled one replaces it. Export produces a complete descriptor, ready to copy into Profiles/ for a pull request once Sources below is filled in.",
+            replacements: [
+              "device": currentDeviceDisplayName.isEmpty
+                ? L10n.text("this mouse") : currentDeviceDisplayName
+            ]
+          )
         )
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -41,11 +47,11 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
           VStack(alignment: .leading, spacing: 8) {
             ForEach(model.profileEditorButtonNumbers, id: \.self) { number in
               HStack(spacing: 10) {
-                Text("Button \(number)")
+                Text(L10n.text("Button {number}", replacements: ["number": String(number)]))
                   .frame(width: 90, alignment: .leading)
                   .foregroundStyle(.secondary)
                 TextField(
-                  "Control name",
+                  L10n.text("Control name"),
                   text: Binding(
                     get: { model.profileEditorButtonNames[number] ?? "" },
                     set: { model.profileEditorButtonNames[number] = $0 }
@@ -53,7 +59,7 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
                 )
                 .textFieldStyle(.roundedBorder)
                 TextField(
-                  "Aliases (comma-separated)",
+                  L10n.text("Aliases (comma-separated)"),
                   text: Binding(
                     get: { model.profileEditorButtonAliases[number] ?? "" },
                     set: { model.profileEditorButtonAliases[number] = $0 }
@@ -64,7 +70,7 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
             }
             Divider()
               .padding(.top, 4)
-            Text("Sources (one URL per line)")
+            Text(L10n.text("Sources (one URL per line)"))
               .font(.callout.weight(.medium))
             TextEditor(text: $model.profileEditorSources)
               .font(.system(.callout, design: .monospaced))
@@ -78,7 +84,7 @@ struct ProfileEditorPane<LoadingState: View, EmptyState: View>: View {
         .id(model.selectedDeviceIndex)
         HStack {
           Spacer()
-          Button("Save as custom profile") { model.saveProfileEditorDraft() }
+          Button(L10n.text("Save as custom profile")) { model.saveProfileEditorDraft() }
             .buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 20)

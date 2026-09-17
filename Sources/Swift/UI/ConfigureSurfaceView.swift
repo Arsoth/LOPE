@@ -53,12 +53,12 @@ struct ConfigureSurfaceView: View {
       VStack(spacing: 10) {
         ProgressView()
           .controlSize(.regular)
-        Text("Loading profiles from mouse…")
+        Text(L10n.text("Loading profiles from mouse…"))
           .font(.headline)
         Text(
           currentDeviceDisplayName.isEmpty
-            ? "Finding Logitech mice and reading onboard data"
-            : "Reading \(currentDeviceDisplayName)"
+            ? L10n.text("Finding Logitech mice and reading onboard data")
+            : L10n.text("Reading {device}", replacements: ["device": currentDeviceDisplayName])
         )
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -80,14 +80,14 @@ struct ConfigureSurfaceView: View {
         .accessibilityHidden(true)
 
       CenteredAppModal(
-        title: "Wake \(currentDeviceDisplayName)",
+        title: L10n.text("Wake {device}", replacements: ["device": currentDeviceDisplayName]),
         message: knownDeviceWakeMessage,
         symbol: "computermouse.fill",
         onDefaultAction: model.knownDeviceWakeExpired ? model.retryKnownDeviceWake : {},
         onCancel: {},
         showsActions: model.knownDeviceWakeExpired
       ) {
-        Button("Retry", action: model.retryKnownDeviceWake)
+        Button(L10n.text("Retry"), action: model.retryKnownDeviceWake)
           .buttonStyle(.borderedProminent)
       }
     }
@@ -110,12 +110,14 @@ struct ConfigureSurfaceView: View {
       messages.append(guidance.sleepDescription)
       messages.append(guidance.wakeInstructions)
     } else {
-      messages.append("Move or click the mouse to wake it while LOPE reads it.")
+      messages.append(L10n.text("Move or click the mouse to wake it while LOPE reads it."))
     }
     messages.append(
       model.knownDeviceWakeExpired
-        ? "LOPE stopped checking after a minute. Choose Retry to keep waiting for the mouse."
-        : "LOPE will keep checking in the background.")
+        ? L10n.text(
+          "LOPE stopped checking after a minute. Choose Retry to keep waiting for the mouse."
+        )
+        : L10n.text("LOPE will keep checking in the background."))
     return messages.joined(separator: "\n\n")
   }
 
@@ -128,11 +130,12 @@ struct LoadingProfileStateView: View {
     VStack(spacing: 10) {
       ProgressView()
         .controlSize(.regular)
-      Text("Loading profiles from mouse…")
+      Text(L10n.text("Loading profiles from mouse…"))
         .font(.headline)
       Text(
         currentDeviceDisplayName.isEmpty
-          ? "Finding Logitech mice and reading onboard data" : "Reading \(currentDeviceDisplayName)"
+          ? L10n.text("Finding Logitech mice and reading onboard data")
+          : L10n.text("Reading {device}", replacements: ["device": currentDeviceDisplayName])
       )
       .font(.callout)
       .foregroundStyle(.secondary)
@@ -162,7 +165,8 @@ struct EmptyStateView: View {
         .foregroundStyle(.secondary)
         .frame(maxWidth: 560)
       if !engineUnavailable && !model.inputMonitoringAuthorized {
-        Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+        Button(
+          L10n.text("Open Input Monitoring Settings"), action: model.openInputMonitoringSettings)
       }
       Spacer()
     }
@@ -178,36 +182,50 @@ struct EmptyStateView: View {
   }
 
   private var emptyStateTitle: String {
-    if engineUnavailable { return "LOPE needs to be reinstalled" }
-    if model.devices.isEmpty { return "No editable Logitech mouse detected" }
+    if engineUnavailable { return L10n.text("LOPE needs to be reinstalled") }
+    if model.devices.isEmpty { return L10n.text("No editable Logitech mouse detected") }
     if inputMonitoringRequiredForWiredMouse {
-      return "Input Monitoring required for \(wiredMouseName)"
+      return L10n.text(
+        "Input Monitoring required for {device}", replacements: ["device": wiredMouseName])
     }
     if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
-      return "No MX mouse profile descriptor"
+      return L10n.text("No MX mouse profile descriptor")
     }
-    return "No editable onboard profile"
+    return L10n.text("No editable onboard profile")
   }
 
   private var emptyStateMessage: String {
     if engineUnavailable {
       return
-        "The bundled HID++ engine is missing, so LOPE cannot access your mouse. Please reinstall LOPE to restore it. Your preferences and data are stored separately and will not be lost."
+        L10n.text(
+          "The bundled HID++ engine is missing, so LOPE cannot access your mouse. Please reinstall LOPE to restore it. Your preferences and data are stored separately and will not be lost."
+        )
     }
     if model.devices.isEmpty {
       return
-        "The app lists Logitech mice. macOS may also be blocking access even when the mouse is connected."
+        L10n.text(
+          "The app lists Logitech mice. macOS may also be blocking access even when the mouse is connected."
+        )
     }
     if inputMonitoringRequiredForWiredMouse {
       return
-        "\(wiredMouseName) is connected, but LOPE cannot read its onboard profile until Input Monitoring is enabled. Enable LOPE in System Settings, then choose Refresh."
+        L10n.text(
+          "{device} is connected, but LOPE cannot read its onboard profile until Input Monitoring is enabled. Enable LOPE in System Settings, then choose Refresh.",
+          replacements: ["device": wiredMouseName]
+        )
     }
     if model.isMXSeriesMouse && !model.hasSpecificMouseProfile {
       return
-        "\(model.deviceSummary) is connected, but LOPE does not have a profile JSON for this MX mouse’s button layout yet."
+        L10n.text(
+          "{device} is connected, but LOPE does not have a profile JSON for this MX mouse’s button layout yet.",
+          replacements: ["device": model.deviceSummary]
+        )
     }
     return
-      "\(model.deviceSummary) is connected, but it does not expose an onboard profile format this app can edit."
+      L10n.text(
+        "{device} is connected, but it does not expose an onboard profile format this app can edit.",
+        replacements: ["device": model.deviceSummary]
+      )
   }
 
   private var inputMonitoringRequiredForWiredMouse: Bool {

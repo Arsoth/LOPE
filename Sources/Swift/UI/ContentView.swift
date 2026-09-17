@@ -44,7 +44,7 @@ struct ContentView: View {
     ZStack {
       // Keep Settings on the standard macOS ⌘, shortcut even though the
       // tab itself is represented by a TabView item.
-      Button("Settings") {
+      Button(L10n.text("Settings")) {
         selectedTab = .settings
       }
       .keyboardShortcut(",", modifiers: [.command])
@@ -65,24 +65,24 @@ struct ContentView: View {
                 presentedRGBZoneID: $presentedRGBZoneID
               )
             }
-            .tabItem { Label("Configure", systemImage: "cursorarrow.click") }
+            .tabItem { Label(L10n.text("Configure"), systemImage: "cursorarrow.click") }
             .tag(AppTab.configure)
             BackupsPane(
               model: model,
               restoreURL: $restoreURL,
               confirmRestore: $confirmRestore
             )
-            .tabItem { Label("Backups", systemImage: "archivebox") }
+            .tabItem { Label(L10n.text("Backups"), systemImage: "archivebox") }
             .tag(AppTab.backups)
             ProfileEditorPane(
               model: model,
               loadingState: LoadingProfileStateView(model: model),
               emptyState: EmptyStateView(model: model)
             )
-            .tabItem { Label("Profile Editor", systemImage: "square.and.pencil") }
+            .tabItem { Label(L10n.text("Profile Editor"), systemImage: "square.and.pencil") }
             .tag(AppTab.profileEditor)
             SettingsPane(model: model)
-              .tabItem { Label("Settings", systemImage: "gearshape") }
+              .tabItem { Label(L10n.text("Settings"), systemImage: "gearshape") }
               .tag(AppTab.settings)
           }
           .padding(.top, selectedTab == .settings || selectedTab == .configure ? 0 : 20)
@@ -139,31 +139,34 @@ struct ContentView: View {
         model.updateInputMonitoringAuthorization()
       }
     }
-    .alert("Restore this backup?", isPresented: $confirmRestore) {
-      Button("Cancel", role: .cancel) { restoreURL = nil }
-      Button("Restore and verify", role: .destructive) {
+    .alert(Text(L10n.text("Restore this backup?")), isPresented: $confirmRestore) {
+      Button(L10n.text("Cancel"), role: .cancel) { restoreURL = nil }
+      Button(L10n.text("Restore and verify"), role: .destructive) {
         if let restoreURL { model.restore(restoreURL) }
         restoreURL = nil
       }
     } message: {
-      Text(restoreURL?.lastPathComponent ?? "Selected backup")
+      Text(restoreURL?.lastPathComponent ?? L10n.text("Selected backup"))
     }
-    .alert("Restore backups from this save?", isPresented: $confirmRecoveryRestore) {
-      Button("Cancel", role: .cancel) {}
-      Button("Restore and verify", role: .destructive) {
+    .alert(Text(L10n.text("Restore backups from this save?")), isPresented: $confirmRecoveryRestore)
+    {
+      Button(L10n.text("Cancel"), role: .cancel) {}
+      Button(L10n.text("Restore and verify"), role: .destructive) {
         model.restoreLastSaveBackups()
       }
     } message: {
       Text(
-        "LOPE will restore the exact pre-save sectors captured by the failed operation. Any sector that was already unchanged will be skipped safely."
+        L10n.text(
+          "LOPE will restore the exact pre-save sectors captured by the failed operation. Any sector that was already unchanged will be skipped safely."
+        )
       )
     }
-    .alert("Primary click required", isPresented: $primaryClickModalPresented) {
-      Button("Return to editor", role: .cancel) {}
+    .alert(Text(L10n.text("Primary click required")), isPresented: $primaryClickModalPresented) {
+      Button(L10n.text("Return to editor"), role: .cancel) {}
     } message: {
       Text(
         model.primaryClickValidationMessage
-          ?? "Choose “Left click” for the primary-click button, then save again."
+          ?? L10n.text("Choose “Left click” for the primary-click button, then save again.")
       )
     }
   }
@@ -209,15 +212,16 @@ struct ContentView: View {
         .accessibilityHidden(true)
 
       CenteredAppModal(
-        title: model.wiredAccessDeviceName.map { "Input Monitoring required for \($0)" }
-          ?? "Input Monitoring required",
+        title: model.wiredAccessDeviceName.map {
+          L10n.text("Input Monitoring required for {device}", replacements: ["device": $0])
+        } ?? L10n.text("Input Monitoring required"),
         message: wiredAccessInstructionsMessage,
         symbol: "lock.shield",
         onDefaultAction: openWiredAccessSettings,
         onCancel: dismissWiredAccessInstructions
       ) {
-        Button("Cancel", role: .cancel, action: dismissWiredAccessInstructions)
-        Button("Open System Settings", action: openWiredAccessSettings)
+        Button(L10n.text("Cancel"), role: .cancel, action: dismissWiredAccessInstructions)
+        Button(L10n.text("Open System Settings"), action: openWiredAccessSettings)
           .buttonStyle(.borderedProminent)
       }
     }
@@ -230,7 +234,9 @@ struct ContentView: View {
   }
 
   private var wiredAccessInstructionsMessage: String {
-    "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, use the button below. On first use, macOS asks to receive keystrokes while it registers LOPE; choose Open System Settings, enable LOPE there, then return and choose Refresh."
+    L10n.text(
+      "LOPE can use wireless and receiver-connected mice without this permission. To read and edit a wired mouse, use the button below. On first use, macOS asks to receive keystrokes while it registers LOPE; choose Open System Settings, enable LOPE there, then return and choose Refresh."
+    )
   }
 
   private func dismissWiredAccessInstructions() {

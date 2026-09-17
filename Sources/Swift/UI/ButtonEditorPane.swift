@@ -19,9 +19,9 @@ struct ButtonEditorPane: View {
           ProfileControlsView(model: model)
           if model.hasGShiftLayer {
             HStack(spacing: 10) {
-              Text("Button assignments")
+              Text(L10n.text("Button assignments"))
                 .font(.callout.weight(.medium))
-              Text("G-Shift assignments apply while holding the mouse’s G-Shift button.")
+              Text(L10n.text("G-Shift assignments apply while holding the mouse’s G-Shift button."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
@@ -35,7 +35,7 @@ struct ButtonEditorPane: View {
           if model.canEditOnboardDPI {
             DPIEditorView(model: model)
           } else {
-            Text("Onboard DPI editing is unavailable for this legacy profile path.")
+            Text(L10n.text("Onboard DPI editing is unavailable for this legacy profile path."))
               .font(.caption)
               .foregroundStyle(.secondary)
               .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,11 +63,13 @@ struct ButtonEditorPane: View {
         Image(systemName: "exclamationmark.triangle.fill")
           .foregroundStyle(theme.warning)
         Text(
-          "The last save was only partially completed. Exact pre-save backups are available for recovery."
+          L10n.text(
+            "The last save was only partially completed. Exact pre-save backups are available for recovery."
+          )
         )
         .font(.callout)
         Spacer()
-        Button("Restore backups from this save") {
+        Button(L10n.text("Restore backups from this save")) {
           confirmRecoveryRestore = true
         }
         .buttonStyle(.bordered)
@@ -81,7 +83,9 @@ struct ButtonEditorPane: View {
   private var readOnlyNotice: some View {
     if !model.isProvisionalMouseData && !model.currentMouseProfile.profileIO.canSave {
       Text(
-        "This device is cataloged for read-only inspection until its profile-specific save format is validated."
+        L10n.text(
+          "This device is cataloged for read-only inspection until its profile-specific save format is validated."
+        )
       )
       .font(.caption)
       .foregroundStyle(theme.warning)
@@ -94,10 +98,12 @@ struct ButtonEditorPane: View {
       HStack(spacing: 8) {
         Image(systemName: "questionmark.circle.fill")
           .foregroundStyle(.secondary)
-        Text("LOPE doesn't recognize this mouse, so buttons below are shown by number only.")
-          .font(.callout)
+        Text(
+          L10n.text("LOPE doesn't recognize this mouse, so buttons below are shown by number only.")
+        )
+        .font(.callout)
         Spacer()
-        Button("Create profile") { model.createGeneratedProfile() }
+        Button(L10n.text("Create profile")) { model.createGeneratedProfile() }
           .buttonStyle(.bordered)
       }
       .padding(8)
@@ -118,14 +124,14 @@ struct ProfileControlsView: View {
         Spacer(minLength: 12)
         if model.hasGShiftLayer {
           Picker(
-            "Button layer",
+            L10n.text("Button layer"),
             selection: Binding(
               get: { model.buttonLayer },
               set: { model.selectButtonLayer($0) }
             )
           ) {
             ForEach(ButtonLayer.allCases, id: \.self) { layer in
-              Text(layer.label).tag(layer)
+              Text(L10n.text(layer.label)).tag(layer)
             }
           }
           .labelsHidden()
@@ -133,9 +139,9 @@ struct ProfileControlsView: View {
           .frame(width: 150)
         }
         if model.profiles.count > 1 {
-          Text("Profile:")
+          Text(L10n.text("Profile:"))
             .font(.callout.weight(.medium))
-          Picker("Profile", selection: $model.profileNumber) {
+          Picker(L10n.text("Profile"), selection: $model.profileNumber) {
             ForEach(model.profiles) { profile in
               Text(profile.title).tag(profile.id)
             }
@@ -144,7 +150,7 @@ struct ProfileControlsView: View {
           .frame(width: 150)
           .disabled(model.busy)
 
-          Text("Enable:")
+          Text(L10n.text("Enable:"))
             .font(.callout.weight(.medium))
           ForEach(model.profiles) { profile in
             profileEnableControl(profile)
@@ -153,13 +159,18 @@ struct ProfileControlsView: View {
       }
       if model.showAdvancedFields {
         HStack(spacing: 12) {
-          Text("Sectors:")
+          Text(L10n.text("Sectors:"))
             .font(.caption)
             .foregroundStyle(.secondary)
           ForEach(model.profiles) { profile in
-            Text("Profile \(profile.id): \(profile.sector)")
-              .font(.caption.monospaced())
-              .foregroundStyle(.secondary)
+            Text(
+              L10n.text(
+                "Profile {id}: {sector}",
+                replacements: ["id": String(profile.id), "sector": profile.sector]
+              )
+            )
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
           }
         }
       }
@@ -188,15 +199,15 @@ struct ProfileControlsView: View {
     case true:
       crcLabel = ""
       crcColor = .secondary
-      helpText = "Profile \(label) CRC valid"
+      helpText = L10n.text("Profile {id} CRC valid", replacements: ["id": label])
     case false:
-      crcLabel = "Profile invalid"
+      crcLabel = L10n.text("Profile invalid")
       crcColor = .red
-      helpText = "Profile \(label) CRC invalid"
+      helpText = L10n.text("Profile {id} CRC invalid", replacements: ["id": label])
     case nil:
       crcLabel = ""
       crcColor = .secondary
-      helpText = "Profile \(label) CRC not read"
+      helpText = L10n.text("Profile {id} CRC not read", replacements: ["id": label])
     }
     let enabled = Binding<Bool>(
       get: { model.profileEnabled(profileID) },

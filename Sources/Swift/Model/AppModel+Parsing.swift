@@ -6,7 +6,8 @@ import Foundation
 @MainActor
 extension AppModel {
   func presetLabel(for raw: String) -> String {
-    presets.first(where: { normalize($0.raw) == normalize(raw) })?.label ?? "Custom raw output"
+    presets.first(where: { normalize($0.raw) == normalize(raw) }).map { L10n.text($0.label) }
+      ?? L10n.text("Custom raw output")
   }
 
   func loadDPI(profileText: String? = nil) {
@@ -239,7 +240,7 @@ extension AppModel {
         currentMouseProfile.button(for: number)?.label
         ?? currentMouseProfile.scrollWheelButtonLabel(for: number)
         ?? ProfileOutputParser.scrollWheelOutputLabel(raw)
-        ?? "Button \(number)"
+        ?? L10n.text("Button {number}", replacements: ["number": String(number)])
       let row = ButtonRow(
         id: number,
         label: label,

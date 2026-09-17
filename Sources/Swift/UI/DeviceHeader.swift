@@ -11,7 +11,7 @@ struct DeviceHeader: View {
   var body: some View {
     HStack(alignment: .center, spacing: 8) {
       if !model.devices.isEmpty {
-        Text("Device")
+        Text(L10n.text("Device"))
           .font(.callout.weight(.medium))
         Picker(
           "",
@@ -29,7 +29,7 @@ struct DeviceHeader: View {
         .frame(width: 180)
         .disabled(model.devices.isEmpty)
       }
-      Button("Refresh", action: model.refresh)
+      Button(L10n.text("Refresh"), action: model.refresh)
         .keyboardShortcut("r", modifiers: [.command])
         .disabled(model.busy)
       if model.busy {
@@ -37,8 +37,8 @@ struct DeviceHeader: View {
       }
       Spacer()
       if !hidesEditingActions {
-        Button("Revert edits") { model.reloadSelectedProfile() }
-        Button("Save to mouse", action: onSave)
+        Button(L10n.text("Revert edits")) { model.reloadSelectedProfile() }
+        Button(L10n.text("Save to mouse"), action: onSave)
           .buttonStyle(.borderedProminent)
           .disabled(
             !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave

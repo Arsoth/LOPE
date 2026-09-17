@@ -18,7 +18,7 @@ extension AppModel {
     if let errorMessage = snapshot.errorMessage {
       publishDevices([])
       resetEditorState()
-      deviceSummary = "Unable to access the Logitech HID++ interface"
+      deviceSummary = L10n.text("Unable to access the Logitech HID++ interface")
       status = errorMessage
       return
     }
@@ -31,19 +31,23 @@ extension AppModel {
     else {
       selectedDeviceIndex = 0
       currentDeviceName = ""
-      deviceSummary = "No editable Logitech mouse found"
+      deviceSummary = L10n.text("No editable Logitech mouse found")
       onboardProfileCapacity = nil
       profiles = []
       buttons = []
       resetEditorState()
       status =
         snapshot.accessWarning
-        ? "A wired Logitech mouse needs Input Monitoring. Choose a wireless mouse, or enable access in System Settings."
+        ? L10n.text(
+          "A wired Logitech mouse needs Input Monitoring. Choose a wireless mouse, or enable access in System Settings."
+        )
         : devices.contains(where: { $0.isWiredDevice }) && !inputMonitoringAuthorized
-          ? "A wired Logitech mouse needs Input Monitoring. Select it to enable access in System Settings."
+          ? L10n.text(
+            "A wired Logitech mouse needs Input Monitoring. Select it to enable access in System Settings."
+          )
           : !devices.isEmpty
-            ? "Choose a Logitech mouse to continue."
-            : "No Logitech mouse was found"
+            ? L10n.text("Choose a Logitech mouse to continue.")
+            : L10n.text("No Logitech mouse was found")
       return
     }
 
@@ -59,7 +63,9 @@ extension AppModel {
         return
       }
       resetEditorState()
-      dpiDetails = "This device does not expose an editable onboard profile through HID++ 0x8100."
+      dpiDetails = L10n.text(
+        "This device does not expose an editable onboard profile through HID++ 0x8100."
+      )
       if snapshot.profileError != nil {
         status = profileReadStatus(
           for: selected.displayName,
@@ -67,7 +73,10 @@ extension AppModel {
         )
       } else {
         status =
-          "Connected to \(selected.displayName), but no compatible onboard profile was found."
+          L10n.text(
+            "Connected to {device}, but no compatible onboard profile was found.",
+            replacements: ["device": selected.displayName]
+          )
       }
       return
     }
@@ -88,7 +97,7 @@ extension AppModel {
       normalButtonRows = []
       gShiftButtonRows = []
       buttonLayer = .normal
-      status = "The mouse was found, but no onboard profiles were readable."
+      status = L10n.text("The mouse was found, but no onboard profiles were readable.")
       return
     }
     // `resolvedProfileNumber` only returns nil when `availableProfileIDs`
@@ -120,15 +129,16 @@ extension AppModel {
     parseDPI(profileText)
     parsePollingRate(profileText)
     if dpiDetails.isEmpty {
-      dpiDetails = snapshot.dpiError ?? "DPI capabilities could not be read."
+      dpiDetails = snapshot.dpiError ?? L10n.text("DPI capabilities could not be read.")
     }
     stopKnownDevicePolling(clearDevice: true)
     startLiveDPIPolling()
     scheduleInitialBackups(for: selected, profileNumbers: profiles.map(\.id))
     status =
       snapshot.accessWarning && selected.isWiredDevice && !isMXSeriesMouse
-      ? "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh."
-      : "Onboard Profile read successfully."
+      ? L10n.text(
+        "Some Logitech interfaces were denied by macOS. Enable Input Monitoring, then Refresh.")
+      : L10n.text("Onboard Profile read successfully.")
   }
 
   func resetEditorState() {
@@ -155,7 +165,7 @@ extension AppModel {
     profiles = [
       ProfileChoice(
         id: placeholderNumber,
-        sector: "Loading…",
+        sector: L10n.text("Loading…"),
         enabled: true,
         crcValid: nil
       )
@@ -169,7 +179,7 @@ extension AppModel {
     rgbEditingAllZones = false
     resetDPIState()
     dpiCapabilities = currentMouseProfile.initialDPICapabilities
-    dpiDetails = "Loading DPI capabilities from the mouse…"
+    dpiDetails = L10n.text("Loading DPI capabilities from the mouse…")
   }
 
   func resetDPIState() {
@@ -185,18 +195,27 @@ extension AppModel {
     baselineDPICount = 5
     baselineDefaultStage = 1
     baselineShiftStage = 1
-    dpiDetails = "DPI capabilities have not been read."
+    dpiDetails = L10n.text("DPI capabilities have not been read.")
   }
 
   func profileReadStatus(for deviceName: String, accessWarning: Bool) -> String {
     if accessWarning && !isMXSeriesMouse {
       return
-        "macOS is blocking access to \(deviceName). Enable Input Monitoring, then choose Refresh."
+        L10n.text(
+          "macOS is blocking access to {device}. Enable Input Monitoring, then choose Refresh.",
+          replacements: ["device": deviceName]
+        )
     }
     if devices.first(where: { $0.id == selectedDeviceIndex })?.isWiredDevice == true {
-      return "Couldn’t read \(deviceName)’s onboard profile. Choose Refresh to try again."
+      return L10n.text(
+        "Couldn’t read {device}’s onboard profile. Choose Refresh to try again.",
+        replacements: ["device": deviceName]
+      )
     }
     return
-      "Couldn’t read \(deviceName)’s onboard profile. Is the mouse turned on and awake? Wake it, then choose Refresh."
+      L10n.text(
+        "Couldn’t read {device}’s onboard profile. Is the mouse turned on and awake? Wake it, then choose Refresh.",
+        replacements: ["device": deviceName]
+      )
   }
 }

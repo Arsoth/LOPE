@@ -66,7 +66,7 @@ enum DPIStagePalette {
   static let bar = Color(red: 0.42, green: 0.45, blue: 0.50)
 }
 
-func formattedDPIValue(_ value: Int) -> String {
+func formattedWholeNumber(_ value: Int) -> String {
   let formatter = NumberFormatter()
   formatter.numberStyle = .decimal
   formatter.locale = .current

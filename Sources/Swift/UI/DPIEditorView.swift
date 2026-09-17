@@ -11,20 +11,20 @@ struct DPIEditorView: View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(alignment: .firstTextBaseline) {
         VStack(alignment: .leading, spacing: 2) {
-          Text("Onboard DPI")
+          Text(L10n.text("Onboard DPI"))
             .font(.headline)
-          Text("Set the active sensitivity stages for this profile.")
+          Text(L10n.text("Set the active sensitivity stages for this profile."))
             .font(.caption)
             .foregroundStyle(.secondary)
         }
         Spacer()
         HStack(spacing: 4) {
           if !model.pollingRateCapabilities.profileSupportedRates.isEmpty {
-            Text("Polling rate")
+            Text(L10n.text("Polling rate"))
               .font(.caption)
               .foregroundStyle(.secondary)
             Picker(
-              "Polling rate",
+              L10n.text("Polling rate"),
               selection: Binding(
                 get: {
                   model.pollingRateDraft ?? model.pollingRateCapabilities.currentRate
@@ -34,16 +34,21 @@ struct DPIEditorView: View {
               )
             ) {
               ForEach(model.pollingRateCapabilities.profileSupportedRates, id: \.self) { rate in
-                Text("\(rate) Hz").tag(rate)
+                Text(L10n.text("{rate} Hz", replacements: ["rate": formattedWholeNumber(rate)]))
+                  .tag(rate)
               }
             }
             .labelsHidden()
             .controlSize(.small)
             .frame(width: 105)
             .disabled(model.busy || model.loadingProfile)
-            .help("Choose a polling rate, then Save to write it to the selected onboard profile.")
+            .help(
+              L10n.text(
+                "Choose a polling rate, then Save to write it to the selected onboard profile."
+              )
+            )
           }
-          Text("Active stages")
+          Text(L10n.text("Active stages"))
             .font(.caption)
             .foregroundStyle(.secondary)
           Button {
@@ -56,8 +61,8 @@ struct DPIEditorView: View {
           .buttonStyle(.bordered)
           .controlSize(.small)
           .disabled(model.dpiCount <= 1)
-          .accessibilityLabel("Remove DPI stage")
-          Text("\(model.dpiCount) of 5")
+          .accessibilityLabel(L10n.text("Remove DPI stage"))
+          Text(L10n.text("{count} of 5", replacements: ["count": String(model.dpiCount)]))
             .font(.callout.monospacedDigit())
             .frame(minWidth: 40)
           Button {
@@ -70,17 +75,17 @@ struct DPIEditorView: View {
           .buttonStyle(.bordered)
           .controlSize(.small)
           .disabled(model.dpiCount >= 5)
-          .accessibilityLabel("Add DPI stage")
+          .accessibilityLabel(L10n.text("Add DPI stage"))
         }
       }
 
       VStack(alignment: .leading, spacing: 6) {
         if !model.isProvisionalMouseData, let currentDPI = model.dpiCapabilities.currentValue {
           HStack(spacing: 6) {
-            Text("Live DPI")
+            Text(L10n.text("Live DPI"))
               .font(.caption)
               .foregroundStyle(.secondary)
-            Text(formattedDPIValue(currentDPI))
+            Text(formattedWholeNumber(currentDPI))
               .font(.caption.monospacedDigit().weight(.semibold))
           }
         }

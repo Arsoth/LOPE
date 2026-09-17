@@ -72,11 +72,11 @@ extension DPIStageBar {
 
         ZStack {
           HStack(spacing: 0) {
-            Text(capabilities.minimum.map(formattedDPIValue) ?? formattedDPIValue(100))
+            Text(capabilities.minimum.map(formattedWholeNumber) ?? formattedWholeNumber(100))
               .frame(width: trackInset, alignment: .center)
               .offset(x: -endpointCenterAdjustment)
             Spacer()
-            Text(capabilities.maximum.map(formattedDPIValue) ?? formattedDPIValue(65535))
+            Text(capabilities.maximum.map(formattedWholeNumber) ?? formattedWholeNumber(65535))
               .frame(width: trackInset, alignment: .center)
               .offset(x: endpointCenterAdjustment)
           }
@@ -192,7 +192,7 @@ extension DPIStageBar {
       }
     }
     .accessibilityElement(children: .contain)
-    .accessibilityLabel("DPI stage bar")
+    .accessibilityLabel(L10n.text("DPI stage bar"))
     .onChange(of: isLoading) { loading in
       if loading { dismissStageEditor() }
     }

@@ -79,13 +79,13 @@ enum RGBEffectMode: UInt8, CaseIterable, Codable, Hashable, Sendable {
 
   var label: String {
     switch self {
-    case .disabled: return "Disabled"
-    case .solid: return "Solid"
-    case .pulse: return "Pulse"
-    case .cycle: return "Cycle"
-    case .wave: return "Wave"
-    case .breathe: return "Breathe"
-    case .ripple: return "Ripple"
+    case .disabled: return L10n.text("Disabled")
+    case .solid: return L10n.text("Solid")
+    case .pulse: return L10n.text("Pulse")
+    case .cycle: return L10n.text("Cycle")
+    case .wave: return L10n.text("Wave")
+    case .breathe: return L10n.text("Breathe")
+    case .ripple: return L10n.text("Ripple")
     }
   }
 

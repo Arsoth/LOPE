@@ -7,7 +7,7 @@ extension DPIStageBar {
   func stageHandle(index: Int, text: String, width: CGFloat) -> some View {
     let parsedValue = Int(text)
     let liveValue = draggingStage == index ? activeDragValue ?? parsedValue : parsedValue
-    let displayValue = liveValue.map(formattedDPIValue) ?? "Enter DPI"
+    let displayValue = liveValue.map(formattedWholeNumber) ?? L10n.text("Enter DPI")
     let positionValue = parsedValue ?? capabilities.minimum ?? 800
     let isDefault = visibleDefaultStage == index + 1
     let isShift = visibleShiftStage == index + 1
@@ -49,9 +49,15 @@ extension DPIStageBar {
     .frame(width: 84, height: 62)
     .buttonStyle(.plain)
     .contentShape(Rectangle())
-    .accessibilityLabel("DPI stage \(index + 1)")
-    .accessibilityValue(liveValue.map { "\(formattedDPIValue($0)) DPI" } ?? "Invalid value")
-    .accessibilityHint("Click to edit, drag to change, or use the keyboard adjustment action.")
+    .accessibilityLabel(
+      L10n.text("DPI stage {number}", replacements: ["number": String(index + 1)])
+    )
+    .accessibilityValue(
+      liveValue.map { "\(formattedWholeNumber($0)) DPI" } ?? L10n.text("Invalid value")
+    )
+    .accessibilityHint(
+      L10n.text("Click to edit, drag to change, or use the keyboard adjustment action.")
+    )
     .accessibilityAdjustableAction { direction in
       switch direction {
       case .increment:

@@ -31,8 +31,8 @@ enum ProfileOutputParser {
   static func scrollWheelOutputLabel(_ raw: String) -> String? {
     let normalized = raw.filter { !$0.isWhitespace }.uppercased()
     switch normalized {
-    case "90100000": return "Scroll down"
-    case "90110000": return "Scroll up"
+    case "90100000": return L10n.text("Scroll down")
+    case "90110000": return L10n.text("Scroll up")
     default: return nil
     }
   }

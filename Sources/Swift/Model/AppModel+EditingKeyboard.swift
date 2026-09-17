@@ -46,10 +46,10 @@ extension AppModel {
   func keyboardChordText(buttonIndex: Int) -> String {
     guard let chord = keyboardBytes(buttonIndex), chord.key != 0 else { return "" }
     let modifierLabels: [(UInt8, String)] = [
-      (0x01, "Ctrl"),
-      (0x02, "Shift"),
-      (0x04, "Alt"),
-      (0x08, "Cmd"),
+      (0x01, L10n.text("Ctrl")),
+      (0x02, L10n.text("Shift")),
+      (0x04, L10n.text("Alt")),
+      (0x08, L10n.text("Cmd")),
     ]
     let modifiers = modifierLabels.compactMap { bit, label in
       chord.modifier & bit == 0 ? nil : label
@@ -74,7 +74,10 @@ extension AppModel {
       let selected = keyboardKeys.first(where: { $0.id == usage })
     else { return }
     if isNonStandardKeyboardKey(selected) && !showNonStandardKeyboardKeys {
-      status = "Enable non-standard keyboard keys in Settings before choosing \(selected.label)."
+      status = L10n.text(
+        "Enable non-standard keyboard keys in Settings before choosing {key}.",
+        replacements: ["key": selected.label]
+      )
       return
     }
     let chord = keyboardBytes(buttonIndex) ?? (modifier: 0, key: 0)
@@ -84,12 +87,12 @@ extension AppModel {
   func beginKeyboardRecording(buttonIndex: Int) {
     guard buttons.indices.contains(buttonIndex) else { return }
     recordingKeyboardButtonID = buttons[buttonIndex].id
-    status = "Press one keyboard key to record it."
+    status = L10n.text("Press one keyboard key to record it.")
   }
 
   func cancelKeyboardRecording() {
     recordingKeyboardButtonID = nil
-    status = "Keyboard recording canceled."
+    status = L10n.text("Keyboard recording canceled.")
   }
 
   func recordKeyboardEvent(buttonIndex: Int, keyCode: UInt8, modifier: UInt8) {
@@ -97,13 +100,13 @@ extension AppModel {
       recordingKeyboardButtonID == buttons[buttonIndex].id
     else { return }
     guard let key = keyboardKeys.first(where: { $0.id == keyCode }) else {
-      status = "That keyboard input is not supported by the HID++ key table."
+      status = L10n.text("That keyboard input is not supported by the HID++ key table.")
       return
     }
     setKeyboardChord(buttonIndex: buttonIndex, modifier: modifier, key: keyCode)
     capturedKeyboardButtonIndices.insert(buttonIndex)
     recordingKeyboardButtonID = nil
-    status = "Recorded \(key.label)."
+    status = L10n.text("Recorded {key}.", replacements: ["key": key.label])
   }
 
   func isModifierToggleDisabled(buttonIndex: Int, bit: UInt8) -> Bool {
@@ -223,6 +226,7 @@ extension AppModel {
 
   func keyboardKeyLabel(_ code: UInt8) -> String {
     if code == 0 { return "" }
-    return keyboardKeys.first(where: { $0.id == code })?.label ?? String(format: "0x%02X", code)
+    return keyboardKeys.first(where: { $0.id == code })?.label
+      ?? String(format: "0x%02X", code)
   }
 }

@@ -29,7 +29,13 @@ struct MouseProfileDescriptor: Codable, Hashable, Sendable {
     var notes: String?
 
     var label: String {
-      aliases.isEmpty ? control : "\(control) (\(aliases.joined(separator: ", ")))"
+      let localizedControl = L10n.text(control)
+      guard !aliases.isEmpty else { return localizedControl }
+      let localizedAliases = aliases.map { L10n.text($0) }.joined(separator: ", ")
+      return L10n.text(
+        "{control} ({aliases})",
+        replacements: ["control": localizedControl, "aliases": localizedAliases]
+      )
     }
   }
 
