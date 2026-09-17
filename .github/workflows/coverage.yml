@@ -16,10 +16,18 @@ permissions:
 
 jobs:
   coverage:
-    name: Coverage
+    name: Coverage (Xcode ${{ matrix.xcode.version }})
     runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode:
+          - version: "16.4"
+            developer_dir: /Applications/Xcode_16.4.app/Contents/Developer
+          - version: "26.3"
+            developer_dir: /Applications/Xcode_26.3.app/Contents/Developer
     env:
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DEVELOPER_DIR: ${{ matrix.xcode.developer_dir }}
     timeout-minutes: 45
     steps:
       - name: Check out source
