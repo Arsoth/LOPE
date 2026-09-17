@@ -146,7 +146,7 @@ C_COVERAGE_PROFDATA := $(COVERAGE_DIR)/lope.profdata
 # the time the report targets expand these variables, so discover them under
 # the package's build directory instead of guessing either name or path.
 SWIFT_COVERAGE_PROFDATA = $(shell find .build -type f -path '*/codecov/default.profdata' -print -quit)
-SWIFT_TEST_BINARY = $(shell find .build -type f -path '*/Contents/MacOS/*' -name '*Tests' -print -quit)
+SWIFT_TEST_BINARY = $(shell find .build -type f -perm -111 -name '*Tests*' -print -quit)
 
 # main.m is the hardware-facing process entrypoint. Its dispatch branches
 # require live-device paths and are not part of the in-process C self-test;
