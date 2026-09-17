@@ -51,37 +51,37 @@
 		},
 		{
 			"number": 8,
-			"control": "G8 · Side/top button",
+			"control": "G8 · Battery check",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 9,
-			"control": "G9 · Side/top button",
+			"control": "G9 · DPI down",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 10,
-			"control": "G10 · Side/top button",
+			"control": "G10 · DPI up",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 11,
-			"control": "G11 · Side/top button",
+			"control": "G11 · Profile switch",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 12,
-			"control": "G12 · Side/top button",
+			"control": "G12 · Wheel tilt left",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 13,
-			"control": "G13 · Side/top button",
+			"control": "G13 · Wheel tilt right",
 			"aliases": [],
 			"notes": null
 		}
@@ -92,7 +92,7 @@
 	},
 	"dpiRange": {
 		"minimum": 200,
-		"maximum": 8200
+		"maximum": 5700
 	},
 	"profileIO": {
 		"supported": false,
@@ -119,8 +119,16 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"Keep this family cataloged so its physical controls are named correctly. Virtual wheel records 14/15 remain visible and editable; do not route this family through the modern writer until a legacy-safe implementation exists."
+			"Keep this family cataloged so its physical controls are named correctly. Virtual wheel records 14/15 remain visible and editable; do not route this family through the modern writer until a legacy-safe implementation exists.",
+			"DPI maximum corrected 8200 -> 5700: libratbag's logitech-g700.device (0xC06B, wired) and logitech-g700-wireless.device (0xC531, receiver mode) both declare DpiRange=0:5700@23.53. 8200 is G700s's confirmed ceiling (logitech-g700s.device, 0xC07C, DpiRange=0:8200@50), not G700's -- the two figures appear to have been conflated between the sibling files.",
+			"Corrected 2026-09-17: relabeled records 8-13. Two official Logitech manuals (Getting Started guide, Features guide) give a numbered G-legend: G8=Battery check, G9=DPI down, G10=DPI up, G11=Profile switch, and 'Hyperfast scroll wheel with tilt (G3, G12, G13)' for the wheel-tilt pair. Only records 6/7 remain genuinely generic/unlabeled thumb buttons -- this was the single highest-confidence finding of the whole legacy-button verification pass, since 6 of the 8 previously-generic 'Side/top button' slots have long-documented, specific official functions."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://www.manualslib.com/manual/465465/Logitech-G700.html",
+		"https://www.manualslib.com/manual/3268568/Logitech-G700.html",
+		"https://www.manualslib.com/manual/657440/Logitech-G700.html",
+		"https://support.logi.com/hc/en-us/articles/17368500244759-G700-Technical-Specifications"
+	]
 }

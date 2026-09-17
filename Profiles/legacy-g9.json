@@ -39,20 +39,20 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · Top control",
-			"aliases": [],
-			"notes": null
+			"control": "G6 · DPI down",
+			"aliases": ["Minus (-)"],
+			"notes": "Official spec confirms these two are the DPI Minus/Plus buttons, not generic 'top controls'; left-to-right physical order (whether G6 or G7 is Minus) is unconfirmed."
 		},
 		{
 			"number": 7,
-			"control": "G7 · Top control",
-			"aliases": [],
-			"notes": null
+			"control": "G7 · DPI up",
+			"aliases": ["Plus (+)"],
+			"notes": "See G6's note -- order unconfirmed."
 		}
 	],
 	"dpiRange": {
 		"minimum": 200,
-		"maximum": 5000
+		"maximum": 3200
 	},
 	"profileIO": {
 		"supported": false,
@@ -79,8 +79,13 @@
 		},
 		"notes": [
 			"The mapping is a conservative physical description for legacy discovery, not an authorization to write unknown macro records.",
-			"The product ID was inherited from a combined G9/G9x descriptor and has not been independently re-verified against a real device."
+			"The product ID was inherited from a combined G9/G9x descriptor and has not been independently re-verified against a real device.",
+			"DPI maximum corrected 5000 -> 3200: libratbag's logitech-g9.device declares DpiList=200;400;600;800;1000;1200;1400;1600;1800;2000;2200;2400;2600;2800;3000;3200 for 0xC048 -- 5000 is not in that list and appears to have been conflated with the G9x successor (which itself tops at 5700, not 5000 either).",
+			"G6/G7 relabeled 2026-09-17 from generic 'Top control' to 'DPI down'/'DPI up': official Logitech G9 Technical Specifications page lists 'DPI Settings Buttons: Minus (-), Plus (+)'. Also per that page, a bottom-mounted profile button and the wheel's FreeSpin/Ratchet mode-shift lever exist on the physical device but are not counted among these 7 profile-array records (CHECK: unconfirmed whether the mode-shift is a mechanical-only lever or a HID button that simply isn't in this array)."
 		]
 	},
-	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
+	"sources": [
+		"https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices",
+		"https://support.logi.com/hc/en-us/articles/360023466893-G9-Technical-Specifications"
+	]
 }

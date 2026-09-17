@@ -39,26 +39,26 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · Top left",
-			"aliases": [],
-			"notes": null
+			"control": "G6 · DPI plus",
+			"aliases": ["Top left"],
+			"notes": "Official G300s spec lists Standard+Special buttons as Left/Middle/Right/Forward/Back/DPI+/DPI-/DPI Shift/Profile toggle (9 total, matching this file's count); exact left-to-right physical order of the DPI+/DPI-/DPI Shift trio (G6/G7/G8) is unconfirmed."
 		},
 		{
 			"number": 7,
-			"control": "G7 · Top middle",
-			"aliases": [],
-			"notes": null
+			"control": "G7 · DPI minus",
+			"aliases": ["Top middle"],
+			"notes": "See G6's note -- order unconfirmed."
 		},
 		{
 			"number": 8,
-			"control": "G8 · Top right",
-			"aliases": [],
-			"notes": null
+			"control": "G8 · DPI Shift",
+			"aliases": ["Top right"],
+			"notes": "See G6's note -- order unconfirmed."
 		},
 		{
 			"number": 9,
-			"control": "G9 · Mode switch",
-			"aliases": ["Profile cycle"],
+			"control": "G9 · Profile toggle",
+			"aliases": ["Mode switch", "Profile cycle"],
 			"notes": null
 		}
 	],
@@ -90,11 +90,13 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"G300s uses a mode/profile switch and a mirrored ambidextrous shell; the mapping is kept separate from the standard six-button family. Shares a USB product ID with G300; the revisions were not assigned distinct IDs."
+			"G300s uses a mode/profile switch and a mirrored ambidextrous shell; the mapping is kept separate from the standard six-button family. Shares a USB product ID with G300; the revisions were not assigned distinct IDs.",
+			"G6-G9 relabeled 2026-09-17 from positional names ('Top left/middle/right', 'Mode switch') to Logitech's own functional terms (DPI plus/minus/Shift, Profile toggle), directly per this file's own PID-matched G300s spec page."
 		]
 	},
 	"sources": [
 		"https://github.com/libratbag/libratbag/wiki/Devices",
-		"https://www.logitech.com/assets/51813/26/lgs-guide.pdf"
+		"https://www.logitech.com/assets/51813/26/lgs-guide.pdf",
+		"https://support.logi.com/hc/en-us/articles/360024548954-G300s-Optical-Gaming-Mouse-Technical-Specifications"
 	]
 }

@@ -33,14 +33,14 @@
 		},
 		{
 			"number": 5,
-			"control": "G5 · Forward",
-			"aliases": ["Front thumb"],
+			"control": "G5 · DPI decrease",
+			"aliases": ["Minus (-)"],
 			"notes": null
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI control",
-			"aliases": ["Top DPI"],
+			"control": "G6 · DPI increase",
+			"aliases": ["Plus (+)"],
 			"notes": null
 		}
 	],
@@ -73,8 +73,12 @@
 		},
 		"notes": [
 			"This is a low-priority legacy descriptor; a more specific future descriptor for this exact model can override it with a higher priority.",
-			"The product ID was inherited from a combined G5/G7 descriptor and is believed to be G7's cordless receiver ID, but has not been independently re-verified against a real device."
+			"The product ID was inherited from a combined G5/G7 descriptor and is believed to be G7's cordless receiver ID, but has not been independently re-verified against a real device.",
+			"Buttons corrected 2026-09-17: official Logitech G7 Technical Specifications page confirms no Forward button exists (only Back) and DPI adjustment is two separate buttons (Minus/Plus), not a single 'DPI control' button. Total count (6) is unchanged, only composition of G5/G6."
 		]
 	},
-	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
+	"sources": [
+		"https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices",
+		"https://support.logi.com/hc/en-us/articles/360023307894-G7-Technical-Specifications"
+	]
 }

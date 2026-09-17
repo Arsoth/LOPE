@@ -39,9 +39,9 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI Shift",
-			"aliases": ["Sniper"],
-			"notes": null
+			"control": "G6 · Hyperscroll toggle",
+			"aliases": ["Scroll wheel mode shift"],
+			"notes": "Official spec calls this 'Hyperscroll toggle' (same free-spin/click-to-click wheel-mode function as G500/G9/G9x's mode-shift button); a hands-on teardown review of a different unit instead found it 'programmed to play/pause by default' and located near the thumb buttons rather than the wheel (CHECK: unresolved whether this is the same physical button with a different out-of-box software default, or a genuinely different button -- neither source calls it 'DPI Shift')."
 		},
 		{
 			"number": 7,
@@ -96,8 +96,13 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping."
+			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping.",
+			"G6 relabeled 2026-09-17 from 'DPI Shift' to 'Hyperscroll toggle': official spec confirms Wheel tilt left/right and DPI up/down are all correct and count (10) is unchanged; only G6's function name was wrong. See its own note for a CHECK-level disagreement on the button's exact default behavior."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices"]
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://support.logi.com/hc/en-in/articles/360023307374-Logitech-G500s-Laser-Gaming-Mouse-Technical-Specifications",
+		"https://gamersnexus.net/hwreviews/1100-logitech-g500s-mouse-teardown-specs"
+	]
 }

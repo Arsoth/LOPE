@@ -39,21 +39,27 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · DPI Shift",
-			"aliases": ["Sniper"],
+			"control": "G6 · DPI increase",
+			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 7,
-			"control": "G7 · DPI down",
+			"control": "G7 · DPI decrease",
 			"aliases": [],
 			"notes": null
 		},
 		{
 			"number": 8,
-			"control": "G8 · DPI up",
+			"control": "G8 · Generic button",
 			"aliases": [],
-			"notes": null
+			"notes": "Freely reprogrammable via Logitech Gaming Software; has no fixed default function of its own."
+		},
+		{
+			"number": 9,
+			"control": "G9 · Default DPI reset",
+			"aliases": [],
+			"notes": "Immediately switches the mouse back to its default tracking sensitivity (800 dpi)."
 		}
 	],
 	"dpiRange": {
@@ -84,8 +90,14 @@
 			"crc": "runtime-validated"
 		},
 		"notes": [
-			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware."
+			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware.",
+			"Corrected 2026-09-17: expanded from 8 to 9 buttons, confirmed by G400s's own dedicated official Getting Started PDF (identical numbered diagram to G400: DPI increase, DPI decrease, reprogrammable 'Generic Button 3', default-DPI-reset, Forward, Back, plus L/R/Middle = 9). The short-form technical-specifications page's 'DPI toggle' item is most likely a loose paraphrase covering both Generic Button 3 and the default-DPI-reset button as one bucket."
 		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices", "https://the-sz.com/products/usbid/index.php?v=0x046D"]
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://the-sz.com/products/usbid/index.php?v=0x046D",
+		"http://www.logitech.com/assets/47975/2/g400s-optical-gaming-mouse-quick-start-guide.pdf",
+		"https://support.logi.com/hc/en-us/articles/360023465473-Logitech-G400s-Optical-Gaming-Mouse-Technical-Specifications"
+	]
 }

@@ -27,20 +27,8 @@
 		},
 		{
 			"number": 4,
-			"control": "G4 · Back",
-			"aliases": ["Rear thumb"],
-			"notes": null
-		},
-		{
-			"number": 5,
-			"control": "G5 · Forward",
-			"aliases": ["Front thumb"],
-			"notes": null
-		},
-		{
-			"number": 6,
-			"control": "G6 · DPI button",
-			"aliases": ["Top DPI"],
+			"control": "G4 · DPI toggle",
+			"aliases": ["DPI button"],
 			"notes": null
 		}
 	],
@@ -71,7 +59,14 @@
 			"buttonOffsetByFormat": "legacy/runtime",
 			"crc": "runtime-validated"
 		},
-		"notes": ["The physical mapping is maintained for discovery and future legacy support."]
+		"notes": [
+			"The physical mapping is maintained for discovery and future legacy support.",
+			"Corrected 2026-09-17: reduced from 6 to 4 buttons, dropping Back/Forward entirely. The G100s has no thumb buttons on either side -- confirmed by a primary hands-on review ('There are no thumb buttons on either side') and corroborated by the official Logitech spec page, which lists only 'Special Buttons: DPI toggle' with no Forward/Back field at all. Real layout: Left, Right, Middle, DPI toggle."
+		]
 	},
-	"sources": ["https://github.com/libratbag/libratbag/wiki/Devices", "https://the-sz.com/products/usbid/index.php?v=0x046D"]
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://techgage.com/article/logitech-g100s-gaming-mouse-review/",
+		"https://support.logi.com/hc/en-001/articles/360023466233-Logitech-G100s-Optical-Gaming-Mouse-Technical-Specifications"
+	]
 }

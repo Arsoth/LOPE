@@ -39,20 +39,20 @@
 		},
 		{
 			"number": 6,
-			"control": "G6 · Top control",
-			"aliases": [],
-			"notes": null
+			"control": "G6 · DPI down",
+			"aliases": ["Minus (-)"],
+			"notes": "Official spec confirms these two are the DPI Minus/Plus buttons, not generic 'top controls'; left-to-right physical order (whether G6 or G7 is Minus) is unconfirmed."
 		},
 		{
 			"number": 7,
-			"control": "G7 · Top control",
-			"aliases": [],
-			"notes": null
+			"control": "G7 · DPI up",
+			"aliases": ["Plus (+)"],
+			"notes": "See G6's note -- order unconfirmed."
 		}
 	],
 	"dpiRange": {
 		"minimum": 200,
-		"maximum": 5000
+		"maximum": 5700
 	},
 	"profileIO": {
 		"supported": false,
@@ -79,8 +79,13 @@
 		},
 		"notes": [
 			"The mapping is a conservative physical description for legacy discovery, not an authorization to write unknown macro records.",
-			"The two product IDs were inherited from a combined G9/G9x descriptor and are believed to be G9x's revisions (including the Signature Edition), but have not been independently re-verified against real devices."
+			"The two product IDs were inherited from a combined G9/G9x descriptor and are believed to be G9x's revisions (including the Signature Edition), but have not been independently re-verified against real devices.",
+			"DPI maximum corrected 5000 -> 5700: libratbag's logitech-g9x-Original.device (0xC066) declares DpiRange=200:5700@50 and logitech-g9x-Call-of-Duty-MW3-Edition.device (0xC249) declares DpiRange=0:5700@23.53 -- both cap at 5700, not 5000.",
+			"G6/G7 relabeled 2026-09-17 from generic 'Top control' to 'DPI down'/'DPI up': official Logitech G9x Technical Reference Document lists 'DPI Settings Buttons: Minus (-), Plus (+)', same shape as G9's spec page (confirmed only against PID 0xC066; 0xC249 is presumably a later board revision not covered by this specific page)."
 		]
 	},
-	"sources": ["https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices"]
+	"sources": [
+		"https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices",
+		"https://support.logi.com/hc/en-001/articles/360023307194-G9x-Technical-Reference-Document"
+	]
 }
