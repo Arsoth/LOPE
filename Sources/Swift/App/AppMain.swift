@@ -10,6 +10,6 @@ struct LOPEApp: App {
       ContentView()
     }
     .windowStyle(.titleBar)
-    .windowToolbarStyle(.unifiedCompact(showsTitle: false))
+    .windowToolbarStyle(.unifiedCompact(showsTitle: true))
   }
 }
