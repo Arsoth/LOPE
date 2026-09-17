@@ -35,6 +35,7 @@ struct ContentView: View {
 
   @StateObject private var model = AppModel()
   @State private var selectedTab: AppTab = .configure
+  @State private var hoveredTab: AppTab?
   @State private var confirmRestore = false
   @State private var restoreURL: URL?
   @State private var confirmRecoveryRestore = false
@@ -78,7 +79,7 @@ struct ContentView: View {
               .zIndex(1)
           }
           tabContent
-            .padding(.top, selectedTab == .settings || selectedTab == .configure ? 0 : 20)
+            .padding(.top, selectedTab == .configure ? 0 : 20)
         }
         .simultaneousGesture(
           TapGesture().onEnded {
@@ -100,7 +101,6 @@ struct ContentView: View {
         wiredAccessInstructionsModal
       }
     }
-    .padding(.top, selectedTab == .settings ? 20 : 0)
     .frame(minWidth: 960, minHeight: 520)
     .background(appBackground)
     .environment(\.lopeTheme, theme)
@@ -193,7 +193,7 @@ struct ContentView: View {
     .buttonStyle(.plain)
     .frame(maxWidth: .infinity, minHeight: tabBarHeight, maxHeight: tabBarHeight)
     .contentShape(Rectangle())
-    .background(selectedTab == tab ? theme.controlBackground : theme.mainBackground)
+    .background(tabBackground(for: tab))
     .overlay(alignment: .trailing) {
       if tab != .settings {
         Rectangle()
@@ -202,6 +202,21 @@ struct ContentView: View {
       }
     }
     .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+    .onHover { isHovering in
+      if isHovering {
+        hoveredTab = tab
+      } else if hoveredTab == tab {
+        hoveredTab = nil
+      }
+    }
+    .animation(.easeInOut(duration: 0.12), value: hoveredTab == tab)
+  }
+
+  private func tabBackground(for tab: AppTab) -> Color {
+    if selectedTab == tab {
+      return theme.controlBackground
+    }
+    return hoveredTab == tab ? theme.hover : theme.mainBackground
   }
 
   private func tabLabel(_ tab: AppTab) -> some View {
