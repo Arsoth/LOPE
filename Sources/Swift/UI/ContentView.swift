@@ -105,6 +105,13 @@ struct ContentView: View {
     .background(appBackground)
     .environment(\.lopeTheme, theme)
     .preferredColorScheme(preferredColorScheme)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        Text(AppConstants.displayName)
+          .font(.headline)
+          .foregroundStyle(theme.primaryText)
+      }
+    }
     .animation(.easeInOut(duration: 0.2), value: statusHistoryPresented)
     .task(id: model.status) {
       statusMessageOpacity = 1
