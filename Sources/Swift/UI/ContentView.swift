@@ -167,39 +167,47 @@ struct ContentView: View {
   private var tabBar: some View {
     HStack(spacing: 0) {
       ForEach(AppTab.allCases, id: \.self) { tab in
-        Button {
-          selectedTab = tab
-        } label: {
-          ZStack {
-            Color.clear
-            Label(L10n.text(tab.title), systemImage: tab.systemImage)
-              .font(.callout.weight(.medium))
-              .foregroundStyle(theme.primaryText)
-          }
-          .frame(maxWidth: .infinity, minHeight: tabBarHeight)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, minHeight: tabBarHeight)
-        .contentShape(Rectangle())
-        .background(selectedTab == tab ? theme.controlBackground : theme.mainBackground)
-        .overlay(alignment: .trailing) {
-          if tab != .settings {
-            Rectangle()
-              .fill(theme.separator)
-              .frame(width: 1)
-          }
-        }
-        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+        tabButton(tab)
       }
     }
-    .frame(maxWidth: .infinity)
+    .frame(maxWidth: .infinity, minHeight: tabBarHeight, maxHeight: tabBarHeight)
     .background(theme.header)
     .overlay(alignment: .bottom) {
       Rectangle()
         .fill(theme.separator)
         .frame(height: 1)
     }
+  }
+
+  private func tabButton(_ tab: AppTab) -> some View {
+    Button {
+      selectedTab = tab
+    } label: {
+      ZStack {
+        Color.clear
+        tabLabel(tab)
+      }
+      .frame(maxWidth: .infinity, minHeight: tabBarHeight, maxHeight: tabBarHeight)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity, minHeight: tabBarHeight, maxHeight: tabBarHeight)
+    .contentShape(Rectangle())
+    .background(selectedTab == tab ? theme.controlBackground : theme.mainBackground)
+    .overlay(alignment: .trailing) {
+      if tab != .settings {
+        Rectangle()
+          .fill(theme.separator)
+          .frame(width: 1)
+      }
+    }
+    .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+  }
+
+  private func tabLabel(_ tab: AppTab) -> some View {
+    Label(L10n.text(tab.title), systemImage: tab.systemImage)
+      .font(.callout.weight(.medium))
+      .foregroundStyle(theme.primaryText)
   }
 
   private var tabContent: some View {
