@@ -152,8 +152,9 @@ struct ButtonAssignmentsView: View {
   private func keyboardModifierToggle(
     buttonIndex: Int, label: String, bit: UInt8, disabled: Bool
   ) -> some View {
+    let localizedLabel = L10n.text(label)
     return Toggle(
-      label,
+      localizedLabel,
       isOn: Binding(
         get: { model.isModifierEnabled(buttonIndex: buttonIndex, bit: bit) },
         set: { model.setModifier(buttonIndex: buttonIndex, bit: bit, enabled: $0) }
@@ -164,7 +165,7 @@ struct ButtonAssignmentsView: View {
     .font(.caption)
     .fixedSize()
     .disabled(disabled)
-    .help(label)
+    .help(localizedLabel)
   }
 
   private func keyboardRecordingBox(_ buttonID: Int) -> some View {
@@ -245,7 +246,7 @@ struct ButtonAssignmentsView: View {
       ForEach(model.filteredExtendedKeyboardKeyLayoutGroups(including: selectedKey)) { group in
         Section(L10n.text(group.label)) {
           ForEach(group.keys) { key in
-            Text(key.label).tag(Int(key.id))
+            Text(L10n.text(key.label)).tag(Int(key.id))
           }
         }
       }
@@ -256,7 +257,7 @@ struct ButtonAssignmentsView: View {
       ) { group in
         Section(keyboardKeyGroupLabel(group, selectedKey: selectedKey)) {
           ForEach(group.keys) { key in
-            Text(key.label).tag(Int(key.id))
+            Text(L10n.text(key.label)).tag(Int(key.id))
           }
         }
       }

@@ -76,7 +76,7 @@ extension AppModel {
     if isNonStandardKeyboardKey(selected) && !showNonStandardKeyboardKeys {
       status = L10n.text(
         "Enable non-standard keyboard keys in Settings before choosing {key}.",
-        replacements: ["key": selected.label]
+        replacements: ["key": L10n.text(selected.label)]
       )
       return
     }
@@ -106,7 +106,7 @@ extension AppModel {
     setKeyboardChord(buttonIndex: buttonIndex, modifier: modifier, key: keyCode)
     capturedKeyboardButtonIndices.insert(buttonIndex)
     recordingKeyboardButtonID = nil
-    status = L10n.text("Recorded {key}.", replacements: ["key": key.label])
+    status = L10n.text("Recorded {key}.", replacements: ["key": L10n.text(key.label)])
   }
 
   func isModifierToggleDisabled(buttonIndex: Int, bit: UInt8) -> Bool {
@@ -226,7 +226,7 @@ extension AppModel {
 
   func keyboardKeyLabel(_ code: UInt8) -> String {
     if code == 0 { return "" }
-    return keyboardKeys.first(where: { $0.id == code })?.label
+    return keyboardKeys.first(where: { $0.id == code }).map { L10n.text($0.label) }
       ?? String(format: "0x%02X", code)
   }
 }
