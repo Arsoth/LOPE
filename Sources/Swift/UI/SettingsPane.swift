@@ -12,27 +12,29 @@ struct SettingsPane: View {
       let contentWidth = max(geometry.size.width - 40, 0)
 
       VStack(alignment: .leading, spacing: 12) {
-        Text("Settings")
+        Text(L10n.text("Settings"))
           .font(.headline)
-        GroupBox("Storage") {
+        GroupBox(L10n.text("Storage")) {
           VStack(alignment: .leading, spacing: 8) {
-            Text("Configuration directory")
+            Text(L10n.text("Configuration directory"))
               .font(.callout.weight(.medium))
             Text(model.configurationDirectoryPath)
               .font(.system(.callout, design: .monospaced))
               .foregroundStyle(.secondary)
               .lineLimit(3)
               .textSelection(.enabled)
-            Text("Backups and custom mouse profiles are stored in separate subfolders here.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
+            Text(
+              L10n.text("Backups and custom mouse profiles are stored in separate subfolders here.")
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
             HStack {
-              Button("Choose directory…") {
+              Button(L10n.text("Choose directory…")) {
                 if let directory = model.chooseConfigurationDirectory() {
                   model.setConfigurationDirectory(directory)
                 }
               }
-              Button("Use default") { model.resetConfigurationDirectory() }
+              Button(L10n.text("Use default")) { model.resetConfigurationDirectory() }
                 .disabled(
                   model.configurationDirectoryPath == model.defaultConfigurationDirectoryPath)
             }
@@ -40,7 +42,7 @@ struct SettingsPane: View {
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
-        GroupBox("Input Monitoring") {
+        GroupBox(L10n.text("Input Monitoring")) {
           VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
               Image(
@@ -52,43 +54,62 @@ struct SettingsPane: View {
               )
               Text(
                 model.inputMonitoringAuthorized
-                  ? "Allowed for this app"
-                  : "Required to edit wired mice"
+                  ? L10n.text("Allowed for this app")
+                  : L10n.text("Required to edit wired mice")
               )
               .font(.callout.weight(.medium))
             }
             Text(
-              "Input Monitoring lets LOPE read wired Logitech mice. On first use, macOS asks to receive keystrokes while it registers LOPE; choose Open System Settings in that dialog, then enable LOPE there. Later clicks open Input Monitoring directly. Wireless and receiver-connected mice do not need this permission."
+              L10n.text(
+                "Input Monitoring lets LOPE read wired Logitech mice. On first use, macOS asks to receive keystrokes while it registers LOPE; choose Open System Settings in that dialog, then enable LOPE there. Later clicks open Input Monitoring directly. Wireless and receiver-connected mice do not need this permission."
+              )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
-            Button("Open Input Monitoring Settings", action: model.openInputMonitoringSettings)
+            Button(
+              L10n.text("Open Input Monitoring Settings"),
+              action: model.openInputMonitoringSettings
+            )
           }
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
-        GroupBox("Mouse profiles") {
+        GroupBox(L10n.text("Mouse profiles")) {
           VStack(alignment: .leading, spacing: 8) {
             Text(
               model.customMouseProfileCount > 0
-                ? "\(model.builtInMouseProfileCount) built-in mice, plus \(model.customMouseProfileCount) custom."
-                : "\(model.builtInMouseProfileCount) built-in mice supported."
+                ? L10n.text(
+                  "{builtIn} built-in mice, plus {custom} custom.",
+                  replacements: [
+                    "builtIn": String(model.builtInMouseProfileCount),
+                    "custom": String(model.customMouseProfileCount),
+                  ]
+                )
+                : L10n.text(
+                  "{builtIn} built-in mice supported.",
+                  replacements: ["builtIn": String(model.builtInMouseProfileCount)]
+                )
             )
             .font(.callout)
             Text(
-              "Add your own or override a bundled one by dropping a JSON descriptor into the custom profiles folder. It starts with an example file that shows the format."
+              L10n.text(
+                "Add your own or override a bundled one by dropping a JSON descriptor into the custom profiles folder. It starts with an example file that shows the format."
+              )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
-            Button("Open custom profiles folder", action: model.openCustomProfilesDirectoryInFinder)
+            Button(
+              L10n.text("Open custom profiles folder"),
+              action: model.openCustomProfilesDirectoryInFinder
+            )
           }
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
-        GroupBox("Advanced display") {
+        GroupBox(L10n.text("Advanced display")) {
           VStack(alignment: .leading, spacing: 6) {
             Toggle(
-              "Show raw HID++ fields",
+              L10n.text("Show raw HID++ fields"),
               isOn: Binding(
                 get: { model.showAdvancedFields },
                 set: { model.setShowAdvancedFields($0) })
@@ -96,7 +117,9 @@ struct SettingsPane: View {
             .toggleStyle(.checkbox)
             .tint(theme.checkboxActive)
             Text(
-              "Shows the 8-digit button records and profile sector numbers. Leave this off for the normal editing view."
+              L10n.text(
+                "Shows the 8-digit button records and profile sector numbers. Leave this off for the normal editing view."
+              )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -104,10 +127,10 @@ struct SettingsPane: View {
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
-        GroupBox("Keyboard outputs") {
+        GroupBox(L10n.text("Keyboard outputs")) {
           VStack(alignment: .leading, spacing: 6) {
             Toggle(
-              "Show non-standard keyboard keys",
+              L10n.text("Show non-standard keyboard keys"),
               isOn: Binding(
                 get: { model.showNonStandardKeyboardKeys },
                 set: { model.setShowNonStandardKeyboardKeys($0) })
@@ -115,12 +138,14 @@ struct SettingsPane: View {
             .toggleStyle(.checkbox)
             .tint(theme.checkboxActive)
             Text(
-              "Shows the optional extended-key override for usages such as Insert, F13–F24, modifier keys, and Sleep. Recording captures modifiers automatically."
+              L10n.text(
+                "Shows the optional extended-key override for usages such as Insert, F13–F24, modifier keys, and Sleep. Recording captures modifiers automatically."
+              )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
-              Text("Key categories")
+              Text(L10n.text("Key categories"))
                 .font(.callout.weight(.medium))
               LazyVGrid(
                 columns: [
@@ -137,7 +162,7 @@ struct SettingsPane: View {
                       set: { model.setKeyboardKeyGroup(group, enabled: $0) }
                     )
                   ) {
-                    Text(group.rawValue)
+                    Text(L10n.text(group.rawValue))
                       .fixedSize(horizontal: false, vertical: true)
                   }
                   .toggleStyle(.checkbox)
@@ -152,11 +177,11 @@ struct SettingsPane: View {
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
-        GroupBox("Appearance") {
+        GroupBox(L10n.text("Appearance")) {
           VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center, spacing: 12) {
               Picker(
-                "Color mode",
+                L10n.text("Color mode"),
                 selection: Binding(
                   get: { model.appearancePreference },
                   set: { model.setAppearancePreference($0) }
@@ -167,8 +192,11 @@ struct SettingsPane: View {
                 }
               }
               .pickerStyle(.segmented)
-              Button("Open custom themes folder", action: model.openCustomThemesDirectoryInFinder)
-              Button("Refresh themes", action: model.refreshThemes)
+              Button(
+                L10n.text("Open custom themes folder"),
+                action: model.openCustomThemesDirectoryInFinder
+              )
+              Button(L10n.text("Refresh themes"), action: model.refreshThemes)
             }
             LazyVGrid(
               columns: [
@@ -179,7 +207,7 @@ struct SettingsPane: View {
               spacing: 12
             ) {
               themePicker(
-                "Light theme",
+                L10n.text("Light theme"),
                 selection: Binding(
                   get: { model.selectedLightThemeID },
                   set: { model.setLightThemeID($0) }
@@ -187,7 +215,7 @@ struct SettingsPane: View {
                 themes: model.lightThemes
               )
               themePicker(
-                "Dark theme",
+                L10n.text("Dark theme"),
                 selection: Binding(
                   get: { model.selectedDarkThemeID },
                   set: { model.setDarkThemeID($0) }
@@ -197,12 +225,16 @@ struct SettingsPane: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(
-              "System follows macOS and selects the matching theme. Light and dark modes use the theme selected below."
+              L10n.text(
+                "System follows macOS and selects the matching theme. Light and dark modes use the theme selected below."
+              )
             )
             .font(.caption)
             .foregroundStyle(.secondary)
             Text(
-              "Light and dark themes are loaded from the bundled themes and Custom Themes folders."
+              L10n.text(
+                "Light and dark themes are loaded from the bundled themes and Custom Themes folders."
+              )
             )
             .font(.caption)
             .foregroundStyle(.secondary)

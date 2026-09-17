@@ -14,9 +14,9 @@ struct RGBEditorView: View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(alignment: .firstTextBaseline) {
         VStack(alignment: .leading, spacing: 2) {
-          Text("Onboard RGB")
+          Text(L10n.text("Onboard RGB"))
             .font(.headline)
-          Text("Choose a color for each advertised lighting zone.")
+          Text(L10n.text("Choose a color for each advertised lighting zone."))
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -27,7 +27,7 @@ struct RGBEditorView: View {
           rgbZoneRow(zone)
         }
       }
-      Text("Shift-click a zone to edit every advertised zone together.")
+      Text(L10n.text("Shift-click a zone to edit every advertised zone together."))
         .font(.caption)
         .foregroundStyle(.secondary)
     }
@@ -101,7 +101,9 @@ struct RGBEditorView: View {
     }
     .buttonStyle(.plain)
     .pointingHandCursor()
-    .help("Click to choose a color. Shift-click to apply the chosen color to all RGB zones.")
+    .help(
+      L10n.text("Click to choose a color. Shift-click to apply the chosen color to all RGB zones.")
+    )
     .popover(
       isPresented: Binding(
         get: { presentedZoneID == zone.id },
@@ -115,7 +117,7 @@ struct RGBEditorView: View {
       arrowEdge: .trailing
     ) {
       RGBColorPopoverView(
-        title: model.rgbEditingAllZones ? "All RGB zones" : zone.name,
+        title: model.rgbEditingAllZones ? L10n.text("All RGB zones") : zone.name,
         initialColor: zone.draft,
         onCommit: { color in
           model.setRGBColor(zoneID: zone.id, color: color)
@@ -169,7 +171,12 @@ struct RGBEditorView: View {
         .stroke(theme.cardBorder, lineWidth: 0.5)
     }
     .pointingHandCursor()
-    .help("Set \(zone.name) lighting mode to \(mode.label). Shift-click to apply to all zones.")
+    .help(
+      L10n.text(
+        "Set {zone} lighting mode to {mode}. Shift-click to apply to all zones.",
+        replacements: ["zone": zone.name, "mode": mode.label]
+      )
+    )
   }
 
 }
@@ -236,11 +243,11 @@ private struct RGBColorPopoverView: View {
           .frame(width: 22, height: 140)
       }
       HStack(spacing: 6) {
-        TextField("#RRGGBB", text: $hexInput)
+        TextField(L10n.text("#RRGGBB"), text: $hexInput)
           .textFieldStyle(.roundedBorder)
           .font(.caption.monospaced())
           .onSubmit(applyHexInput)
-        Button("Apply", action: applyHexInput)
+        Button(L10n.text("Apply"), action: applyHexInput)
           .buttonStyle(.bordered)
       }
       if let hexError {
@@ -263,7 +270,7 @@ private struct RGBColorPopoverView: View {
 
   private func applyHexInput() {
     guard let color = RGBColor(hex: hexInput) else {
-      hexError = "Enter a 6-digit hex color, such as #33AAFF."
+      hexError = L10n.text("Enter a 6-digit hex color, such as #33AAFF.")
       return
     }
     pickerColor = swiftUIColor(color)

@@ -52,13 +52,15 @@ struct StatusArea: View {
         .buttonStyle(.plain)
         .frame(width: 20, height: 20)
         .contentShape(Circle())
-        .accessibilityLabel(showsHistoryHeader ? "Close recent events" : "Show recent events")
+        .accessibilityLabel(
+          L10n.text(showsHistoryHeader ? "Close recent events" : "Show recent events")
+        )
         if showsHistoryHeader {
-          Text("Recent events")
+          Text(L10n.text("Recent events"))
             .font(.headline)
             .foregroundStyle(theme.primaryText)
           Spacer()
-          Text("Last \(events.count)")
+          Text(L10n.text("Last {count}", replacements: ["count": String(events.count)]))
             .font(.caption)
             .foregroundStyle(theme.secondaryText)
         } else if !status.isEmpty {

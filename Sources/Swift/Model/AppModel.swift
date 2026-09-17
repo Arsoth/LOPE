@@ -8,8 +8,8 @@ import IOKit.hidsystem
 
 @MainActor
 final class AppModel: ObservableObject {
-  @Published var deviceSummary = "No Logitech HID++ device loaded"
-  @Published var status = "Connect a Logitech mouse, then choose Refresh."
+  @Published var deviceSummary = L10n.text("No Logitech HID++ device loaded")
+  @Published var status = L10n.text("Connect a Logitech mouse, then choose Refresh.")
 
   var statusFooterText: String {
     waitingForKnownDevice ? "" : status
@@ -30,7 +30,7 @@ final class AppModel: ObservableObject {
   @Published var defaultStage = 3
   @Published var shiftStage = 1
   @Published var dpiCapabilities = DPICapabilities()
-  @Published var dpiDetails = "DPI capabilities have not been read."
+  @Published var dpiDetails = L10n.text("DPI capabilities have not been read.")
   @Published var pollingRateCapabilities = PollingRateCapabilities()
   @Published var pollingRateDraft: Int?
   @Published var rgbZones: [RGBZoneState] = []
@@ -192,30 +192,42 @@ final class AppModel: ObservableObject {
   }
 
   var onboardProfileSummary: String {
-    guard !loadingProfile else { return "Onboard profiles" }
+    guard !loadingProfile else { return L10n.text("Onboard profiles") }
     let readableCount = profiles.count
-    guard readableCount > 0 else { return "Onboard profiles" }
+    guard readableCount > 0 else { return L10n.text("Onboard profiles") }
 
     guard let capacity = onboardProfileCapacity else {
       return readableCount == 1
-        ? "Profile 1 (capacity not reported)"
-        : "Onboard profiles (\(readableCount) readable; capacity not reported)"
+        ? L10n.text("Profile 1 (capacity not reported)")
+        : L10n.text(
+          "Onboard profiles ({count} readable; capacity not reported)",
+          replacements: ["count": String(readableCount)]
+        )
     }
 
     guard capacity >= readableCount else {
-      return "Onboard profiles (\(readableCount) readable; reported capacity inconsistent)"
+      return L10n.text(
+        "Onboard profiles ({count} readable; reported capacity inconsistent)",
+        replacements: ["count": String(readableCount)]
+      )
     }
 
     if !onboardProfileCapacityWasReported {
       return readableCount == 1
-        ? "Profile 1 (1 readable; capacity not reported)"
-        : "Onboard profiles (\(readableCount) readable; capacity not reported)"
+        ? L10n.text("Profile 1 (1 readable; capacity not reported)")
+        : L10n.text(
+          "Onboard profiles ({count} readable; capacity not reported)",
+          replacements: ["count": String(readableCount)]
+        )
     }
 
     if readableCount == 1 && capacity == 1 {
-      return "Profile 1 of 1"
+      return L10n.text("Profile 1 of 1")
     }
-    return "Onboard profiles (\(readableCount) of \(capacity) supported)"
+    return L10n.text(
+      "Onboard profiles ({count} of {capacity} supported)",
+      replacements: ["count": String(readableCount), "capacity": String(capacity)]
+    )
   }
 
   var engine: URL? {

@@ -9,6 +9,7 @@ GUI_BIN := bin/LOPEGUI
 GUI_SRC := $(shell find Sources/Swift -type f -name '*.swift' ! -path 'Sources/Swift/Tests/*' -print | sort)
 PROFILE_FILES := $(wildcard Profiles/*.json)
 THEME_FILES := $(wildcard Themes/*.json)
+LOCALIZATION_FILES := $(wildcard Localization/*.json)
 APP_ARCH ?= arm64
 MACOSX_DEPLOYMENT_TARGET ?= 13.0
 GUI_TARGET := $(APP_ARCH)-apple-macos$(MACOSX_DEPLOYMENT_TARGET)
@@ -51,17 +52,18 @@ $(APP): $(SRC) $(C_MODULES) $(C_HEADERS)
 
 gui: $(GUI_BIN)
 
-$(GUI_BIN): $(GUI_SRC) $(PROFILE_FILES) $(THEME_FILES)
+$(GUI_BIN): $(GUI_SRC) $(PROFILE_FILES) $(THEME_FILES) $(LOCALIZATION_FILES)
 	@mkdir -p bin $(SWIFT_MODULE_CACHE)
 	swiftc -O -parse-as-library -target $(GUI_TARGET) -module-cache-path $(SWIFT_MODULE_CACHE) -framework SwiftUI -framework AppKit -framework ApplicationServices -framework IOKit $(GUI_SRC) -o $(GUI_BIN)
 
-app: build gui $(PROFILE_FILES) $(THEME_FILES)
+app: build gui $(PROFILE_FILES) $(THEME_FILES) $(LOCALIZATION_FILES)
 	@rm -rf "$(GUI_BUNDLE)"
-	@mkdir -p "$(GUI_BUNDLE)/Contents/MacOS" "$(GUI_BUNDLE)/Contents/Resources/MouseProfiles" "$(GUI_BUNDLE)/Contents/Resources/Themes"
+	@mkdir -p "$(GUI_BUNDLE)/Contents/MacOS" "$(GUI_BUNDLE)/Contents/Resources/MouseProfiles" "$(GUI_BUNDLE)/Contents/Resources/Themes" "$(GUI_BUNDLE)/Contents/Resources/Localization"
 	cp -f "$(GUI_BIN)" "$(GUI_BUNDLE)/Contents/MacOS/LOPE"
 	cp -f "bin/$(APP)" "$(GUI_BUNDLE)/Contents/Resources/$(APP)"
 	cp -f $(PROFILE_FILES) "$(GUI_BUNDLE)/Contents/Resources/MouseProfiles/"
 	cp -f $(THEME_FILES) "$(GUI_BUNDLE)/Contents/Resources/Themes/"
+	cp -f $(LOCALIZATION_FILES) "$(GUI_BUNDLE)/Contents/Resources/Localization/"
 	cp -f App/Info.plist "$(GUI_BUNDLE)/Contents/Info.plist"
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $(BUNDLE_IDENTIFIER)" "$(GUI_BUNDLE)/Contents/Info.plist"
 	@if [ -n "$(APP_VERSION)" ]; then \

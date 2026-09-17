@@ -11,7 +11,7 @@
 
 # LOPE todo list
 
-1. [ ] Add language support by replacing hard-coded labels with JSON-based input bundled into the app, including UI labels and mouse button labels. Initially support `en-us.json`, select the OS language by default, and fall back to English when that language is unavailable.
+1. [x] Add language support by replacing hard-coded labels with JSON-based input bundled into the app, including UI labels and mouse button labels. Initially support `en-us.json`, select the OS language by default, and fall back to English when that language is unavailable.
 
    **Done when:** All user-facing UI and mouse button labels are loaded from the bundled localization data, the OS language is selected when supported, and English is used as the fallback.
 

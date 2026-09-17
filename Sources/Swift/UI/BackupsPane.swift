@@ -10,35 +10,37 @@ struct BackupsPane: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("Backups")
+      Text(L10n.text("Backups"))
         .font(.headline)
       Text(
-        "Save to mouse creates exact binary backups for the selected mouse before any write. JSON is an explicit import/export format; older JSON sidecars remain available as editable files, but new mouse saves do not create them."
+        L10n.text(
+          "Save to mouse creates exact binary backups for the selected mouse before any write. JSON is an explicit import/export format; older JSON sidecars remain available as editable files, but new mouse saves do not create them."
+        )
       )
       .font(.callout)
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
       HStack {
-        Button("Save selected profile backup") { model.dumpBackup() }
-        Button("Export JSON…") {
+        Button(L10n.text("Save selected profile backup")) { model.dumpBackup() }
+        Button(L10n.text("Export JSON…")) {
           if let url = model.chooseJSONExport() {
             model.exportCurrentJSON(to: url)
           }
         }
-        Button("Import JSON…") {
+        Button(L10n.text("Import JSON…")) {
           if let url = model.chooseJSONBackup() {
             model.loadEditableBackup(url)
           }
         }
-        Button("Choose another backup…") {
+        Button(L10n.text("Choose another backup…")) {
           restoreURL = model.chooseRestoreBackup()
           confirmRestore = restoreURL != nil
         }
-        Button("Refresh list", action: model.refreshBackups)
-        Button("Open in Finder", action: model.openBackupDirectoryInFinder)
+        Button(L10n.text("Refresh list"), action: model.refreshBackups)
+        Button(L10n.text("Open in Finder"), action: model.openBackupDirectoryInFinder)
       }
       Toggle(
-        "Show backups for all mice",
+        L10n.text("Show backups for all mice"),
         isOn: Binding(
           get: { model.showAllBackups },
           set: { model.setShowAllBackups($0) })
@@ -46,17 +48,26 @@ struct BackupsPane: View {
       .toggleStyle(.checkbox)
       Text(
         model.showAllBackups
-          ? "Showing every backup. Unknown-device files require review before restore or import."
-          : "Showing backups matched to the selected mouse. Legacy files that cannot be matched safely are hidden."
+          ? L10n.text(
+            "Showing every backup. Unknown-device files require review before restore or import."
+          )
+          : L10n.text(
+            "Showing backups matched to the selected mouse. Legacy files that cannot be matched safely are hidden."
+          )
       )
       .font(.caption)
       .foregroundStyle(.secondary)
-      GroupBox("Available backups") {
+      GroupBox(L10n.text("Available backups")) {
         if model.backups.isEmpty {
           Text(
             model.showAllBackups
-              ? "No backups in \(model.backupDirectoryPath)."
-              : "No backups for the selected mouse in \(model.backupDirectoryPath)."
+              ? L10n.text(
+                "No backups in {path}.", replacements: ["path": model.backupDirectoryPath]
+              )
+              : L10n.text(
+                "No backups for the selected mouse in {path}.",
+                replacements: ["path": model.backupDirectoryPath]
+              )
           )
           .font(.callout)
           .foregroundStyle(.secondary)
@@ -78,11 +89,11 @@ struct BackupsPane: View {
                 }
                 Spacer()
                 if backup.isJSON {
-                  Button("Load") {
+                  Button(L10n.text("Load")) {
                     model.loadEditableBackup(backup.url)
                   }
                 } else {
-                  Button("Restore") {
+                  Button(L10n.text("Restore")) {
                     restoreURL = backup.url
                     confirmRestore = true
                   }
@@ -96,7 +107,9 @@ struct BackupsPane: View {
         }
       }
       Text(
-        "Quit G HUB and other mouse remappers while saving. Don't bother re-enabling them after ;)"
+        L10n.text(
+          "Quit G HUB and other mouse remappers while saving. Don't bother re-enabling them after ;)"
+        )
       )
       .font(.callout)
       .foregroundStyle(.secondary)

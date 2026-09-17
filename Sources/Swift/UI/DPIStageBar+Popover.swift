@@ -17,7 +17,7 @@ extension DPIStageBar {
     let isShift = visibleShiftStage == index + 1
     let canDelete = !isDefault && !isShift
     return VStack(alignment: .leading, spacing: 10) {
-      Text("DPI stage \(index + 1)")
+      Text(L10n.text("DPI stage {number}", replacements: ["number": String(index + 1)]))
         .font(.headline)
       stageValueField(index: index, isInteractive: isInteractive)
 
@@ -30,7 +30,7 @@ extension DPIStageBar {
         HStack(spacing: 7) {
           roleIcon(
             isDefault: true, isShift: false, filled: isDefault, tint: theme.defaultStage)
-          Text(isDefault ? "Default" : "Make Default")
+          Text(L10n.text(isDefault ? "Default" : "Make Default"))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -47,7 +47,7 @@ extension DPIStageBar {
       } label: {
         HStack(spacing: 7) {
           roleIcon(isDefault: false, isShift: true, filled: isShift, tint: theme.shiftStage)
-          Text(isShift ? "DPI Shift" : "Make DPI Shift")
+          Text(L10n.text(isShift ? "DPI Shift" : "Make DPI Shift"))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -62,7 +62,7 @@ extension DPIStageBar {
         onDelete(index)
         dismissStageEditor()
       } label: {
-        Label("Delete stage", systemImage: "trash")
+        Label(L10n.text("Delete stage"), systemImage: "trash")
           .frame(maxWidth: .infinity, alignment: .leading)
           .contentShape(Rectangle())
       }
@@ -71,7 +71,7 @@ extension DPIStageBar {
       .contentShape(Rectangle())
       .disabled(!canDelete)
 
-      Text("Dragging snaps to the mouse’s supported DPI values.")
+      Text(L10n.text("Dragging snaps to the mouse’s supported DPI values."))
         .font(.caption)
         .foregroundStyle(theme.secondaryText)
         .fixedSize(horizontal: false, vertical: true)
@@ -95,13 +95,13 @@ extension DPIStageBar {
       set: { onTextChange(index, $0) }
     )
     if isInteractive {
-      TextField("DPI", text: binding)
+      TextField(L10n.text("DPI"), text: binding)
         .textFieldStyle(.roundedBorder)
         .controlSize(.small)
         .focused($focusedStageIndex, equals: index)
         .onSubmit { onCommitText(index) }
     } else {
-      TextField("DPI", text: binding)
+      TextField(L10n.text("DPI"), text: binding)
         .textFieldStyle(.roundedBorder)
         .controlSize(.small)
         .allowsHitTesting(false)
@@ -124,17 +124,17 @@ extension DPIStageBar {
 
     switch role {
     case .defaultStage:
-      label = "Default"
+      label = L10n.text("Default")
       isDefault = true
       isShift = false
       tint = theme.defaultStage
     case .shift:
-      label = "DPI Shift"
+      label = L10n.text("DPI Shift")
       isDefault = false
       isShift = true
       tint = theme.shiftStage
     case .other:
-      label = "Other"
+      label = L10n.text("Other")
       isDefault = false
       isShift = false
       tint = theme.otherStage

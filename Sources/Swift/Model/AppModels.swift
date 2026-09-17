@@ -12,7 +12,10 @@ struct ProfileChoice: Identifiable, Hashable {
   var crcValid: Bool?
 
   var title: String {
-    "Profile \(id)\(enabled ? "" : " (disabled)")"
+    L10n.text(
+      enabled ? "Profile {id}" : "Profile {id} (disabled)",
+      replacements: ["id": String(id)]
+    )
   }
 }
 
@@ -22,8 +25,8 @@ enum ButtonLayer: String, CaseIterable, Hashable, Sendable {
 
   var label: String {
     switch self {
-    case .normal: return "Normal"
-    case .gShift: return "G-Shift"
+    case .normal: return L10n.text("Normal")
+    case .gShift: return L10n.text("G-Shift")
     }
   }
 }
@@ -54,7 +57,9 @@ struct ButtonRow: Identifiable {
 
   var displayLabel: String {
     let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmedLabel.isEmpty ? "Button \(id)" : trimmedLabel
+    return trimmedLabel.isEmpty
+      ? L10n.text("Button {number}", replacements: ["number": String(id)])
+      : L10n.text(trimmedLabel)
   }
 }
 
@@ -82,9 +87,9 @@ struct BackupEntry: Identifiable {
 
     var label: String {
       switch self {
-      case .selected: return "Selected mouse"
-      case .other: return "Different mouse"
-      case .unknown: return "Unknown device"
+      case .selected: return L10n.text("Selected mouse")
+      case .other: return L10n.text("Different mouse")
+      case .unknown: return L10n.text("Unknown device")
       }
     }
   }
@@ -98,16 +103,20 @@ struct BackupEntry: Identifiable {
   var id: String { url.path }
   var name: String { url.lastPathComponent }
   var isJSON: Bool { url.pathExtension.lowercased() == "json" }
-  var fileTypeLabel: String { isJSON ? "Editable JSON" : "Exact binary" }
+  var fileTypeLabel: String { L10n.text(isJSON ? "Editable JSON" : "Exact binary") }
 
   var deviceStatusLabel: String {
     switch deviceMatch {
     case .selected:
-      return deviceName.map { "Selected mouse: \($0)" } ?? deviceMatch.label
+      return deviceName.map {
+        L10n.text("Selected mouse: {device}", replacements: ["device": $0])
+      } ?? deviceMatch.label
     case .other:
-      return deviceName.map { "Different mouse: \($0)" } ?? deviceMatch.label
+      return deviceName.map {
+        L10n.text("Different mouse: {device}", replacements: ["device": $0])
+      } ?? deviceMatch.label
     case .unknown:
-      return "Unknown device — review before using"
+      return L10n.text("Unknown device — review before using")
     }
   }
 }
@@ -128,7 +137,10 @@ struct DeviceChoice: Identifiable, Hashable, Codable, Sendable {
   }
 
   var title: String {
-    "\(displayName) — \(connection)"
+    L10n.text(
+      "{device} — {connection}",
+      replacements: ["device": displayName, "connection": L10n.text(connection)]
+    )
   }
 
   var isWiredDevice: Bool {

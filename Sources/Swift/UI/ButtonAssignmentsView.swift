@@ -52,18 +52,18 @@ struct ButtonAssignmentsView: View {
                 })
             ) {
               ForEach(model.presets.prefix(1)) { preset in
-                Text(preset.label).tag(preset.raw)
+                Text(L10n.text(preset.label)).tag(preset.raw)
               }
-              Text("Keystroke").tag("keystroke")
+              Text(L10n.text("Keystroke")).tag("keystroke")
               ForEach(model.presets.dropFirst()) { preset in
-                Text(preset.label).tag(preset.raw)
+                Text(L10n.text(preset.label)).tag(preset.raw)
               }
             }
             .labelsHidden()
             .frame(width: 190, alignment: .trailing)
             if model.showAdvancedFields {
               TextField(
-                "8 hex digits",
+                L10n.text("8 hex digits"),
                 text: Binding(
                   get: { model.buttons.first(where: { $0.id == buttonID })?.draftRaw ?? "" },
                   set: { raw in
@@ -125,7 +125,8 @@ struct ButtonAssignmentsView: View {
       .frame(width: 0, height: 0)
       keyboardRecordingBox(buttonID)
     }
-    .help("Click the input box to capture a key and its modifiers. The X cancels recording.")
+    .help(
+      L10n.text("Click the input box to capture a key and its modifiers. The X cancels recording."))
   }
 
   private func keyboardModifierControls(_ buttonID: Int) -> some View {
@@ -145,14 +146,15 @@ struct ButtonAssignmentsView: View {
         disabled: model.isModifierToggleDisabled(buttonIndex: buttonIndex, bit: 0x08))
     }
     .frame(width: 190, height: 26, alignment: .leading)
-    .help("Choose the modifiers to send with the selected extended key.")
+    .help(L10n.text("Choose the modifiers to send with the selected extended key."))
   }
 
   private func keyboardModifierToggle(
     buttonIndex: Int, label: String, bit: UInt8, disabled: Bool
   ) -> some View {
-    Toggle(
-      label,
+    let localizedLabel = L10n.text(label)
+    return Toggle(
+      localizedLabel,
       isOn: Binding(
         get: { model.isModifierEnabled(buttonIndex: buttonIndex, bit: bit) },
         set: { model.setModifier(buttonIndex: buttonIndex, bit: bit, enabled: $0) }
@@ -163,7 +165,7 @@ struct ButtonAssignmentsView: View {
     .font(.caption)
     .fixedSize()
     .disabled(disabled)
-    .help(label)
+    .help(localizedLabel)
   }
 
   private func keyboardRecordingBox(_ buttonID: Int) -> some View {
@@ -177,10 +179,14 @@ struct ButtonAssignmentsView: View {
         model.beginKeyboardRecording(buttonIndex: buttonIndex)
       } label: {
         HStack(spacing: 0) {
-          Text(isRecording ? "Recording..." : (chord.isEmpty ? "Click to record" : chord))
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .frame(maxWidth: .infinity, alignment: .leading)
+          Text(
+            isRecording
+              ? L10n.text("Recording...")
+              : (chord.isEmpty ? L10n.text("Click to record") : chord)
+          )
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.leading, 8)
         .padding(.trailing, isRecording ? 28 : 8)
@@ -200,7 +206,7 @@ struct ButtonAssignmentsView: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
-        .help("Cancel recording")
+        .help(L10n.text("Cancel recording"))
       }
     }
     .frame(width: 190, height: 26, alignment: .leading)
@@ -225,7 +231,7 @@ struct ButtonAssignmentsView: View {
     let selectedKey = UInt8(exactly: model.keyboardKeyChoice(buttonIndex: buttonIndex))
 
     return Picker(
-      "Extended key",
+      L10n.text("Extended key"),
       selection: Binding(
         get: {
           guard let index = model.buttons.firstIndex(where: { $0.id == buttonID }) else { return 0 }
@@ -236,11 +242,11 @@ struct ButtonAssignmentsView: View {
           model.setKeyboardKeyChoice(buttonIndex: index, key: key)
         })
     ) {
-      Text("Use Recorded Key").tag(0)
+      Text(L10n.text("Use Recorded Key")).tag(0)
       ForEach(model.filteredExtendedKeyboardKeyLayoutGroups(including: selectedKey)) { group in
-        Section(group.label) {
+        Section(L10n.text(group.label)) {
           ForEach(group.keys) { key in
-            Text(key.label).tag(Int(key.id))
+            Text(L10n.text(key.label)).tag(Int(key.id))
           }
         }
       }
@@ -251,7 +257,7 @@ struct ButtonAssignmentsView: View {
       ) { group in
         Section(keyboardKeyGroupLabel(group, selectedKey: selectedKey)) {
           ForEach(group.keys) { key in
-            Text(key.label).tag(Int(key.id))
+            Text(L10n.text(key.label)).tag(Int(key.id))
           }
         }
       }
@@ -259,7 +265,7 @@ struct ButtonAssignmentsView: View {
     .controlSize(.small)
     .labelsHidden()
     .frame(width: 150)
-    .help("Insert an extended HID keyboard usage directly.")
+    .help(L10n.text("Insert an extended HID keyboard usage directly."))
   }
 
   private func keyboardKeyGroupLabel(
@@ -269,6 +275,9 @@ struct ButtonAssignmentsView: View {
     let containsHiddenSelection =
       group.keys.contains { $0.id == selectedKey }
       && !model.isKeyboardKeyGroupEnabled(group.group)
-    return containsHiddenSelection ? "\(group.label) (hidden)" : group.label
+    let label = L10n.text(group.label)
+    return containsHiddenSelection
+      ? L10n.text("{group} (hidden)", replacements: ["group": label])
+      : label
   }
 }

@@ -28,12 +28,17 @@ extension AppModel {
   func setProfileEnabled(profileID: Int, enabled: Bool) {
     guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
     if !enabled && profiles.filter({ $0.enabled }).count <= 1 {
-      status = "At least one onboard profile must remain enabled."
+      status = L10n.text("At least one onboard profile must remain enabled.")
       return
     }
     profiles[index].enabled = enabled
     status =
-      "Profile \(profileID) will be \(enabled ? "enabled" : "disabled") when you save to the mouse."
+      L10n.text(
+        "Profile {id} will be {state} when you save to the mouse.",
+        replacements: [
+          "id": String(profileID), "state": L10n.text(enabled ? "enabled" : "disabled"),
+        ]
+      )
   }
 
   func setRaw(buttonIndex: Int, raw: String) {

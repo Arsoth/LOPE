@@ -10,9 +10,9 @@ enum EngineError: LocalizedError {
   var errorDescription: String? {
     switch self {
     case .unavailable:
-      return "The bundled HID++ engine could not be found."
+      return L10n.text("The bundled HID++ engine could not be found.")
     case .failed(let message):
-      return message.isEmpty ? "The HID++ engine failed." : message
+      return message.isEmpty ? L10n.text("The HID++ engine failed.") : message
     }
   }
 }
@@ -35,9 +35,9 @@ enum AppearancePreference: String, CaseIterable, Hashable {
 
   var label: String {
     switch self {
-    case .system: return "System"
-    case .light: return "Light"
-    case .dark: return "Dark"
+    case .system: return L10n.text("System")
+    case .light: return L10n.text("Light")
+    case .dark: return L10n.text("Dark")
     }
   }
 }
