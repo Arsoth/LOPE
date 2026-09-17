@@ -10,7 +10,10 @@ The app has three layers:
 
 - `Sources/Swift/App/AppMain.swift`, `Sources/Swift/UI/ContentView.swift`, and the
   focused `Sources/Swift/UI` components provide the SwiftUI
-  window, tabs, editor, settings, and status messages. The footer message fades
+  window, full-width tabs, editor, settings, and status messages. The tab strip
+  sits below the LOPE titlebar, equally distributes its four controls, and keeps
+  every pane mounted while inactive panes are hidden so switching tabs does not
+  reload their context. The footer message fades
   after 30 seconds; its info button replaces the footer with a full-width,
   scrollable history drawer whose header is the same footer bar and shows the
   ten most recent status events. Opening the drawer reduces the editor's

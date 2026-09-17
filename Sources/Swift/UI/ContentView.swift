@@ -45,6 +45,7 @@ struct ContentView: View {
   @State private var statusHistory = StatusHistory()
   @Environment(\.scenePhase) private var scenePhase
 
+  private let tabBarHeight: CGFloat = 36
   private let statusFadeDelayNanoseconds: UInt64 = 30_000_000_000
   private var theme: ThemePalette {
     ThemePalette(theme: model.activeTheme, isDarkAppearance: model.isDarkAppearance)
@@ -61,7 +62,7 @@ struct ContentView: View {
   var body: some View {
     ZStack {
       // Keep Settings on the standard macOS ⌘, shortcut even though the
-      // tab itself is represented by a TabView item.
+      // tab itself is represented by a custom tab-bar button.
       Button(L10n.text("Settings")) {
         selectedTab = .settings
       }
@@ -169,15 +170,19 @@ struct ContentView: View {
         Button {
           selectedTab = tab
         } label: {
-          Label(L10n.text(tab.title), systemImage: tab.systemImage)
-            .font(.callout.weight(.medium))
-            .foregroundStyle(selectedTab == tab ? Color.white : theme.primaryText)
-            .frame(maxWidth: .infinity, minHeight: 48)
+          ZStack {
+            Color.clear
+            Label(L10n.text(tab.title), systemImage: tab.systemImage)
+              .font(.callout.weight(.medium))
+              .foregroundStyle(theme.primaryText)
+          }
+          .frame(maxWidth: .infinity, minHeight: tabBarHeight)
+          .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, minHeight: 48)
+        .frame(maxWidth: .infinity, minHeight: tabBarHeight)
         .contentShape(Rectangle())
-        .background(selectedTab == tab ? theme.accent : theme.header)
+        .background(selectedTab == tab ? theme.controlBackground : theme.mainBackground)
         .overlay(alignment: .trailing) {
           if tab != .settings {
             Rectangle()
@@ -197,32 +202,47 @@ struct ContentView: View {
     }
   }
 
-  @ViewBuilder
   private var tabContent: some View {
-    switch selectedTab {
-    case .configure:
-      ZStack {
-        ConfigureSurfaceView(
+    ZStack {
+      tabPane(.configure) {
+        ZStack {
+          ConfigureSurfaceView(
+            model: model,
+            confirmRecoveryRestore: $confirmRecoveryRestore,
+            presentedRGBZoneID: $presentedRGBZoneID
+          )
+        }
+      }
+      tabPane(.backups) {
+        BackupsPane(
           model: model,
-          confirmRecoveryRestore: $confirmRecoveryRestore,
-          presentedRGBZoneID: $presentedRGBZoneID
+          restoreURL: $restoreURL,
+          confirmRestore: $confirmRestore
         )
       }
-    case .backups:
-      BackupsPane(
-        model: model,
-        restoreURL: $restoreURL,
-        confirmRestore: $confirmRestore
-      )
-    case .profileEditor:
-      ProfileEditorPane(
-        model: model,
-        loadingState: LoadingProfileStateView(model: model),
-        emptyState: EmptyStateView(model: model)
-      )
-    case .settings:
-      SettingsPane(model: model)
+      tabPane(.profileEditor) {
+        ProfileEditorPane(
+          model: model,
+          loadingState: LoadingProfileStateView(model: model),
+          emptyState: EmptyStateView(model: model)
+        )
+      }
+      tabPane(.settings) {
+        SettingsPane(model: model)
+      }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private func tabPane<Content: View>(
+    _ tab: AppTab,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    content()
+      .opacity(selectedTab == tab ? 1 : 0)
+      .allowsHitTesting(selectedTab == tab)
+      .accessibilityHidden(selectedTab != tab)
+      .zIndex(selectedTab == tab ? 1 : 0)
   }
 
   private var deviceHeaderSurface: some View {
