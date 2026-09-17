@@ -8,11 +8,29 @@ import CoreVideo
 import SwiftUI
 
 struct ContentView: View {
-  private enum AppTab: Hashable {
+  private enum AppTab: CaseIterable, Hashable {
     case configure
     case backups
     case profileEditor
     case settings
+
+    var title: String {
+      switch self {
+      case .configure: return "Configure"
+      case .backups: return "Backups"
+      case .profileEditor: return "Profile Editor"
+      case .settings: return "Settings"
+      }
+    }
+
+    var systemImage: String {
+      switch self {
+      case .configure: return "cursorarrow.click"
+      case .backups: return "archivebox"
+      case .profileEditor: return "square.and.pencil"
+      case .settings: return "gearshape"
+      }
+    }
   }
 
   @StateObject private var model = AppModel()
@@ -53,39 +71,13 @@ struct ContentView: View {
 
       VStack(alignment: .leading, spacing: 0) {
         VStack(alignment: .leading, spacing: 0) {
+          tabBar
           if selectedTab != .settings {
             deviceHeaderSurface
               .zIndex(1)
           }
-          TabView(selection: $selectedTab) {
-            ZStack {
-              ConfigureSurfaceView(
-                model: model,
-                confirmRecoveryRestore: $confirmRecoveryRestore,
-                presentedRGBZoneID: $presentedRGBZoneID
-              )
-            }
-            .tabItem { Label(L10n.text("Configure"), systemImage: "cursorarrow.click") }
-            .tag(AppTab.configure)
-            BackupsPane(
-              model: model,
-              restoreURL: $restoreURL,
-              confirmRestore: $confirmRestore
-            )
-            .tabItem { Label(L10n.text("Backups"), systemImage: "archivebox") }
-            .tag(AppTab.backups)
-            ProfileEditorPane(
-              model: model,
-              loadingState: LoadingProfileStateView(model: model),
-              emptyState: EmptyStateView(model: model)
-            )
-            .tabItem { Label(L10n.text("Profile Editor"), systemImage: "square.and.pencil") }
-            .tag(AppTab.profileEditor)
-            SettingsPane(model: model)
-              .tabItem { Label(L10n.text("Settings"), systemImage: "gearshape") }
-              .tag(AppTab.settings)
-          }
-          .padding(.top, selectedTab == .settings || selectedTab == .configure ? 0 : 20)
+          tabContent
+            .padding(.top, selectedTab == .settings || selectedTab == .configure ? 0 : 20)
         }
         .simultaneousGesture(
           TapGesture().onEnded {
@@ -168,6 +160,68 @@ struct ContentView: View {
         model.primaryClickValidationMessage
           ?? L10n.text("Choose “Left click” for the primary-click button, then save again.")
       )
+    }
+  }
+
+  private var tabBar: some View {
+    HStack(spacing: 0) {
+      ForEach(AppTab.allCases, id: \.self) { tab in
+        Button {
+          selectedTab = tab
+        } label: {
+          Label(L10n.text(tab.title), systemImage: tab.systemImage)
+            .font(.callout.weight(.medium))
+            .foregroundStyle(selectedTab == tab ? Color.white : theme.primaryText)
+            .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .contentShape(Rectangle())
+        .background(selectedTab == tab ? theme.accent : theme.header)
+        .overlay(alignment: .trailing) {
+          if tab != .settings {
+            Rectangle()
+              .fill(theme.separator)
+              .frame(width: 1)
+          }
+        }
+        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .background(theme.header)
+    .overlay(alignment: .bottom) {
+      Rectangle()
+        .fill(theme.separator)
+        .frame(height: 1)
+    }
+  }
+
+  @ViewBuilder
+  private var tabContent: some View {
+    switch selectedTab {
+    case .configure:
+      ZStack {
+        ConfigureSurfaceView(
+          model: model,
+          confirmRecoveryRestore: $confirmRecoveryRestore,
+          presentedRGBZoneID: $presentedRGBZoneID
+        )
+      }
+    case .backups:
+      BackupsPane(
+        model: model,
+        restoreURL: $restoreURL,
+        confirmRestore: $confirmRestore
+      )
+    case .profileEditor:
+      ProfileEditorPane(
+        model: model,
+        loadingState: LoadingProfileStateView(model: model),
+        emptyState: EmptyStateView(model: model)
+      )
+    case .settings:
+      SettingsPane(model: model)
     }
   }
 

@@ -9,5 +9,6 @@ struct LOPEApp: App {
     Window(AppConstants.displayName, id: "main") {
       ContentView()
     }
+    .windowStyle(.titleBar)
   }
 }
