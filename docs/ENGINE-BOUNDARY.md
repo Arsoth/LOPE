@@ -93,3 +93,8 @@ The structured path currently covers `list`, `profiles`, `dpi`,
 diagnostic commands remain available in human mode and return an explicit
 `unsupported` structured error instead of leaking human output into a JSON
 stream.
+
+The contract is available for GUI adoption; the current GUI still invokes the
+human renderer while its JSON migration is evaluated. The process-versus-
+in-process decision and the supporting benchmark are recorded in
+[ENGINE-API-EVALUATION.md](ENGINE-API-EVALUATION.md).

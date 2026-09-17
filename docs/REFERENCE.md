@@ -347,8 +347,10 @@ verifies readback. The GUI uses the same engine but supplies a stable device
 key and keeps low-level diagnostics out of the status bar.
 
 The GUI-facing structured process contract is documented in
-[ENGINE-BOUNDARY.md](ENGINE-BOUNDARY.md). Human CLI output remains the default
-for diagnostics.
+[ENGINE-BOUNDARY.md](ENGINE-BOUNDARY.md). The process-versus-in-process API
+evaluation is recorded in [ENGINE-API-EVALUATION.md](ENGINE-API-EVALUATION.md).
+Human CLI output remains the default for diagnostics while the GUI adopts the
+structured contract.
 
 ## Development checks
 
