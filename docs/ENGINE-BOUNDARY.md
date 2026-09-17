@@ -94,7 +94,10 @@ diagnostic commands remain available in human mode and return an explicit
 `unsupported` structured error instead of leaking human output into a JSON
 stream.
 
-The contract is available for GUI adoption; the current GUI still invokes the
-human renderer while its JSON migration is evaluated. The process-versus-
+The GUI uses this contract for device discovery, profile refreshes, DPI and
+report-rate reads, live DPI polling, and profile writes. It validates the
+contract version and response kind before projecting data into the editor, and
+it preserves non-JSON lines only as diagnostics for status/error reporting.
+There is no human-output fallback in the GUI path. The process-versus-
 in-process decision and the supporting benchmark are recorded in
 [ENGINE-API-EVALUATION.md](ENGINE-API-EVALUATION.md).

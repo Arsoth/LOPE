@@ -11,24 +11,24 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
   private func makeSnapshot(
     devices: [DeviceChoice] = [],
     selectedDeviceIndex: Int? = nil,
-    profileText: String? = nil,
     profileError: String? = nil,
     dpiText: String? = nil,
     dpiError: String? = nil,
     selectedProfileNumber: Int? = nil,
     errorMessage: String? = nil,
-    accessWarning: Bool = false
+    accessWarning: Bool = false,
+    profileResponse: EngineJSONResponse? = nil
   ) -> RefreshSnapshot {
     RefreshSnapshot(
       devices: devices,
       selectedDeviceIndex: selectedDeviceIndex,
-      profileText: profileText,
       profileError: profileError,
       dpiText: dpiText,
       dpiError: dpiError,
       selectedProfileNumber: selectedProfileNumber,
       errorMessage: errorMessage,
-      accessWarning: accessWarning
+      accessWarning: accessWarning,
+      profileResponse: profileResponse
     )
   }
 
@@ -49,6 +49,30 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     XCTAssertFalse(model.loadingProfile)
     XCTAssertNil(model.refreshTask)
     XCTAssertTrue(model.profiles.isEmpty)
+  }
+
+  func testApplyRefreshSnapshotUsesStructuredProfileResponse() {
+    let model = AppModel(startInitialRefresh: false)
+    let device = DeviceChoice(
+      id: 1, name: "G502 X", connection: "Wired", productID: "0x0000", deviceKey: "abc123ef")
+    let response = try! EngineJSON.decode(fakeStructuredProfilesOutput()).response
+
+    model.applyRefreshSnapshot(
+      makeSnapshot(
+        devices: [device],
+        selectedDeviceIndex: 1,
+        selectedProfileNumber: 2,
+        profileResponse: response
+      ))
+    model.stopLiveDPIPolling()
+
+    XCTAssertEqual(model.profiles.map(\.id), [1, 2])
+    XCTAssertEqual(model.profileNumber, 2)
+    XCTAssertEqual(model.buttons.first?.currentRaw, "80010002")
+    XCTAssertEqual(model.gShiftButtonRows.first?.currentRaw, "80020003")
+    XCTAssertEqual(model.dpiCapabilities.currentValue, 800)
+    XCTAssertEqual(model.pollingRateCapabilities.currentRate, 500)
+    XCTAssertEqual(model.onboardProfileCapacity, 3)
   }
 
   // MARK: - No selected device
@@ -116,7 +140,7 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [device], selectedDeviceIndex: 1, profileText: nil,
+        devices: [device], selectedDeviceIndex: 1,
         profileError: "sleeping", selectedProfileNumber: nil))
 
     XCTAssertFalse(model.waitingForKnownDevice)
@@ -133,7 +157,7 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [device], selectedDeviceIndex: 1, profileText: nil,
+        devices: [device], selectedDeviceIndex: 1,
         profileError: "timed out", selectedProfileNumber: nil))
 
     XCTAssertTrue(model.waitingForKnownDevice)
@@ -150,7 +174,7 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [device], selectedDeviceIndex: 1, profileText: nil,
+        devices: [device], selectedDeviceIndex: 1,
         profileError: "timed out", accessWarning: true))
 
     XCTAssertEqual(
@@ -167,7 +191,7 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [device], selectedDeviceIndex: 1, profileText: nil,
+        devices: [device], selectedDeviceIndex: 1,
         profileError: "timed out", accessWarning: false))
 
     XCTAssertTrue(model.status.contains("Choose Refresh"))
@@ -181,7 +205,7 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
       deviceKey: "unknown-device")
 
     model.applyRefreshSnapshot(
-      makeSnapshot(devices: [device], selectedDeviceIndex: 1, profileText: nil, profileError: nil))
+      makeSnapshot(devices: [device], selectedDeviceIndex: 1, profileError: nil))
 
     XCTAssertEqual(
       model.status, "Connected to Unrecognized Mouse, but no compatible onboard profile was found."
@@ -198,7 +222,9 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     model.applyRefreshSnapshot(
       makeSnapshot(
         devices: [device], selectedDeviceIndex: 1,
-        profileText: "Profile capacity: 3\n"))
+        profileResponse: try! EngineJSON.decode(
+          fakeStructuredProfilesWithoutSelectionOutput()
+        ).response))
 
     XCTAssertTrue(model.profiles.isEmpty)
     XCTAssertTrue(model.buttons.isEmpty)
@@ -215,7 +241,8 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     model.applyRefreshSnapshot(
       makeSnapshot(
         devices: [device], selectedDeviceIndex: 1,
-        profileText: fakeProfilesOutput(), selectedProfileNumber: 2))
+        selectedProfileNumber: 2,
+        profileResponse: try! EngineJSON.decode(fakeStructuredProfilesOutput()).response))
 
     XCTAssertEqual(model.profileNumber, 2)
     XCTAssertFalse(model.profiles.isEmpty)
@@ -230,14 +257,13 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     let model = AppModel(startInitialRefresh: false)
     let device = DeviceChoice(
       id: 1, name: "G502 X", connection: "Wired", productID: "0x0000", deviceKey: "test-device")
-    let profileText = """
-      Selected profile: 2
-      Profile 2 (sector 0x0100, enabled=yes)
-        button 1: Left click [80 01 00 02]
-      """
-
     model.applyRefreshSnapshot(
-      makeSnapshot(devices: [device], selectedDeviceIndex: 1, profileText: profileText))
+      makeSnapshot(
+        devices: [device], selectedDeviceIndex: 1,
+        profileResponse: try! EngineJSON.decode(
+          fakeStructuredProfilesWithoutReportedCapacityOutput()
+        ).response
+      ))
 
     XCTAssertEqual(model.onboardProfileCapacity, model.profiles.count)
     XCTAssertFalse(model.onboardProfileCapacityWasReported)
@@ -252,7 +278,8 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     model.applyRefreshSnapshot(
       makeSnapshot(
         devices: [device], selectedDeviceIndex: 1,
-        profileText: fakeProfilesOutput(selectedProfile: 99), selectedProfileNumber: 99))
+        selectedProfileNumber: 99,
+        profileResponse: try! EngineJSON.decode(fakeStructuredProfilesOutput()).response))
 
     // 99 is not a real profile id, so resolution falls back to the
     // preferred profile number already selected before the refresh.
@@ -263,16 +290,11 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
     let model = AppModel(startInitialRefresh: false)
     let device = DeviceChoice(
       id: 1, name: "G502 X", connection: "Wired", productID: "0x0000", deviceKey: "test-device")
-    let profileText = """
-      Selected profile: 2
-      Profile 2 (sector 0x0100, enabled=yes)
-        button 1: Left click [80 01 00 02]
-      """
-
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [device], selectedDeviceIndex: 1, profileText: profileText,
-        dpiError: "DPI feature not present"))
+        devices: [device], selectedDeviceIndex: 1,
+        dpiError: "DPI feature not present",
+        profileResponse: try! EngineJSON.decode(fakeStructuredProfilesWithoutDPIOutput()).response))
 
     XCTAssertEqual(model.dpiDetails, "DPI feature not present")
   }
@@ -284,8 +306,9 @@ final class AppModelRefreshSnapshotTests: XCTestCase {
 
     model.applyRefreshSnapshot(
       makeSnapshot(
-        devices: [device], selectedDeviceIndex: 1, profileText: fakeProfilesOutput(),
-        accessWarning: true))
+        devices: [device], selectedDeviceIndex: 1,
+        accessWarning: true,
+        profileResponse: try! EngineJSON.decode(fakeStructuredProfilesOutput()).response))
 
     XCTAssertTrue(model.status.contains("Some Logitech interfaces were denied"))
   }

@@ -143,22 +143,20 @@ extension AppModel {
       ["--profile-state-change", "\($0.id):\($0.enabled ? "enable" : "disable")"]
     }
     do {
-      let output = try runEngine(arguments + ["--yes"])
+      let result = try runEngineJSON(arguments + ["--yes"], expectedKind: "write")
+      guard result.response.completed == true else {
+        throw EngineError.failed("The HID++ engine did not complete the save operation.")
+      }
+      let verified = result.response.verifiedSectors ?? 0
       recoveryBackups.removeAll()
       recoveryDeviceKey = nil
       reloadSelectedProfileContents()
       refreshBackups()
-      let verified = output.components(separatedBy: "\n")
-        .filter { $0.hasPrefix("Verified sector ") }
-        .count
-      let liveDPI = output.components(separatedBy: "\n")
-        .first { $0.hasPrefix("Live default DPI:") }
-      let liveSuffix = liveDPI.map { " \($0)" } ?? ""
       let rgbSuffix =
         rgbChanges.isEmpty && rgbModeChanges.isEmpty
         ? "" : " RGB colors were read back from the profile summary."
       status =
-        "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back.\(rgbSuffix)\(liveSuffix)"
+        "Save operation \(operationID) complete: wrote \(verified) sector(s); each was backed up before writing and verified by exact read-back.\(rgbSuffix)"
     } catch {
       let details = error.localizedDescription
       recoveryBackups = batchRecoveryBackups(from: details)
@@ -214,8 +212,13 @@ extension AppModel {
 
   private func batchRecoveryBackups(from message: String) -> [URL] {
     var result: [URL] = []
-    for line in message.components(separatedBy: "\n") where line.hasPrefix("Backup saved: ") {
-      let value = String(line.dropFirst("Backup saved: ".count))
+    for line in message.components(separatedBy: "\n") {
+      guard line.hasPrefix("  "),
+        line.trimmingCharacters(in: .whitespaces).hasSuffix(".logiob")
+      else {
+        continue
+      }
+      let value = line.trimmingCharacters(in: .whitespacesAndNewlines)
       // `?? ""` is unreachable: `String.components(separatedBy:)` always
       // returns at least one element (even for "", it returns [""]), so
       // `.first` is never nil here.
@@ -231,8 +234,8 @@ extension AppModel {
   private func batchFailureSummary(from message: String) -> String {
     let lines = message.components(separatedBy: "\n").filter { line in
       line.hasPrefix("Save operation") || line.hasPrefix("Preflight") || line.hasPrefix("Planned ")
-        || line.hasPrefix("Backup saved: ") || line.hasPrefix("Writing ")
-        || line.hasPrefix("Verified sector ") || line.contains("was not verified")
+        || line.hasPrefix("Writing ") || line.hasPrefix("Verified sector ")
+        || line.contains("was not verified")
         || line.contains("stopped before any sector write")
     }
     return lines.isEmpty ? message : lines.joined(separator: "\n")

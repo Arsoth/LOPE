@@ -84,7 +84,7 @@ final class AppModelLiveDPIPollingTests: XCTestCase {
     let tempDir = TestTempDirectory.make()
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
-    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", "Current sensor 1 DPI: 1600\n")
+    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", fakeStructuredCurrentDPIOutput(1600))
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
@@ -106,7 +106,7 @@ final class AppModelLiveDPIPollingTests: XCTestCase {
     let tempDir = TestTempDirectory.make()
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
-    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", "Current sensor 1 DPI: 1600\n")
+    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", fakeStructuredCurrentDPIOutput(1600))
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
@@ -119,7 +119,7 @@ final class AppModelLiveDPIPollingTests: XCTestCase {
     await waitUntil { model.dpiCapabilities.currentValue == 1600 }
 
     model.busy = true
-    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", "Current sensor 1 DPI: 1800\n")
+    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", fakeStructuredCurrentDPIOutput(1800))
     // One full poll interval (500ms) plus margin: the busy guard should
     // make every tick `continue` before the value is re-read.
     try? await Task.sleep(nanoseconds: 800_000_000)
@@ -135,7 +135,7 @@ final class AppModelLiveDPIPollingTests: XCTestCase {
     let tempDir = TestTempDirectory.make()
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
-    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", "Current sensor 1 DPI: 1600\n")
+    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", fakeStructuredCurrentDPIOutput(1600))
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
@@ -193,7 +193,7 @@ final class AppModelLiveDPIPollingTests: XCTestCase {
     let engine = FakeEngine.write(to: tempDir)
     let logURL = tempDir.appendingPathComponent("args.log")
     FakeEngineEnvironment.set("LOPE_TEST_ARGS_LOG", logURL.path)
-    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", "Current sensor 1 DPI: 800\n")
+    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", fakeStructuredCurrentDPIOutput(800))
     defer { FakeEngineEnvironment.clearAll() }
 
     let result = AppModel.readCurrentSensorDPI(
@@ -214,7 +214,7 @@ final class AppModelLiveDPIPollingTests: XCTestCase {
     let engine = FakeEngine.write(to: tempDir)
     let logURL = tempDir.appendingPathComponent("args.log")
     FakeEngineEnvironment.set("LOPE_TEST_ARGS_LOG", logURL.path)
-    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", "Current sensor 1 DPI: 800\n")
+    FakeEngineEnvironment.set("LOPE_TEST_CURRENT_DPI_OUTPUT", fakeStructuredCurrentDPIOutput(800))
     defer { FakeEngineEnvironment.clearAll() }
 
     let result = AppModel.readCurrentSensorDPI(

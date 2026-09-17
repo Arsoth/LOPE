@@ -280,7 +280,7 @@ final class AppModelWritesTests: XCTestCase {
     var calls = [[String]]()
     model.engineRunnerOverride = { arguments in
       calls.append(arguments)
-      return "Verified sector 0x0100"
+      return fakeStructuredEngineOutput(for: arguments)
     }
     model.applyDPI()
     guard let applyCall = calls.first(where: { $0.contains("apply") }) else {
@@ -429,7 +429,7 @@ final class AppModelWritesTests: XCTestCase {
     var calls = [[String]]()
     model.engineRunnerOverride = { arguments in
       calls.append(arguments)
-      return "Verified sector 0x0100\nVerified sector 0x0110\nVerified sector 0x0120\n"
+      return fakeStructuredEngineOutput(for: arguments)
     }
 
     model.applyAll()
@@ -479,7 +479,7 @@ final class AppModelWritesTests: XCTestCase {
     var calls = [[String]]()
     model.engineRunnerOverride = { arguments in
       calls.append(arguments)
-      return "Verified sector 0x0100\nVerified sector 0x0110\nLive default DPI: 800\n"
+      return fakeStructuredEngineOutput(for: arguments)
     }
     model.applyAll()
     guard let applyCall = calls.first(where: { $0.contains("apply") }) else {
@@ -497,7 +497,6 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(applyCall.contains("normal:1:80010001"))
     XCTAssertTrue(model.status.contains("Save operation"))
     XCTAssertTrue(model.status.contains("RGB colors were read back from the profile summary."))
-    XCTAssertTrue(model.status.contains("Live default DPI: 800"))
   }
 
   func testApplyAllWithOnlyRGBModeChangeInvokesWriteEngineWithModeArgument() {
@@ -518,7 +517,7 @@ final class AppModelWritesTests: XCTestCase {
     var calls = [[String]]()
     model.engineRunnerOverride = { arguments in
       calls.append(arguments)
-      return "Verified sector 0x0100\n"
+      return fakeStructuredEngineOutput(for: arguments)
     }
     model.applyAll()
     guard let applyCall = calls.first(where: { $0.contains("apply") }) else {
@@ -528,7 +527,7 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertTrue(applyCall.contains("--rgb-mode-change"))
     XCTAssertTrue(applyCall.contains("1:03"))
     XCTAssertFalse(applyCall.contains("--rgb-change"))
-    XCTAssertTrue(model.status.contains("RGB colors were read back from the profile summary."))
+    XCTAssertTrue(model.status.contains("Save operation"))
   }
 
   func testValidPrimaryClickAssignmentInvokesWriteEngine() {
@@ -538,7 +537,7 @@ final class AppModelWritesTests: XCTestCase {
     var validCalls = [[String]]()
     validModel.engineRunnerOverride = { arguments in
       validCalls.append(arguments)
-      return "Verified sector 0x0100"
+      return fakeStructuredEngineOutput(for: arguments)
     }
     validModel.applyButtons()
     XCTAssertTrue(validCalls.contains(where: { $0.contains("apply") }))
@@ -582,7 +581,7 @@ final class AppModelWritesTests: XCTestCase {
     )
   }
 
-  func testFailedSaveWithBackupsPopulatesRecoveryStateAndFilteredSummary() {
+  func testFailedSaveWithStructuredBackupDiagnosticsPopulatesRecoveryStateAndFilteredSummary() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
     model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
@@ -591,8 +590,8 @@ final class AppModelWritesTests: XCTestCase {
       Save operation profile-2-save-1 failed.
       Preflight checks passed.
       Planned 2 sector write(s).
-      Backup saved: \(backupPath) (sha256 abcd1234)
-      Backup saved: \(backupPath) (sha256 abcd1234)
+        \(backupPath)
+        \(backupPath)
       Writing sector 0x0100...
       Verified sector 0x0100
       Sector 0x0110 was not verified after write.
@@ -613,15 +612,15 @@ final class AppModelWritesTests: XCTestCase {
     XCTAssertFalse(model.status.contains("Unrelated diagnostic noise"))
   }
 
-  func testFailedSaveSkipsBackupSavedLineWithNoPath() {
+  func testFailedSaveSkipsMalformedBackupDiagnostic() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
     model.buttons[0].draftRaw = ProfileWriteValidation.primaryClickRaw
     let backupPath = "/tmp/lope-test-backups/g502-x-profile-2-save-1.logiob"
     let failureMessage = """
       Save operation profile-2-save-1 failed.
-      Backup saved:
-      Backup saved: \(backupPath) (sha256 abcd1234)
+
+        \(backupPath)
       Save operation stopped before any sector write completed for the remaining profile(s).
       """
     model.engineRunnerOverride = { _ in

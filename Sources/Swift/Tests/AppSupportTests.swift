@@ -130,7 +130,6 @@ final class AppSupportTests: XCTestCase {
     let refresh = RefreshSnapshot(
       devices: [device],
       selectedDeviceIndex: 0,
-      profileText: "text",
       profileError: nil,
       dpiText: nil,
       dpiError: "err",
@@ -140,7 +139,7 @@ final class AppSupportTests: XCTestCase {
     )
     XCTAssertEqual(refresh.devices, [device])
     XCTAssertEqual(refresh.selectedDeviceIndex, 0)
-    XCTAssertEqual(refresh.profileText, "text")
+    XCTAssertNil(refresh.profileResponse)
     XCTAssertNil(refresh.profileError)
     XCTAssertNil(refresh.dpiText)
     XCTAssertEqual(refresh.dpiError, "err")

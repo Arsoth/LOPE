@@ -40,6 +40,222 @@ final class AppModelParsingTests: XCTestCase {
     XCTAssertEqual(model.dpiDetails, "Sensor read timed out.")
   }
 
+  func testLoadDPIReportsMissingStructuredCapabilities() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.engineRunnerOverride = { _ in
+      #"{"contract_version":1,"ok":true,"kind":"dpi","dpi":null}"#
+    }
+
+    model.loadDPI()
+
+    XCTAssertEqual(
+      model.dpiDetails, "The HID++ engine returned no DPI capabilities.")
+    XCTAssertEqual(
+      model.dpiCapabilities.errorMessage,
+      "The HID++ engine returned no DPI capabilities.")
+  }
+
+  func testRunEngineJSONDecodesAnOverriddenStructuredResponse() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.engineRunnerOverride = { _ in fakeStructuredDPIOutput() }
+
+    let result = try model.runEngineJSON(["dpi"], expectedKind: "dpi")
+
+    XCTAssertEqual(result.response.kind, "dpi")
+    XCTAssertEqual(result.response.dpi?.currentSensorDPI, 800)
+  }
+
+  func testRunEngineJSONWithoutOverrideUsesDeviceKeySelector() throws {
+    let output = fakeStructuredDPIOutput()
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '%s\\n' '\(output)'
+        """
+    ) { model in
+      let result = try model.runEngineJSON(["dpi"], expectedKind: "dpi")
+
+      XCTAssertEqual(result.response.kind, "dpi")
+      XCTAssertEqual(result.response.dpi?.currentSensorDPI, 800)
+    }
+  }
+
+  func testRunEngineJSONWithoutDeviceKeyUsesNumericSelector() throws {
+    let output = fakeStructuredDPIOutput()
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '%s\\n' '\(output)'
+        """
+    ) { model in
+      model.devices = [
+        DeviceChoice(
+          id: 1, name: "G502 X", connection: "Wired", productID: "0x0000", deviceKey: "")
+      ]
+      let result = try model.runEngineJSON(["dpi"], expectedKind: "dpi")
+
+      XCTAssertEqual(result.response.kind, "dpi")
+    }
+  }
+
+  func testRunEngineJSONWithoutSelectedDeviceOmitsSelector() throws {
+    let output = fakeStructuredDPIOutput()
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '%s\\n' '\(output)'
+        """
+    ) { model in
+      model.selectedDeviceIndex = 999
+      let result = try model.runEngineJSON(["dpi"], expectedKind: "dpi")
+
+      XCTAssertEqual(result.response.kind, "dpi")
+    }
+  }
+
+  func testRunEngineJSONReportsStructuredProcessFailure() throws {
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '%s\\n' '{"contract_version":1,"ok":false,"kind":"dpi","error":{"code":"read","message":"sensor unavailable"}}'
+        exit 1
+        """
+    ) { model in
+      XCTAssertThrowsError(try model.runEngineJSON(["dpi"], expectedKind: "dpi")) { error in
+        XCTAssertTrue(error.localizedDescription.contains("sensor unavailable"))
+      }
+    }
+  }
+
+  func testRunEngineJSONReportsMalformedProcessFailureAndMalformedSuccess() throws {
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '%s\\n' 'malformed output'
+        exit 7
+        """
+    ) { model in
+      XCTAssertThrowsError(try model.runEngineJSON(["dpi"], expectedKind: "dpi")) { error in
+        XCTAssertTrue(error.localizedDescription.contains("malformed output"))
+      }
+    }
+
+    try withSandboxedEngine(
+      scriptBody: """
+        #!/bin/sh
+        printf '%s\\n' 'malformed output'
+        exit 0
+        """
+    ) { model in
+      XCTAssertThrowsError(try model.runEngineJSON(["dpi"], expectedKind: "dpi")) { error in
+        XCTAssertTrue(error.localizedDescription.contains("invalid structured output"))
+      }
+    }
+  }
+
+  func testStructuredProfileProjectionBuildsEditorRowsAndRGB() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    let response = try EngineJSON.decode(fakeStructuredProfilesOutput()).response
+
+    let parsed = model.parseProfiles(response)
+
+    XCTAssertEqual(parsed.choices.map(\.id), [1, 2])
+    XCTAssertEqual(parsed.choices[1].sector, "0x0200")
+    XCTAssertEqual(parsed.rowsByProfile[2]?.first?.currentRaw, "80010002")
+    XCTAssertEqual(parsed.gShiftRowsByProfile[2]?.first?.layer, .gShift)
+    XCTAssertEqual(parsed.rgbByProfile[2]?.first?.color, RGBColor(red: 255, green: 0, blue: 16))
+    XCTAssertEqual(parsed.profileFormatsByProfile[2], 1)
+  }
+
+  func testStructuredProfileProjectionAddsSelectedProfileWhenHeaderIsMissing() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    let output = fakeStructuredProfilesOutput().replacingOccurrences(
+      of:
+        #""headers":[{"number":1,"sector":256,"enabled":false},{"number":2,"sector":512,"enabled":true}]"#,
+      with: #""headers":[] "#.trimmingCharacters(in: .whitespaces)
+    )
+    let response = try EngineJSON.decode(output).response
+
+    let parsed = model.parseProfiles(response)
+
+    XCTAssertEqual(parsed.choices.map(\.id), [2])
+    XCTAssertEqual(parsed.choices.first?.crcValid, true)
+  }
+
+  func testStructuredProfileProjectionUsesScrollAndGenericButtonLabels() throws {
+    let model = AppModel(startInitialRefresh: false)
+    model.devices = [
+      DeviceChoice(
+        id: 1, name: "G604", connection: "Wireless", productID: "0x4085", deviceKey: "g604-test")
+    ]
+    model.selectedDeviceIndex = 1
+    model.currentDeviceName = "G604"
+    let output = fakeStructuredProfilesOutput().replacingOccurrences(
+      of:
+        #""buttons":[{"number":1,"layer":"normal","raw":[128,1,0,2],"description":"Left click"},{"number":1,"layer":"gShift","raw":[128,2,0,3],"description":"Right click"}],"dpi_stages""#,
+      with:
+        #""buttons":[{"number":20,"layer":"normal","raw":[144,16,0,0],"description":"Scroll down"},{"number":21,"layer":"normal","raw":[18,52,86,120],"description":"Mystery"}],"dpi_stages""#
+    )
+    let response = try EngineJSON.decode(output).response
+
+    let parsed = model.parseProfiles(response)
+
+    XCTAssertEqual(parsed.rowsByProfile[2]?.first(where: { $0.id == 20 })?.label, "Scroll down")
+    XCTAssertEqual(parsed.rowsByProfile[2]?.first(where: { $0.id == 21 })?.label, "Button 21")
+  }
+
+  func testApplyStructuredDPIProjectsStagesAndCapabilities() throws {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    let response = try EngineJSON.decode(fakeStructuredProfilesOutput()).response
+    let dpi = try XCTUnwrap(response.dpi)
+
+    model.applyStructuredDPI(dpi, profile: response.selectedProfile)
+
+    XCTAssertEqual(model.dpiStages, ["400", "800", "1600", "", ""])
+    XCTAssertEqual(model.defaultStage, 2)
+    XCTAssertEqual(model.shiftStage, 1)
+    XCTAssertEqual(model.dpiCapabilities.supportedValues, [400, 800, 1600])
+    XCTAssertTrue(model.dpiDetails.contains("DPI sensors: 1"))
+  }
+
+  func testApplyStructuredDPIPreservesCatalogRangeWhenResponseHasNoValues() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.dpiCapabilities = DPICapabilities(
+      supportedValues: [400, 800], minimum: 400, maximum: 800)
+    let dpi = EngineJSONDPI(
+      requested: true,
+      available: false,
+      sensorCount: 0,
+      supportedValues: [],
+      currentSensorDPI: 0,
+      error: "DPI unavailable"
+    )
+
+    model.applyStructuredDPI(dpi)
+
+    XCTAssertEqual(model.dpiCapabilities.supportedValues, [400, 800])
+    XCTAssertNil(model.dpiCapabilities.currentValue)
+    XCTAssertEqual(model.dpiCapabilities.errorMessage, "DPI unavailable")
+    XCTAssertTrue(model.dpiDetails.contains("DPI unavailable"))
+  }
+
+  func testParsePollingRateUpdatesDraftAndBaseline() {
+    let model = AppModel(startInitialRefresh: false)
+
+    model.parsePollingRate(
+      "Supported polling rates: 125, 500, 1000 Hz\nCurrent polling rate: 500 Hz")
+
+    XCTAssertEqual(model.pollingRateCapabilities.supportedRates, [125, 500, 1000])
+    XCTAssertEqual(model.pollingRateDraft, 500)
+    XCTAssertEqual(model.baselinePollingRate, 500)
+  }
+
   func testRunEngineWithoutOverrideAndNoBundledEngineThrowsUnavailable() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
@@ -264,14 +480,13 @@ final class AppModelParsingTests: XCTestCase {
     XCTAssertEqual(model.shiftStage, 1)
   }
 
-  func testLoadDPIWithoutProfileTextFallsBackToEmptyString() {
-    // Covers loadDPI's default `profileText: String? = nil` -- the
-    // `profileText ?? ""` fallback only fires when a caller omits it.
+  func testLoadDPIDecodesTheStructuredResponse() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
-    model.engineRunnerOverride = { _ in "DPI stages: 400, 800 (default 1, shift 2)" }
+    model.engineRunnerOverride = { _ in fakeStructuredDPIOutput() }
     model.loadDPI()
-    XCTAssertEqual(model.dpiCount, 2)
+    XCTAssertEqual(model.dpiCapabilities.currentValue, 800)
+    XCTAssertEqual(model.dpiCapabilities.supportedValues, [400, 800, 1600])
   }
 
   func testRunEngineWithoutOverrideFallsBackToEmptyStringWhenOutputIsNotValidUTF8() throws {

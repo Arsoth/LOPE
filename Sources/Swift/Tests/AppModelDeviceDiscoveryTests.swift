@@ -47,7 +47,9 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
   private func deviceListLine(
     id: Int, connection: String = "Wireless", name: String, productID: String, key: String
   ) -> String {
-    "[\(id)] \(connection)  \(name) (HID++ 4.5, product \(productID), key \(key))"
+    let numericProductID = UInt32(productID.dropFirst(2), radix: 16) ?? 0
+    return
+      "{\"contract_version\":1,\"ok\":true,\"kind\":\"device_list\",\"vendor_interface_count\":1,\"devices\":[{\"index\":\(id),\"vendor_id\":1133,\"product_id\":\(numericProductID),\"device_number\":1,\"request_device_number\":1,\"protocol\":4.5,\"name\":\"\(name)\",\"connection\":\"\(connection)\",\"device_key\":\"\(key)\"}],\"device_count\":1}"
   }
 
   // MARK: - runDeviceListWithRetry
@@ -69,17 +71,35 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     XCTAssertEqual(attempts.count, 1, "expected a single attempt when the first list succeeds")
   }
 
+  func testStructuredDeviceListIsDecodedForEnumeration() {
+    let output = fakeStructuredDeviceListOutput()
+    let engine = makeFakeEngine("echo '\(output)'; exit 0")
+    let snapshot = AppModel.makeDeviceEnumerationSnapshot(
+      executable: engine,
+      currentDirectory: makeTemporaryDirectory(),
+      preferredDeviceIndex: -1,
+      preferredDeviceKey: "abc123ef"
+    )
+
+    XCTAssertEqual(snapshot.devices.count, 1)
+    XCTAssertEqual(snapshot.devices.first?.name, "G502 X")
+    XCTAssertEqual(snapshot.selectedDeviceIndex, 1)
+    XCTAssertFalse(snapshot.accessWarning)
+    XCTAssertNil(snapshot.errorMessage)
+  }
+
   func testRunDeviceListWithRetryReturnsLastAttemptEvenWhenListStaysEmpty() throws {
     let counterFile = makeTemporaryDirectory().appendingPathComponent("count")
     let engine = makeFakeEngine(
       """
       printf '.' >> "\(counterFile.path)"
+      echo '{"contract_version":1,"ok":true,"kind":"device_list","vendor_interface_count":0,"devices":[],"device_count":0}'
       exit 0
       """)
 
     let output = try AppModel.runDeviceListWithRetry(
       executable: engine, currentDirectory: makeTemporaryDirectory())
-    XCTAssertEqual(output, "")
+    XCTAssertEqual(try EngineJSON.decode(output).response.deviceCount, 0)
     let attempts = (try? String(contentsOf: counterFile)) ?? ""
     XCTAssertEqual(
       attempts.count, AppModelRefreshConfiguration.deviceReadAttempts,
@@ -131,9 +151,9 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
   // MARK: - makeDeviceEnumerationSnapshot
 
   func testMakeDeviceEnumerationSnapshotRequiresAnExplicitSelection() {
-    let lineA = deviceListLine(id: 1, name: "Mouse A", productID: "0xAAAA", key: "aaaa-a1")
-    let lineB = deviceListLine(id: 2, name: "Mouse B", productID: "0xBBBB", key: "bbbb-b2")
-    let engine = makeFakeEngine("echo '\(lineA)'; echo '\(lineB)'; exit 0")
+    let list =
+      "{\"contract_version\":1,\"ok\":true,\"kind\":\"device_list\",\"vendor_interface_count\":2,\"devices\":[{\"index\":1,\"vendor_id\":1133,\"product_id\":43690,\"device_number\":1,\"request_device_number\":1,\"protocol\":4.5,\"name\":\"Mouse A\",\"connection\":\"Wireless\",\"device_key\":\"aaaa-a1\"},{\"index\":2,\"vendor_id\":1133,\"product_id\":48059,\"device_number\":1,\"request_device_number\":1,\"protocol\":4.5,\"name\":\"Mouse B\",\"connection\":\"Wireless\",\"device_key\":\"bbbb-b2\"}],\"device_count\":2}"
+    let engine = makeFakeEngine("echo '\(list)'; exit 0")
     let directory = makeTemporaryDirectory()
 
     let byKey = AppModel.makeDeviceEnumerationSnapshot(
@@ -225,12 +245,9 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     let cachedDevice = DeviceChoice(
       id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-0001")
-    let line = deviceListLine(
-      id: 1, name: cachedDevice.name, productID: cachedDevice.productID,
-      key: cachedDevice.deviceKey)
-    let otherLine = deviceListLine(
-      id: 2, name: "Other Mouse", productID: "0xBBBB", key: "bbbb-0002")
-    let engine = makeFakeEngine("echo '\(line)'; echo '\(otherLine)'; exit 0")
+    let list =
+      "{\"contract_version\":1,\"ok\":true,\"kind\":\"device_list\",\"vendor_interface_count\":2,\"devices\":[{\"index\":1,\"vendor_id\":1133,\"product_id\":43690,\"device_number\":1,\"request_device_number\":1,\"protocol\":4.5,\"name\":\"Recon Mouse\",\"connection\":\"Wireless\",\"device_key\":\"aaaa-0001\"},{\"index\":2,\"vendor_id\":1133,\"product_id\":48059,\"device_number\":1,\"request_device_number\":1,\"protocol\":4.5,\"name\":\"Other Mouse\",\"connection\":\"Wireless\",\"device_key\":\"bbbb-0002\"}],\"device_count\":2}"
+    let engine = makeFakeEngine("echo '\(list)'; exit 0")
 
     let model = AppModel(startInitialRefresh: false)
     model.devices = [cachedDevice.replacingName("Previously remembered name")]
@@ -315,7 +332,9 @@ final class AppModelDeviceDiscoveryTests: XCTestCase {
     let cachedDevice = DeviceChoice(
       id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-9999")
-    let engine = makeFakeEngine("exit 0")
+    let engine = makeFakeEngine(
+      "echo '{\"contract_version\":1,\"ok\":true,\"kind\":\"device_list\",\"vendor_interface_count\":0,\"devices\":[],\"device_count\":0}'; exit 0"
+    )
 
     let model = AppModel(startInitialRefresh: false)
     model.startBackgroundDeviceEnumeration(

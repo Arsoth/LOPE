@@ -74,12 +74,18 @@ extension AppModel {
       ? ["--device", String(deviceIndex)]
       : ["--device-key", deviceKey]
     guard
-      let output = try? EngineRunner.run(
+      let result = try? EngineRunner.runStructured(
         executable: executable,
-        arguments: selector + ["current-dpi"],
+        arguments: selector + ["current-dpi", "--format", "json"],
         currentDirectory: currentDirectory
       )
     else { return nil }
-    return DPIOutputParser.parse(output).currentValue
+    guard result.terminationStatus == 0,
+      let structured = try? EngineJSON.validate(
+        EngineJSON.decode(result.output), expectedKind: "current_dpi"),
+      let dpi = structured.response.dpi,
+      dpi.currentSensorDPI > 0
+    else { return nil }
+    return dpi.currentSensorDPI
   }
 }

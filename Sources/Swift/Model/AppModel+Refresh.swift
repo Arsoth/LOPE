@@ -139,24 +139,37 @@ extension AppModel {
 
   func reloadSelectedProfileContents() {
     do {
-      let profileText = try runEngine([
-        "--summary-only",
-        "--with-report-rate",
-        "--profile", String(profileNumber),
-        "profiles",
-      ])
-      let parsed = parseProfiles(profileText)
+      let result = try runEngineJSON(
+        [
+          "--summary-only",
+          "--with-dpi",
+          "--with-report-rate",
+          "--profile", String(profileNumber),
+          "profiles",
+        ], expectedKind: "profiles")
+      let parsed = parseProfiles(result.response)
+      guard let normalRows = parsed.rowsByProfile[profileNumber],
+        let gShiftRows = parsed.gShiftRowsByProfile[profileNumber],
+        let rgbZones = parsed.rgbByProfile[profileNumber]
+      else {
+        throw EngineJSONError(message: "The selected onboard profile was not returned.")
+      }
       setButtonRows(
-        normal: parsed.rowsByProfile[profileNumber] ?? parsed.rowsByProfile.values.first ?? [],
-        gShift: parsed.gShiftRowsByProfile[profileNumber] ?? parsed.gShiftRowsByProfile.values.first
-          ?? []
+        normal: normalRows,
+        gShift: gShiftRows
       )
       applyRGBZones(
-        parsed.rgbByProfile[profileNumber] ?? [],
+        rgbZones,
         profileFormat: parsed.profileFormatsByProfile[profileNumber]
       )
-      loadDPI(profileText: profileText)
-      parsePollingRate(profileText)
+      if let dpi = result.response.dpi {
+        applyStructuredDPI(dpi, profile: result.response.selectedProfile)
+      }
+      if let reportRate = result.response.reportRate {
+        pollingRateCapabilities = reportRate.capabilities
+        pollingRateDraft = reportRate.capabilities.currentRate
+        baselinePollingRate = reportRate.capabilities.currentRate
+      }
       status = "Reloaded profile \(profileNumber)."
     } catch {
       status = error.localizedDescription

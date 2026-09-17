@@ -220,7 +220,7 @@ extension AppModel {
         self.knownDisconnectedDevice == device
       else { return }
 
-      guard snapshot.profileText != nil else {
+      guard snapshot.profileResponse != nil else {
         self.finishKnownDeviceProbe(generation: generation)
         return
       }

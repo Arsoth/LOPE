@@ -101,8 +101,11 @@ extension AppModel {
         executable: executable,
         currentDirectory: currentDirectory
       )
-      let discovered = parseDeviceChoices(list)
-      let accessWarning = list.localizedCaseInsensitiveContains("macOS denied HID access")
+      let structured = try EngineJSON.validate(
+        EngineJSON.decode(list), expectedKind: "device_list")
+      let discovered = EngineJSON.deviceChoices(from: structured.response)
+      let accessWarning = structured.diagnostics.localizedCaseInsensitiveContains(
+        "macOS denied HID access")
       let selectedIndex: Int?
       if let preferredDeviceKey,
         let keyMatch = discovered.first(where: { $0.deviceKey == preferredDeviceKey })
@@ -145,15 +148,24 @@ extension AppModel {
 
     for attempt in 0..<AppModelRefreshConfiguration.deviceReadAttempts {
       do {
-        let output = try EngineRunner.run(
+        let result = try EngineRunner.runStructured(
           executable: executable,
-          arguments: ["list"],
+          arguments: ["list", "--format", "json"],
           currentDirectory: currentDirectory
         )
-        if !parseDeviceChoices(output).isEmpty
+        if result.terminationStatus != 0 {
+          if let structured = try? EngineJSON.decode(result.output) {
+            _ = try EngineJSON.validate(structured, expectedKind: "device_list")
+          }
+          throw EngineError.failed(
+            result.output.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        let structured = try EngineJSON.validate(
+          EngineJSON.decode(result.output), expectedKind: "device_list")
+        if !(structured.response.devices ?? []).isEmpty
           || attempt == AppModelRefreshConfiguration.deviceReadAttempts - 1
         {
-          return output
+          return result.output
         }
         lastError = EngineError.failed("The Logitech device list was empty.")
       } catch {

@@ -61,6 +61,41 @@ enum EngineRunner {
     invocationLock.unlock()
   }
 
+  struct ProcessResult: Sendable {
+    let output: String
+    let terminationStatus: Int32
+  }
+
+  /// Runs a GUI-facing engine command without interpreting its output. The
+  /// caller owns contract validation so structured error envelopes can be
+  /// surfaced alongside any stderr diagnostics emitted by the helper.
+  static func runStructured(
+    executable: URL,
+    arguments: [String],
+    currentDirectory: URL
+  ) throws -> ProcessResult {
+    invocationLock.lock()
+    defer { invocationLock.unlock() }
+
+    let process = Process()
+    let pipe = Pipe()
+    process.executableURL = executable
+    process.arguments = arguments
+    process.currentDirectoryURL = currentDirectory
+    var environment = ProcessInfo.processInfo.environment
+    environment["LOGITECH_ONBOARD_DEBUG"] = "0"
+    process.environment = environment
+    process.standardOutput = pipe
+    process.standardError = pipe
+    try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    return ProcessResult(
+      output: String(data: data, encoding: .utf8) ?? "",
+      terminationStatus: process.terminationStatus
+    )
+  }
+
   static func run(executable: URL, arguments: [String], currentDirectory: URL) throws -> String {
     invocationLock.lock()
     defer { invocationLock.unlock() }
@@ -88,12 +123,12 @@ enum EngineRunner {
     return output
   }
 
-  static func runWithLineProgress(
+  static func runStructuredWithLineProgress(
     executable: URL,
     arguments: [String],
     currentDirectory: URL,
     onLine: @escaping @Sendable (String) -> Void
-  ) throws -> String {
+  ) throws -> ProcessResult {
     invocationLock.lock()
     defer { invocationLock.unlock() }
 
@@ -132,24 +167,63 @@ enum EngineRunner {
     }
 
     process.waitUntilExit()
-    let output = String(data: outputData, encoding: .utf8) ?? ""
-    guard process.terminationStatus == 0 else {
-      throw EngineError.failed(output.trimmingCharacters(in: .whitespacesAndNewlines))
+    return ProcessResult(
+      output: String(data: outputData, encoding: .utf8) ?? "",
+      terminationStatus: process.terminationStatus
+    )
+  }
+
+  static func runWithLineProgress(
+    executable: URL,
+    arguments: [String],
+    currentDirectory: URL,
+    onLine: @escaping @Sendable (String) -> Void
+  ) throws -> String {
+    let result = try runStructuredWithLineProgress(
+      executable: executable,
+      arguments: arguments,
+      currentDirectory: currentDirectory,
+      onLine: onLine
+    )
+    guard result.terminationStatus == 0 else {
+      throw EngineError.failed(result.output.trimmingCharacters(in: .whitespacesAndNewlines))
     }
-    return output
+    return result.output
   }
 }
 
 struct RefreshSnapshot: Sendable {
   let devices: [DeviceChoice]
   let selectedDeviceIndex: Int?
-  let profileText: String?
+  let profileResponse: EngineJSONResponse?
   let profileError: String?
   let dpiText: String?
   let dpiError: String?
   let selectedProfileNumber: Int?
   let errorMessage: String?
   let accessWarning: Bool
+
+  init(
+    devices: [DeviceChoice],
+    selectedDeviceIndex: Int?,
+    profileError: String?,
+    dpiText: String?,
+    dpiError: String?,
+    selectedProfileNumber: Int?,
+    errorMessage: String?,
+    accessWarning: Bool,
+    profileResponse: EngineJSONResponse? = nil
+  ) {
+    self.devices = devices
+    self.selectedDeviceIndex = selectedDeviceIndex
+    self.profileResponse = profileResponse
+    self.profileError = profileError
+    self.dpiText = dpiText
+    self.dpiError = dpiError
+    self.selectedProfileNumber = selectedProfileNumber
+    self.errorMessage = errorMessage
+    self.accessWarning = accessWarning
+  }
 }
 
 struct DeviceEnumerationSnapshot: Sendable {

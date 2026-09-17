@@ -10,11 +10,14 @@ extension AppModel {
       ?? L10n.text("Custom raw output")
   }
 
-  func loadDPI(profileText: String? = nil) {
+  func loadDPI() {
     dpiDetails = ""
     do {
-      let dpiText = try runEngine(["--sensor-only", "dpi"])
-      parseDPI([profileText ?? "", dpiText].joined(separator: "\n"))
+      let result = try runEngineJSON(["--sensor-only", "dpi"], expectedKind: "dpi")
+      guard let dpi = result.response.dpi else {
+        throw EngineJSONError(message: "The HID++ engine returned no DPI capabilities.")
+      }
+      applyStructuredDPI(dpi, profile: result.response.onboardProfile)
     } catch {
       dpiCapabilities = DPICapabilities(errorMessage: error.localizedDescription)
       dpiDetails = error.localizedDescription
@@ -26,6 +29,51 @@ extension AppModel {
       return try engineRunnerOverride(arguments)
     }
     return try runEngineSelectingDevice(arguments)
+  }
+
+  func runEngineJSON(
+    _ arguments: [String], expectedKind: String
+  ) throws -> EngineJSONCommandResult {
+    if let engineRunnerOverride {
+      let output = try engineRunnerOverride(arguments)
+      return try EngineJSON.validate(
+        EngineJSON.decode(output), expectedKind: expectedKind)
+    }
+    guard let engine else { throw EngineError.unavailable }
+    let selector: [String]
+    if let selected = devices.first(where: { $0.id == selectedDeviceIndex }) {
+      selector =
+        selected.deviceKey.isEmpty
+        ? ["--device", String(selectedDeviceIndex)]
+        : ["--device-key", selected.deviceKey]
+    } else {
+      selector = []
+    }
+    let processResult = try EngineRunner.runStructured(
+      executable: engine,
+      arguments: selector + arguments + ["--format", "json"],
+      currentDirectory: backupDirectory
+    )
+    let decoded: EngineJSONCommandResult
+    do {
+      decoded = try EngineJSON.decode(processResult.output)
+    } catch {
+      guard processResult.terminationStatus == 0 else {
+        throw EngineError.failed(
+          processResult.output.trimmingCharacters(in: .whitespacesAndNewlines))
+      }
+      throw error
+    }
+    guard processResult.terminationStatus == 0 else {
+      // Validation turns the versioned error envelope into the same
+      // user-facing EngineError used by the structured process path. A
+      // malformed helper that nevertheless returned an `ok` envelope is
+      // still treated as a failed process below.
+      _ = try EngineJSON.validate(decoded, expectedKind: expectedKind)
+      throw EngineError.failed(
+        "The HID++ engine exited with status \(processResult.terminationStatus).")
+    }
+    return try EngineJSON.validate(decoded, expectedKind: expectedKind)
   }
 
   private func runEngineSelectingDevice(_ arguments: [String]) throws -> String {
@@ -87,7 +135,12 @@ extension AppModel {
       // remainder is whitespace-only, and a single space is a non-empty
       // `pieces` element, so `pieces` can never actually be empty here
       // (verified empirically against the compiled NSRegularExpression).
-      let connection = pieces.first ?? "Logitech HID++"
+      let connection: String
+      if let firstPiece = pieces.first {
+        connection = firstPiece
+      } else {
+        connection = "Logitech HID++"
+      }
       let name = DeviceChoice.normalizedReportedName(
         pieces.dropFirst().joined(separator: " ").isEmpty
           ? descriptor
@@ -218,12 +271,7 @@ extension AppModel {
       if let profile = currentProfile,
         let parsedRGB = ProfileOutputParser.rgbZone(from: line)
       {
-        // `default: []` is unreachable: `currentProfile` is only ever set
-        // together with `rgb[id] = []` (and the rows/gShiftRows
-        // equivalents below) at the "Profile N (...)" header match, so
-        // `rgb[profile]` is always already present by the time this line
-        // runs.
-        rgb[profile, default: []].append(parsedRGB)
+        rgb[profile]!.append(parsedRGB)
         continue
       }
       guard let profile = currentProfile,
@@ -249,14 +297,83 @@ extension AppModel {
         draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke",
         layer: layer
       )
-      // Both `default: []` fallbacks below are unreachable for the same
-      // reason as the `rgb` one above: `currentProfile` is only ever set
-      // together with pre-seeding `rows[id]`/`gShiftRows[id]` to `[]`.
       if layer == .normal {
-        rows[profile, default: []].append(row)
+        rows[profile]!.append(row)
       } else {
-        gShiftRows[profile, default: []].append(row)
+        gShiftRows[profile]!.append(row)
       }
+    }
+    return (choices, rows, gShiftRows, rgb, profileFormats)
+  }
+
+  func parseProfiles(_ response: EngineJSONResponse) -> (
+    choices: [ProfileChoice],
+    rowsByProfile: [Int: [ButtonRow]],
+    gShiftRowsByProfile: [Int: [ButtonRow]],
+    rgbByProfile: [Int: [ParsedRGBZone]],
+    profileFormatsByProfile: [Int: Int]
+  ) {
+    var choices = EngineJSON.profileChoices(from: response)
+    if let selected = response.selectedProfile,
+      !choices.contains(where: { $0.id == selected.number })
+    {
+      choices.append(
+        ProfileChoice(
+          id: selected.number,
+          sector: String(format: "0x%04X", selected.sector),
+          enabled: selected.enabled,
+          crcValid: selected.crcChecked ? selected.crcValid : nil
+        ))
+      choices.sort { $0.id < $1.id }
+    }
+
+    var rows = Dictionary(uniqueKeysWithValues: choices.map { ($0.id, [ButtonRow]()) })
+    var gShiftRows = Dictionary(uniqueKeysWithValues: choices.map { ($0.id, [ButtonRow]()) })
+    var rgb = Dictionary(uniqueKeysWithValues: choices.map { ($0.id, [ParsedRGBZone]()) })
+    var profileFormats = [Int: Int]()
+
+    guard let profile = response.selectedProfile else {
+      return (choices, rows, gShiftRows, rgb, profileFormats)
+    }
+    profileFormats[profile.number] = profile.format
+    for button in profile.buttons {
+      guard let layer = ButtonLayer(rawValue: button.layer == "gShift" ? "gShift" : "normal"),
+        button.number > 0,
+        button.raw.count == 4,
+        currentMouseProfile.hiddenProfileButtonNumbers?.contains(button.number) != true
+      else { continue }
+      let raw = button.raw.map { String(format: "%02X", max(0, min(255, $0))) }.joined()
+      let label =
+        currentMouseProfile.button(for: button.number)?.label
+        ?? currentMouseProfile.scrollWheelButtonLabel(for: button.number)
+        ?? ProfileOutputParser.scrollWheelOutputLabel(raw)
+        ?? L10n.text("Button {number}", replacements: ["number": String(button.number)])
+      let row = ButtonRow(
+        id: button.number,
+        label: label,
+        currentRaw: raw,
+        draftRaw: raw,
+        draftChoice: presets.contains(where: { normalize($0.raw) == raw }) ? raw : "keystroke",
+        layer: layer
+      )
+      if layer == .normal {
+        rows[profile.number]!.append(row)
+      } else {
+        gShiftRows[profile.number]!.append(row)
+      }
+    }
+    for zone in profile.rgbZones where zone.present && zone.number > 0 && zone.color.count == 3 {
+      let color = RGBColor(
+        red: UInt8(max(0, min(255, zone.color[0]))),
+        green: UInt8(max(0, min(255, zone.color[1]))),
+        blue: UInt8(max(0, min(255, zone.color[2])))
+      )
+      rgb[profile.number]!.append(
+        ParsedRGBZone(
+          index: zone.number - 1,
+          color: color,
+          mode: RGBEffectMode.from(byte: UInt8(max(0, min(255, zone.mode))))
+        ))
     }
     return (choices, rows, gShiftRows, rgb, profileFormats)
   }
@@ -305,6 +422,37 @@ extension AppModel {
         }
       }
     }
+  }
+
+  func applyStructuredDPI(_ dpi: EngineJSONDPI, profile: EngineJSONProfile? = nil) {
+    let capabilities = dpi.capabilities
+    let loadingCapabilities = dpiCapabilities
+    if capabilities.hasKnownValues || !loadingCapabilities.hasKnownValues {
+      dpiCapabilities = capabilities
+    } else {
+      dpiCapabilities = DPICapabilities(
+        supportedValues: loadingCapabilities.supportedValues,
+        minimum: loadingCapabilities.minimum,
+        maximum: loadingCapabilities.maximum,
+        step: loadingCapabilities.step,
+        sensorCount: capabilities.sensorCount,
+        currentValue: capabilities.currentValue,
+        errorMessage: capabilities.errorMessage
+      )
+    }
+    dpiDetails = dpiCapabilities.displayText
+
+    guard let profile, (1...5).contains(profile.dpiStages.count) else { return }
+    dpiCount = profile.dpiStages.count
+    dpiStages =
+      profile.dpiStages.map(String.init)
+      + Array(repeating: "", count: 5 - profile.dpiStages.count)
+    defaultStage = profile.dpiDefaultStage
+    shiftStage = profile.dpiShiftStage
+    baselineDPICount = dpiCount
+    baselineDPIStages = dpiStages
+    baselineDefaultStage = defaultStage
+    baselineShiftStage = shiftStage
   }
 
   func parsePollingRate(_ text: String) {

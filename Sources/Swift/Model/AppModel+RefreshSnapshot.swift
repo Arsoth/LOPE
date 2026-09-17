@@ -57,7 +57,7 @@ extension AppModel {
     rememberSelectedDevice(selected)
     refreshBackups()
 
-    guard let profileText = snapshot.profileText else {
+    guard let profileResponse = snapshot.profileResponse else {
       if selected.isNonWiredDevice && snapshot.profileError != nil {
         beginKnownDeviceRefresh(selected)
         return
@@ -81,12 +81,12 @@ extension AppModel {
       return
     }
 
-    let parsed = parseProfiles(profileText)
+    let parsed = parseProfiles(profileResponse)
+    let reportedCapacity = profileResponse.profileCapacity
     profiles = parsed.choices
     rgbZones.removeAll()
     baselineRGBColors.removeAll()
     rgbEditingAllZones = false
-    let reportedCapacity = Self.onboardProfileCapacity(in: profileText)
     onboardProfileCapacity = reportedCapacity ?? parsed.choices.count
     onboardProfileCapacityWasReported = reportedCapacity != nil
     baselineProfileEnabled = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0.enabled) })
@@ -126,8 +126,12 @@ extension AppModel {
       profileFormat: parsed.profileFormatsByProfile[profileNumber]
     )
     dpiDetails = ""
-    parseDPI(profileText)
-    parsePollingRate(profileText)
+    if let dpi = profileResponse.dpi {
+      applyStructuredDPI(dpi, profile: profileResponse.selectedProfile)
+    }
+    pollingRateCapabilities = profileResponse.reportRate?.capabilities ?? PollingRateCapabilities()
+    pollingRateDraft = pollingRateCapabilities.currentRate
+    baselinePollingRate = pollingRateCapabilities.currentRate
     if dpiDetails.isEmpty {
       dpiDetails = snapshot.dpiError ?? L10n.text("DPI capabilities could not be read.")
     }

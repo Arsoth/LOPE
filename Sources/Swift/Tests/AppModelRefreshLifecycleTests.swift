@@ -50,7 +50,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     let tempDir = TestTempDirectory.make()
     defer { try? FileManager.default.removeItem(at: tempDir) }
     let engine = FakeEngine.write(to: tempDir)
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     defer { FakeEngineEnvironment.clearAll() }
 
     let snapshot = AppModel.makeProfileSnapshot(
@@ -62,10 +62,32 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
       preferredProfileNumber: 2
     )
 
-    XCTAssertNotNil(snapshot.profileText)
+    XCTAssertNotNil(snapshot.profileResponse)
     XCTAssertEqual(snapshot.selectedProfileNumber, 2)
     XCTAssertNil(snapshot.profileError)
     XCTAssertNil(snapshot.errorMessage)
+  }
+
+  func testMakeProfileSnapshotDecodesStructuredResponse() {
+    let tempDir = TestTempDirectory.make()
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+    let engine = FakeEngine.write(to: tempDir)
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
+    defer { FakeEngineEnvironment.clearAll() }
+
+    let snapshot = AppModel.makeProfileSnapshot(
+      executable: engine,
+      currentDirectory: tempDir,
+      devices: [fixtureDevice()],
+      selectedDeviceKey: "abc123ef",
+      selectedDeviceIndex: 1,
+      preferredProfileNumber: 2
+    )
+
+    XCTAssertNotNil(snapshot.profileResponse)
+    XCTAssertEqual(snapshot.selectedProfileNumber, 2)
+    XCTAssertEqual(snapshot.profileResponse?.profileCapacity, 3)
+    XCTAssertEqual(snapshot.devices.first?.name, "G502 X")
   }
 
   func testMakeProfileSnapshotRetriesUntilSelectedProfileMarkerAppears() {
@@ -78,9 +100,10 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     // profile:" marker), matching a transient HID++ timeout; the retry loop
     // must keep trying rather than treating that as success.
     FakeEngineEnvironment.set("LOPE_TEST_PROFILES_FAIL_UNTIL", "2")
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_FAIL_OUTPUT", "Profile capacity: 3\n")
+    FakeEngineEnvironment.set(
+      "LOPE_TEST_PROFILES_FAIL_OUTPUT", fakeStructuredProfilesWithoutSelectionOutput())
     FakeEngineEnvironment.set("LOPE_TEST_PROFILES_FAIL_EXIT", "0")
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     defer { FakeEngineEnvironment.clearAll() }
 
     let snapshot = AppModel.makeProfileSnapshot(
@@ -92,7 +115,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
       preferredProfileNumber: 2
     )
 
-    XCTAssertNotNil(snapshot.profileText)
+    XCTAssertNotNil(snapshot.profileResponse)
     XCTAssertEqual(snapshot.selectedProfileNumber, 2)
     XCTAssertEqual((try? String(contentsOf: counterURL, encoding: .utf8)), "3")
   }
@@ -114,7 +137,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
       preferredProfileNumber: 2
     )
 
-    XCTAssertNil(snapshot.profileText)
+    XCTAssertNil(snapshot.profileResponse)
     XCTAssertEqual(snapshot.profileError, "engine offline")
   }
 
@@ -124,7 +147,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     let engine = FakeEngine.write(to: tempDir)
     let logURL = tempDir.appendingPathComponent("args.log")
     FakeEngineEnvironment.set("LOPE_TEST_ARGS_LOG", logURL.path)
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     defer { FakeEngineEnvironment.clearAll() }
 
     _ = AppModel.makeProfileSnapshot(
@@ -146,8 +169,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     let engine = FakeEngine.write(to: tempDir)
     FakeEngineEnvironment.set(
       "LOPE_TEST_PROFILES_OUTPUT",
-      "Onboard profiles for Paired Logitech Mouse - Lightspeed:\nDevice: G604\n"
-        + fakeProfilesOutput())
+      fakeStructuredProfilesOutput().replacingOccurrences(of: "G502 X", with: "G604"))
     defer { FakeEngineEnvironment.clearAll() }
 
     let generic = DeviceChoice(
@@ -184,7 +206,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     let tempDir = TestTempDirectory.make()
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     FakeEngineEnvironment.set("LOPE_TEST_LIST_OUTPUT", fakeDeviceListLine() + "\n")
     defer { FakeEngineEnvironment.clearAll() }
 
@@ -218,7 +240,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     FakeEngineEnvironment.set("LOPE_TEST_PROFILES_FAIL_UNTIL", "5")
     FakeEngineEnvironment.set("LOPE_TEST_PROFILES_FAIL_EXIT", "1")
     FakeEngineEnvironment.set("LOPE_TEST_PROFILES_FAIL_OUTPUT", "not yet awake")
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     FakeEngineEnvironment.set("LOPE_TEST_LIST_OUTPUT", fakeDeviceListLine() + "\n")
     defer { FakeEngineEnvironment.clearAll() }
 
@@ -311,7 +333,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
     FakeEngineEnvironment.set("LOPE_TEST_LIST_OUTPUT", fakeDeviceListLine() + "\n")
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
@@ -336,7 +358,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
     FakeEngineEnvironment.set("LOPE_TEST_LIST_OUTPUT", fakeDeviceListLine() + "\n")
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
@@ -441,7 +463,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: tempDir) }
     FakeEngine.write(to: tempDir)
     FakeEngineEnvironment.set("LOPE_TEST_LIST_OUTPUT", fakeDeviceListLine() + "\n")
-    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeProfilesOutput())
+    FakeEngineEnvironment.set("LOPE_TEST_PROFILES_OUTPUT", fakeStructuredProfilesOutput())
     defer { FakeEngineEnvironment.clearAll() }
 
     let model = AppModel(startInitialRefresh: false)
@@ -468,7 +490,9 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     let generation = model.refreshGeneration
     let handler = model.profileReadProgressHandler(generation: generation)
 
-    handler("Profile capacity: 4")
+    handler(
+      fakeStructuredProfilesWithoutSelectionOutput().replacingOccurrences(
+        of: "\"profile_capacity\":3", with: "\"profile_capacity\":4"))
 
     await waitUntil { model.onboardProfileCapacity == 4 }
     XCTAssertTrue(model.onboardProfileCapacityWasReported)
@@ -479,7 +503,7 @@ final class AppModelRefreshLifecycleTests: XCTestCase {
     model.loadingProfile = true
     let handler = model.profileReadProgressHandler(generation: model.refreshGeneration)
 
-    handler("Selected profile: 1")
+    handler(fakeStructuredDeviceListOutput())
     try? await Task.sleep(nanoseconds: 50_000_000)
 
     XCTAssertNil(model.onboardProfileCapacity)

@@ -59,7 +59,11 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     precondition(
       !fileManager.fileExists(atPath: Self.engineURL.path),
       "bin/lope already exists; refusing to overwrite a real build artifact")
-    let script = "#!/bin/sh\n" + body + "\n"
+    let helpers = """
+      emit_device() { printf '{"contract_version":1,"ok":true,"kind":"device_list","vendor_interface_count":1,"devices":[{"index":%s,"vendor_id":1133,"product_id":%s,"device_number":1,"request_device_number":1,"protocol":4.5,"name":"%s","connection":"%s","device_key":"%s"}],"device_count":1}\\n' "$1" "$4" "$3" "$2" "$5"; }
+      emit_profile() { printf '{"contract_version":1,"ok":true,"kind":"profiles","device":{"index":1,"vendor_id":1133,"product_id":%s,"device_number":1,"request_device_number":1,"protocol":4.5,"name":"%s","connection":"Wireless","device_key":"%s"},"profile_capacity":1,"headers":[{"number":1,"sector":256,"enabled":true}],"selected_profile":{"number":1,"sector":256,"enabled":true,"memory":3,"format":1,"macro_format":0,"profile_capacity":1,"button_capacity":5,"sector_count":1,"sector_size":256,"shift_flags":0,"crc_checked":true,"crc_valid":true,"layouts":{"buttons":true,"gshift":false,"dpi":false,"rgb":false},"buttons":[{"number":1,"layer":"normal","raw":[128,1,0,1],"description":"Left click"}],"dpi_stages":[],"dpi_default_stage":0,"dpi_shift_stage":0,"rgb_zones":[]},"dpi":null,"report_rate":null}\\n' "$1" "$2" "$3"; }
+      """
+    let script = "#!/bin/sh\n" + helpers + "\n" + body + "\n"
     try! script.write(to: Self.engineURL, atomically: true, encoding: .utf8)
     try! fileManager.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: Self.engineURL.path)
@@ -272,6 +276,7 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       exit 1
       """)
     let model = makeModel()
+    model.knownDevicePollPolicy = (intervalNanoseconds: 10_000_000, maximumAttempts: 1)
     let device = DeviceChoice(
       id: 1, name: "G603 LIGHTSPEED", connection: "Wireless", productID: "0xB01C",
       deviceKey: "aaaa-0001")
@@ -585,9 +590,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" aaaa-0001
       fi
       exit 0
       """)
@@ -596,7 +601,6 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-0001")
     model.knownDisconnectedDevice = device
-
     model.startKnownDeviceProbe(device)
     await model.refreshTask?.value
 
@@ -610,13 +614,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[3] Wireless  Paired Logitech Mouse - Lightspeed (HID++ 4.5, product 0x4085, key aaaa-0003)'
+        emit_device 3 Wireless "Paired Logitech Mouse - Lightspeed" 16517 aaaa-0003
       else
-        echo 'Onboard profiles for G604:'
-        echo 'Device: G604'
-        echo 'Selected profile: 1'
-        echo 'Profile 1 (sector 0x0100, enabled=yes)'
-        echo '  button 1: Left click [80 01 00 01]'
+        emit_profile 16517 "G604" aaaa-0003
       fi
       exit 0
       """)
@@ -638,9 +638,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[1] Wireless  Other Mouse (HID++ 4.5, product 0xBBBB, key aaaa-9999)'
+        emit_device 1 Wireless "Other Mouse" 48059 aaaa-9999
       else
-        echo 'Selected profile: 1'
+        emit_profile 48059 "Other Mouse" aaaa-9999
       fi
       exit 0
       """)
@@ -666,7 +666,7 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
         exit 0
       fi
       echo "profile read failed" 1>&2
@@ -677,7 +677,6 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-0001")
     model.knownDisconnectedDevice = device
-
     model.startKnownDeviceProbe(device)
     await model.refreshTask?.value
 
@@ -689,9 +688,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" aaaa-0001
       fi
       exit 0
       """)
@@ -700,7 +699,6 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       id: 1, name: "Recon Mouse", connection: "Wireless", productID: "0xAAAA",
       deviceKey: "aaaa-0001")
     model.knownDisconnectedDevice = device
-
     model.startKnownDeviceProbe(device)
     // startKnownDeviceProbe captures `refreshGeneration` synchronously before
     // returning; bumping it again immediately (before the background probe's
@@ -718,9 +716,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" aaaa-0001
       fi
       exit 0
       """)
@@ -813,9 +811,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
     installFakeEngine(
       """
       if [ "$1" = "list" ]; then
-        echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+        emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" aaaa-0001
       fi
       exit 0
       """)
@@ -846,10 +844,10 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       mode=$(cat "\(modeFile.path)" 2>/dev/null || echo gone)
       if [ "$1" = "list" ]; then
         if [ "$mode" = "present" ]; then
-          echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+          emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
         fi
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" aaaa-0001
       fi
       exit 0
       """)
@@ -889,12 +887,12 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       mode=$(cat "\(modeFile.path)" 2>/dev/null || echo present)
       if [ "$1" = "list" ]; then
         if [ "$mode" = "absent" ]; then
-          echo '[1] Wireless  Other Widget (HID++ 4.5, product 0xBBBB, key bbbb-0001)'
+          emit_device 1 Wireless "Other Widget" 48059 bbbb-0001
         else
-          echo '[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-0001)'
+          emit_device 1 Wireless "Recon Mouse" 43690 aaaa-0001
         fi
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" aaaa-0001
       fi
       exit 0
       """)
@@ -936,9 +934,9 @@ final class AppModelKnownDeviceReconnectTests: XCTestCase {
       """
       mode=$(cat "\(modeFile.path)" 2>/dev/null || echo 1)
       if [ "$1" = "list" ]; then
-        echo "[1] Wireless  Recon Mouse (HID++ 4.5, product 0xAAAA, key aaaa-000$mode)"
+        emit_device 1 Wireless "Recon Mouse" 43690 "aaaa-000$mode"
       else
-        echo 'Selected profile: 1'
+        emit_profile 43690 "Recon Mouse" "aaaa-000$mode"
       fi
       exit 0
       """)

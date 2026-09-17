@@ -10,9 +10,9 @@ in-process C-library rewrite based on the current evidence.
 The structured C operations already isolate presentation from device access,
 and the process boundary gives the GUI a versioned, platform-independent data
 contract. The measured helper-launch cost is small compared with HID discovery
-and device I/O. The first follow-up should be to have the GUI consume the
-existing `--format json` contract; that changes the representation used across
-the existing process boundary, not the boundary itself.
+and device I/O. The GUI now consumes the existing `--format json` contract for
+its engine read/write paths. This changes the representation used across the
+existing process boundary, not the boundary itself.
 
 ## Evidence
 
@@ -55,13 +55,14 @@ human diagnostics remain on stderr. These properties are documented in
 [ENGINE-BOUNDARY.md](ENGINE-BOUNDARY.md) and implemented in
 `Sources/C/Core/engine_boundary.c`.
 
-The current GUI still invokes the human renderer and merges stdout and stderr
-through `EngineRunner`, then parses the text in `AppModel+Parsing.swift` and
-related refresh code. That is the main current boundary weakness. Moving the
-GUI to the existing JSON contract will improve error stability without
-introducing C/Swift ABI ownership or a new library API. An in-process design
-would still need a Swift error adapter, versioning rules, and a policy for
-mapping transport failures, partial writes, and invalid device data.
+The GUI invokes the structured renderer and validates its versioned response
+through `EngineJSON`, while retaining merged diagnostics for status/error
+reporting. Human-readable parsing remains limited to direct diagnostic helpers;
+the GUI's discovery, refresh, polling, and write paths have no compatibility
+fallback to human output. This improves error stability without introducing
+C/Swift ABI ownership or a new library API. An in-process design would still
+need a Swift error adapter, versioning rules, and a policy for mapping
+transport failures, partial writes, and invalid device data.
 
 ### Cancellation and failure isolation
 
@@ -145,5 +146,5 @@ one of these concrete benefits:
 3. A target platform can link the C engine but cannot package a cooperating
    executable, with that constraint demonstrated in its build environment.
 
-Until then, adopt the structured JSON contract in the GUI, keep the C typed
-operations independently testable, and preserve the process boundary.
+The structured JSON contract is now adopted in the GUI. Keep the C typed
+operations independently testable and preserve the process boundary.

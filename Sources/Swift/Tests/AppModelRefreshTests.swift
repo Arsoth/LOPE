@@ -102,7 +102,6 @@ final class AppModelRefreshTests: XCTestCase {
       RefreshSnapshot(
         devices: sleepingModel.devices,
         selectedDeviceIndex: 1,
-        profileText: nil,
         profileError: "sleeping",
         dpiText: nil,
         dpiError: nil,
@@ -345,12 +344,44 @@ final class AppModelRefreshTests: XCTestCase {
   func testReloadSelectedProfileContentsAppliesEngineOutput() {
     let model = AppModel(startInitialRefresh: false)
     configureFixtureDevice(model)
-    model.engineRunnerOverride = { _ in fakeProfilesOutput() }
+    model.engineRunnerOverride = { _ in fakeStructuredProfilesOutput() }
 
     model.reloadSelectedProfileContents()
 
     XCTAssertFalse(model.buttons.isEmpty)
     XCTAssertEqual(model.status, "Reloaded profile 2.")
+  }
+
+  func testReloadSelectedProfileContentsHandlesUnavailableOptionalCapabilities() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    let output = fakeStructuredProfilesOutput()
+      .replacingOccurrences(
+        of:
+          #""dpi":{"requested":true,"available":true,"sensor_count":1,"supported_values":[400,800,1600],"current_sensor_dpi":800,"error":""},"#,
+        with: #""dpi":null,"#
+      )
+      .replacingOccurrences(
+        of:
+          #""report_rate":{"requested":true,"available":true,"feature_id":32864,"rates":[{"hertz":125,"wire_value":8},{"hertz":500,"wire_value":2},{"hertz":1000,"wire_value":1}],"current_valid":true,"current_hertz":500,"error":""}"#,
+        with: #""report_rate":null"#)
+    model.engineRunnerOverride = { _ in output }
+
+    model.reloadSelectedProfileContents()
+
+    XCTAssertEqual(model.status, "Reloaded profile 2.")
+    XCTAssertEqual(model.dpiDetails, "DPI capabilities have not been read.")
+    XCTAssertNil(model.pollingRateCapabilities.currentRate)
+  }
+
+  func testReloadSelectedProfileContentsReportsMissingSelectedProfile() {
+    let model = AppModel(startInitialRefresh: false)
+    configureFixtureDevice(model)
+    model.engineRunnerOverride = { _ in fakeStructuredProfilesWithoutSelectionOutput() }
+
+    model.reloadSelectedProfileContents()
+
+    XCTAssertEqual(model.status, "The selected onboard profile was not returned.")
   }
 
   func testReloadSelectedProfileContentsReportsEngineError() {

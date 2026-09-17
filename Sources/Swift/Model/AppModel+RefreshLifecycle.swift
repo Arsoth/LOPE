@@ -78,7 +78,6 @@ extension AppModel {
           RefreshSnapshot(
             devices: enumeration.devices,
             selectedDeviceIndex: nil,
-            profileText: nil,
             profileError: nil,
             dpiText: nil,
             dpiError: nil,
@@ -148,7 +147,9 @@ extension AppModel {
 
   func profileReadProgressHandler(generation: Int) -> @Sendable (String) -> Void {
     { [weak self] line in
-      guard let capacity = Self.onboardProfileCapacity(in: line) else { return }
+      guard let response = try? EngineJSON.decode(line).response,
+        let capacity = response.profileCapacity
+      else { return }
       Task { @MainActor [weak self] in
         guard let self,
           self.refreshGeneration == generation,
@@ -189,32 +190,32 @@ extension AppModel {
         arguments += ["--profile", String(preferredProfileNumber)]
       }
       arguments.append("profiles")
-      let profileText = try runProfileReadWithRetry(
+      let structured = try runProfileReadWithRetry(
         executable: executable,
         arguments: arguments,
         currentDirectory: currentDirectory,
         onLine: onLine
       )
-      let selectedProfileNumber = Self.selectedProfileNumber(in: profileText)
+      let selectedProfileNumber = structured.response.selectedProfile?.number
       let resolvedDevices = devices.map { device in
         guard device.deviceKey == selectedDeviceKey,
-          let reportedName = Self.reportedDeviceName(in: profileText)
+          let reportedName = structured.response.device?.name
         else { return device }
         return device.replacingName(
           DeviceChoice.preferredName(reported: reportedName, fallback: device.name))
       }
       return RefreshSnapshot(
         devices: resolvedDevices, selectedDeviceIndex: selectedDeviceIndex,
-        profileText: profileText, profileError: nil, dpiText: nil,
-        dpiError: nil, selectedProfileNumber: selectedProfileNumber,
-        errorMessage: nil, accessWarning: accessWarning
+        profileError: nil, dpiText: nil, dpiError: nil,
+        selectedProfileNumber: selectedProfileNumber, errorMessage: nil,
+        accessWarning: accessWarning, profileResponse: structured.response
       )
     } catch {
       return RefreshSnapshot(
         devices: devices, selectedDeviceIndex: selectedDeviceIndex,
-        profileText: nil, profileError: errorMessage(for: error), dpiText: nil,
+        profileError: errorMessage(for: error), dpiText: nil,
         dpiError: nil, selectedProfileNumber: nil, errorMessage: nil,
-        accessWarning: accessWarning
+        accessWarning: accessWarning, profileResponse: nil
       )
     }
   }
@@ -224,23 +225,35 @@ extension AppModel {
     arguments: [String],
     currentDirectory: URL,
     onLine: @escaping @Sendable (String) -> Void
-  ) throws -> String {
+  ) throws -> EngineJSONCommandResult {
     var lastError: Error?
 
     for attempt in 0..<AppModelRefreshConfiguration.profileReadAttempts {
       do {
-        let output = try EngineRunner.runWithLineProgress(
+        let processResult = try EngineRunner.runStructuredWithLineProgress(
           executable: executable,
-          arguments: arguments,
+          arguments: arguments + ["--format", "json"],
           currentDirectory: currentDirectory,
           onLine: onLine
         )
-        // run_profiles historically returned success after emitting
-        // headers when the selected sector read timed out. Require
-        // this marker so a transient G603 wake-up failure is retried
-        // instead of being presented as a mouse with no profile.
-        if selectedProfileNumber(in: output) != nil {
-          return output
+        let structured: EngineJSONCommandResult
+        do {
+          structured = try EngineJSON.decode(processResult.output)
+        } catch {
+          if processResult.terminationStatus != 0 {
+            throw EngineError.failed(
+              processResult.output.trimmingCharacters(in: .whitespacesAndNewlines))
+          }
+          throw error
+        }
+        guard processResult.terminationStatus == 0 else {
+          _ = try EngineJSON.validate(structured, expectedKind: "profiles")
+          throw EngineError.failed(
+            "The HID++ engine exited with status \(processResult.terminationStatus).")
+        }
+        let validated = try EngineJSON.validate(structured, expectedKind: "profiles")
+        if validated.response.selectedProfile != nil {
+          return validated
         }
         lastError = EngineError.failed("The selected onboard profile was not returned.")
       } catch {

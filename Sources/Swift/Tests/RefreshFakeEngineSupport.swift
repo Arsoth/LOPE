@@ -76,6 +76,9 @@ enum FakeEngine {
 
       eval "output=\\$LOPE_TEST_${cmd}_OUTPUT"
       eval "exit_code=\\$LOPE_TEST_${cmd}_EXIT"
+      if [ "$cmd" = "LIST" ] && [ -z "$output" ]; then
+        output='{"contract_version":1,"ok":true,"kind":"device_list","vendor_interface_count":0,"devices":[],"device_count":0}'
+      fi
       printf '%s' "$output"
       exit "${exit_code:-0}"
       """
@@ -142,11 +145,7 @@ func waitUntil(
   }
 }
 
-/// A realistic device-list line accepted by `AppModel.parseDeviceChoices`.
-/// Note the parser's device-key capture group is hex-and-hyphen only
-/// (`[0-9A-Fa-f-]+`), unlike the free-form `deviceKey` strings used
-/// elsewhere in fixtures that build `DeviceChoice` values directly (no text
-/// parsing involved) -- keep any key threaded through this helper hex-only.
+/// A realistic device-list response accepted by the GUI-facing JSON decoder.
 func fakeDeviceListLine(
   id: Int = 1,
   connection: String = "Wired",
@@ -154,33 +153,61 @@ func fakeDeviceListLine(
   productID: String = "0x0000",
   deviceKey: String = "abc123ef"
 ) -> String {
-  "[\(id)] \(connection)  \(name) (HID++ 4.5, product \(productID), key \(deviceKey))"
+  let numericProductID = UInt32(productID.dropFirst(2), radix: 16) ?? 0
+  return
+    "{\"contract_version\":1,\"ok\":true,\"kind\":\"device_list\",\"vendor_interface_count\":1,\"devices\":[{\"index\":\(id),\"vendor_id\":1133,\"product_id\":\(numericProductID),\"device_number\":1,\"request_device_number\":1,\"protocol\":4.5,\"name\":\"\(name)\",\"connection\":\"\(connection)\",\"device_key\":\"\(deviceKey)\"}],\"device_count\":1}"
 }
 
-/// A realistic "profiles" output body accepted by `AppModel.parseProfiles`,
-/// `AppModel.selectedProfileNumber(in:)`, and `ProfileOutputParser`.
-func fakeProfilesOutput(
-  capacity: Int = 3,
-  selectedProfile: Int = 2,
-  profileID: Int = 2,
-  sector: String = "0x0100",
-  enabled: Bool = true,
-  buttonRaw: String = "80 01 00 02",
-  currentDPI: Int = 800
-) -> String {
+func fakeStructuredDeviceListOutput() -> String {
   """
-  Profile capacity: \(capacity)
-  Selected profile: \(selectedProfile)
-  Profile \(profileID) (sector \(sector), enabled=\(enabled ? "yes" : "no"))
-  CRC: OK
-  format: 0x01
-    button 1: Left click [\(buttonRaw)]
-  Supported DPI: 100..25600 (step 50)
-  DPI sensors: 1
-  Current sensor 1 DPI: \(currentDPI)
-  DPI stages: 400, 800, 1600 (default 2, shift 1)
-  Supported polling rates: 125, 500, 1000
-  Current polling rate: 500 Hz
+  {"contract_version":1,"ok":true,"kind":"device_list","vendor_interface_count":1,"devices":[{"index":1,"vendor_id":1133,"product_id":0,"device_number":1,"request_device_number":1,"protocol":4.5,"name":"G502 X","connection":"Wired","device_key":"abc123ef"}],"device_count":1}
+  """.trimmingCharacters(in: .whitespacesAndNewlines)
+}
 
+func fakeStructuredProfilesOutput() -> String {
   """
+  {"contract_version":1,"ok":true,"kind":"profiles","device":{"index":1,"vendor_id":1133,"product_id":0,"device_number":1,"request_device_number":1,"protocol":4.5,"name":"G502 X","connection":"Wired","device_key":"abc123ef"},"profile_capacity":3,"headers":[{"number":1,"sector":256,"enabled":false},{"number":2,"sector":512,"enabled":true}],"selected_profile":{"number":2,"sector":512,"enabled":true,"memory":3,"format":1,"macro_format":0,"profile_capacity":3,"button_capacity":5,"sector_count":1,"sector_size":256,"shift_flags":0,"crc_checked":true,"crc_valid":true,"layouts":{"buttons":true,"gshift":true,"dpi":true,"rgb":true},"buttons":[{"number":1,"layer":"normal","raw":[128,1,0,2],"description":"Left click"},{"number":1,"layer":"gShift","raw":[128,2,0,3],"description":"Right click"}],"dpi_stages":[400,800,1600],"dpi_default_stage":2,"dpi_shift_stage":1,"rgb_zones":[{"number":1,"present":true,"mode":1,"color":[255,0,16]}]},"dpi":{"requested":true,"available":true,"sensor_count":1,"supported_values":[400,800,1600],"current_sensor_dpi":800,"error":""},"report_rate":{"requested":true,"available":true,"feature_id":32864,"rates":[{"hertz":125,"wire_value":8},{"hertz":500,"wire_value":2},{"hertz":1000,"wire_value":1}],"current_valid":true,"current_hertz":500,"error":""}}
+  """.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+func fakeStructuredProfilesWithoutSelectionOutput() -> String {
+  """
+  {"contract_version":1,"ok":true,"kind":"profiles","device":{"index":1,"vendor_id":1133,"product_id":0,"device_number":1,"request_device_number":1,"protocol":4.5,"name":"G502 X","connection":"Wired","device_key":"abc123ef"},"profile_capacity":3,"headers":[],"selected_profile":null,"dpi":null,"report_rate":null}
+  """.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+func fakeStructuredProfilesWithoutDPIOutput() -> String {
+  fakeStructuredProfilesOutput().replacingOccurrences(
+    of:
+      "\"dpi\":{\"requested\":true,\"available\":true,\"sensor_count\":1,\"supported_values\":[400,800,1600],\"current_sensor_dpi\":800,\"error\":\"\"},",
+    with: "\"dpi\":null,"
+  )
+}
+
+func fakeStructuredProfilesWithoutReportedCapacityOutput() -> String {
+  var output = fakeStructuredProfilesOutput()
+  if let range = output.range(of: "\"profile_capacity\":3,") {
+    output.removeSubrange(range)
+  }
+  return output
+}
+
+func fakeStructuredDPIOutput() -> String {
+  """
+  {"contract_version":1,"ok":true,"kind":"dpi","device":{"index":1,"vendor_id":1133,"product_id":0,"device_number":1,"request_device_number":1,"protocol":4.5,"name":"G502 X","connection":"Wired","device_key":"abc123ef"},"dpi":{"requested":true,"available":true,"sensor_count":1,"supported_values":[400,800,1600],"current_sensor_dpi":800,"error":""},"onboard_profile":null,"onboard_profile_error":""}
+  """.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+func fakeStructuredCurrentDPIOutput(_ value: Int) -> String {
+  "{\"contract_version\":1,\"ok\":true,\"kind\":\"current_dpi\",\"device\":null,\"dpi\":{\"requested\":false,\"available\":true,\"sensor_count\":1,\"supported_values\":[],\"current_sensor_dpi\":\(value),\"error\":\"\"}}"
+}
+
+func fakeStructuredWriteOutput() -> String {
+  """
+  {"contract_version":1,"ok":true,"kind":"write","operation":"apply","operation_id":"profile-2-save-test","device":null,"profile":2,"changed":true,"dry_run":false,"completed":true,"planned_sectors":[{"kind":"profile","sector":512,"length":256}],"has_backup":true,"backup_path":"/tmp/profile-2-save-test.logiob","verified_sectors":1}
+  """.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+func fakeStructuredEngineOutput(for arguments: [String]) -> String {
+  arguments.contains("profiles") ? fakeStructuredProfilesOutput() : fakeStructuredWriteOutput()
 }
