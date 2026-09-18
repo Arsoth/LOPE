@@ -11,10 +11,16 @@
 
 # LOPE todo list
 
-### 1: Evaluate an in-process engine API after the C boundaries are clean
+1. [x] Add Cmd+Q and Cmd+H menu options.
 
-- [x] Measure the cost and complexity of the separate `lope` process after the structured boundary and C layering work are complete, then decide whether the GUI should continue using the process boundary or use a typed in-process C library API. Does keeping the lope engine separate allow for easier multi platform work later?
+   **Done when:** The application responds to Cmd+Q to quit and Cmd+H to hide as expected.
 
-**Done when:** The decision is documented with evidence covering startup cost, error handling, cancellation, HID-resource ownership, testability, and packaging; no process-boundary rewrite is started without a demonstrated benefit.
+2. [x] Add an About menu item with the copyright and version number.
+
+   **Done when:** The About item is available from the application menu and displays the current copyright and version information.
+
+3. [ ] Add an update checker below Appearance in Settings.
+
+   **Done when:** On launch, update checks can be enabled or disabled; when enabled, the app checks for a newer GitHub release, notifies the user, downloads the update, and replaces the current app with it.
 
 # Ignore below item(s):
