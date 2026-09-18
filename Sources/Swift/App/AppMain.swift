@@ -19,6 +19,8 @@ private final class LOPEAppDelegate: NSObject, NSApplicationDelegate {
   private var mainWindow: NSWindow?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    configureMainMenu()
+
     let hostingController = NSHostingController(rootView: ContentView())
     let window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 960, height: 520),
@@ -35,6 +37,38 @@ private final class LOPEAppDelegate: NSObject, NSApplicationDelegate {
     window.makeKeyAndOrderFront(nil)
     addCenteredTitlebarTitle(to: window)
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  private func configureMainMenu() {
+    let mainMenu = NSMenu()
+    let applicationMenuItem = NSMenuItem()
+    let applicationMenu = NSMenu(title: AppConstants.displayName)
+
+    mainMenu.addItem(applicationMenuItem)
+    applicationMenuItem.submenu = applicationMenu
+
+    applicationMenu.addItem(
+      withTitle: "About \(AppConstants.displayName)",
+      action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+      keyEquivalent: ""
+    )
+    applicationMenu.addItem(NSMenuItem.separator())
+
+    let hideItem = applicationMenu.addItem(
+      withTitle: "Hide \(AppConstants.displayName)",
+      action: #selector(NSApplication.hide(_:)),
+      keyEquivalent: "h"
+    )
+    hideItem.keyEquivalentModifierMask = [.command]
+
+    let quitItem = applicationMenu.addItem(
+      withTitle: "Quit \(AppConstants.displayName)",
+      action: #selector(NSApplication.terminate(_:)),
+      keyEquivalent: "q"
+    )
+    quitItem.keyEquivalentModifierMask = [.command]
+
+    NSApp.mainMenu = mainMenu
   }
 
   private func addCenteredTitlebarTitle(to window: NSWindow) {
