@@ -1,0 +1,10 @@
+.build/
+bin/
+outputs/
+lope
+*.logiob
+*.bin
+rebuild-signed.sh
+AGENTS.md
+CLAUDE.md
+.VSCodeCounter

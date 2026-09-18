@@ -1,0 +1,72 @@
+{
+	"schemaVersion": 1,
+	"id": "g100s",
+	"name": "G100s",
+	"match": {
+		"nameContains": ["G100S"],
+		"productIDs": ["0xC247"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · DPI toggle",
+			"aliases": ["DPI button"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 250,
+		"maximum": 2500
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ profile transport",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy/runtime",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G100s storage has not been validated by the modern sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The physical mapping is maintained for discovery and future legacy support.",
+			"Corrected 2026-09-17: reduced from 6 to 4 buttons, dropping Back/Forward entirely. The G100s has no thumb buttons on either side -- confirmed by a primary hands-on review ('There are no thumb buttons on either side') and corroborated by the official Logitech spec page, which lists only 'Special Buttons: DPI toggle' with no Forward/Back field at all. Real layout: Left, Right, Middle, DPI toggle."
+		]
+	},
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://techgage.com/article/logitech-g100s-gaming-mouse-review/",
+		"https://support.logi.com/hc/en-001/articles/360023466233-Logitech-G100s-Optical-Gaming-Mouse-Technical-Specifications"
+	]
+}

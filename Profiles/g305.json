@@ -1,0 +1,83 @@
+{
+	"schemaVersion": 1,
+	"id": "g305",
+	"name": "G305 LIGHTSPEED",
+	"match": {
+		"nameContains": ["G305"],
+		"productIDs": ["0x4074"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI button",
+			"aliases": ["Top DPI"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 12000
+	},
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": ["G304 is the identical hardware sold under a different regional name; see g304.json."]
+	},
+	"sources": [
+		"https://www.logitechg.com/en-us/shop/p/g305-lightspeed-se-gaming-mouse",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g305.device"
+	]
+}

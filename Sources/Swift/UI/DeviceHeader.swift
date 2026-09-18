@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026
+
+import SwiftUI
+
+struct DeviceHeader: View {
+  @ObservedObject var model: AppModel
+  let hidesEditingActions: Bool
+  let onSave: () -> Void
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 8) {
+      if !model.devices.isEmpty {
+        Text(L10n.text("Device"))
+          .font(.callout.weight(.medium))
+        Picker(
+          "",
+          selection: Binding(
+            get: { model.selectedDeviceIndex },
+            set: { model.selectDevice($0) }
+          )
+        ) {
+          ForEach(model.devices) { device in
+            Label(device.displayName, systemImage: connectionSymbol(for: device.connection))
+              .tag(device.id)
+          }
+        }
+        .labelsHidden()
+        .frame(width: 180)
+        .disabled(model.devices.isEmpty)
+      }
+      Button(L10n.text("Refresh"), action: model.refresh)
+        .keyboardShortcut("r", modifiers: [.command])
+        .disabled(model.busy)
+      if model.busy {
+        ProgressView().controlSize(.small)
+      }
+      Spacer()
+      if !hidesEditingActions {
+        Button(L10n.text("Revert edits")) { model.reloadSelectedProfile() }
+        Button(L10n.text("Save to mouse"), action: onSave)
+          .buttonStyle(.borderedProminent)
+          .disabled(
+            !model.hasPendingChanges || model.busy || !model.currentMouseProfile.profileIO.canSave
+              || (model.hasDPIChanges && !model.canApplyDPI)
+          )
+      }
+    }
+  }
+
+  private func connectionSymbol(for connection: String) -> String {
+    switch connection.lowercased() {
+    case "wired", "usb":
+      return "cable.connector"
+    case "bluetooth":
+      return "dot.radiowaves.left.and.right"
+    default:
+      return "wifi"
+    }
+  }
+}

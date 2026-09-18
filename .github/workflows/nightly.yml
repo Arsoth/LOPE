@@ -1,0 +1,47 @@
+name: LOPE Nightly Full Test
+
+on:
+  schedule:
+    # GitHub Actions schedules use UTC. Run after the workday on the US east
+    # coast while keeping the minute non-zero to avoid the top-of-hour rush.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  full-test:
+    name: Full format, test, and coverage gate
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify Apple toolchain
+        run: |
+          set -euo pipefail
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR"
+          xcodebuild -version
+          xcrun --find swift-format
+          xcrun --find clang-format
+          xcrun swift-format --version
+          xcrun --find llvm-cov
+          xcrun --find llvm-profdata
+          xcrun swift --version
+
+      - name: Check formatting
+        run: make lint
+
+      - name: Run the complete unit and self-test suites
+        run: make test
+
+      - name: Enforce all coverage minimums
+        run: make coverage-check

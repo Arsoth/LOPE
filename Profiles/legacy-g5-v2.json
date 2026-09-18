@@ -1,0 +1,104 @@
+{
+	"schemaVersion": 1,
+	"id": "legacy-g5-v2",
+	"name": "Legacy G5 V2",
+	"match": {
+		"nameContains": ["G5 V2", "G5 2007"],
+		"productIDs": ["0xC049"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI increase",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · DPI decrease",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Wheel tilt left",
+			"aliases": ["Scroll left"],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Wheel tilt right",
+			"aliases": ["Scroll right"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 400,
+		"maximum": 2000
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G5 V2 records are not compatible with the standard sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"This is a low-priority legacy descriptor; a more specific future descriptor for this exact model can override it with a higher priority.",
+			"Split out of legacy-g5.json (2026-09-17): 0xC049 is a revised 2007 hardware revision ('G5 V2') sold with a box sticker reading 'Now with 2 thumb buttons', a 9-button layout distinct from the original 6-button 0xC041 unit. Evidence is community/press-tier (Techgage, APH Networks reviews quoting official box/press copy), not an official Logitech spec page -- none could be found still live for this model. libratbag already tracks 0xC041 and 0xC049 as two separate .device files, which this split mirrors.",
+			"Button count/composition (9: L, R, Middle, Back, Forward, DPI+, DPI-, wheel-tilt-left, wheel-tilt-right) is inferred from press descriptions rather than a numbered official diagram; exact left-to-right tilt order and precise DPI +/- button positions are unconfirmed (CHECK)."
+		]
+	},
+	"sources": [
+		"https://techgage.com/article/logitech_revised_g5/",
+		"https://aphnetworks.com/reviews/logitech_g5_v2",
+		"https://gamersnexus.net/hwreviews/139-logitechg5mouse",
+		"https://raw.githubusercontent.com/libratbag/libratbag/master/data/devices/logitech-g5-2007.device"
+	]
+}

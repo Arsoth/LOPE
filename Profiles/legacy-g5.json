@@ -1,0 +1,87 @@
+{
+	"schemaVersion": 1,
+	"id": "legacy-g5",
+	"name": "Legacy G5",
+	"match": {
+		"nameContains": ["G5"],
+		"productIDs": ["0xC041"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Thumb button",
+			"aliases": [],
+			"notes": "Original G5 (0xC041) had only one thumb button, not a Back/Forward pair; whether it was factory-labeled Back or left unlabeled is unconfirmed."
+		},
+		{
+			"number": 5,
+			"control": "G5 · DPI increase",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI decrease",
+			"aliases": [],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 400,
+		"maximum": 2000
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G5 records are not compatible with the standard sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"This is a low-priority legacy descriptor; a more specific future descriptor for this exact model can override it with a higher priority.",
+			"The two product IDs were inherited from a combined G5/G7 descriptor and are believed to cover G5's hardware revisions, but have not been independently re-verified against real devices.",
+			"DPI minimum corrected 200 -> 400: libratbag's logitech-g5.device and logitech-g5-2007.device both declare DpiList=400;800;1600;2000 for 0xC041/0xC049 respectively, with no 200 entry in either file.",
+			"Split 0xC049 out into legacy-g5-v2.json: this file now covers only the original 2005 G5 (0xC041). Press coverage (Techgage, APH Networks) states the original had a single thumb button and two separate DPI +/- buttons, not the Back/Forward/'DPI control' layout previously listed here -- corrected. Evidence is community/press-tier (manufacturerSpec-adjacent, quoting official box/press text), not an official Logitech spec page, since none could be found still live for this model."
+		]
+	},
+	"sources": [
+		"https://github-wiki-see.page/m/libratbag/libratbag/wiki/Devices",
+		"https://techgage.com/article/logitech_revised_g5/",
+		"https://aphnetworks.com/reviews/logitech_g5_v2",
+		"https://gamersnexus.net/hwreviews/139-logitechg5mouse"
+	]
+}

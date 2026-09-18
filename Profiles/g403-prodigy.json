@@ -1,0 +1,106 @@
+{
+	"schemaVersion": 1,
+	"id": "g403-prodigy",
+	"name": "G403 Prodigy",
+	"match": {
+		"nameContains": ["G403 PRODIGY"],
+		"productIDs": ["0xC083"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI button",
+			"aliases": ["Top DPI"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 12000
+	},
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": [
+			"G403 Prodigy is the wired-only, PMW3366-sensor budget variant of the G403 shell (200-12000 DPI, PID 0xC083, registered by Logitech as 'G403 Prodigy Gaming Mouse'). It is a separate hardware SKU from the original wireless-capable G403 (g403.json, PID 0xC082) and the HERO-sensor refresh (g403-hero.json, PID 0xC08F), though all three share the same physical six-control mapping and RGB zones."
+		]
+	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 0,
+				"name": "Scroll wheel"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the scroll-wheel and logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
+	"sources": [
+		"https://the-sz.com/products/usbid/index.php?v=0x046D",
+		"https://www.logitech.com/assets/64771/g403-prodigy.pdf",
+		"https://www.amazon.com/Logitech-G403-Prodigy-Gaming-Mouse/dp/B01KUAMCV4"
+	]
+}

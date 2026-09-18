@@ -1,0 +1,209 @@
+# Development and formatting standards
+
+This repo is a single macOS app: a C command-line/HID core
+(`Sources/C/Core/main.m` plus the independently compiled
+modules under `Sources/C`) and a SwiftUI/AppKit GUI under `Sources/Swift`,
+packaged together into `outputs/LOPE.app` by the Makefile. These are the
+project's contributor defaults; the Makefile and existing source conventions
+override them when they are more specific. For required tooling and one-time
+setup, see [development-setup.md](development-setup.md).
+
+## Working tools
+
+- Search content with `rg`; find files with `fd`.
+- Use `jq` for inspecting or transforming the profile JSON under `Profiles/`.
+- Do not use `cat -A`.
+
+## Building and testing
+
+- `make app` builds the deliverable at `outputs/LOPE.app`.
+- `make gui` and direct `swiftc` invocations are compile-only checks, useful
+  for fast iteration but not a substitute for `make app`.
+- `make test` runs `./lope self-test` (C core) and `swift test` (the
+  `LOPECoreTests` XCTest target defined in `Package.swift`). Run
+  `make test-modified` during normal branch work: it selects tests related to
+  changed files and checks coverage for changed production files. Run the full
+  `make test` after touching shared test/build infrastructure, and run the full
+  repository checks before requesting review. Passing test runs print only a
+  concise summary; failing runs print just the failing lines (compiler
+  errors, failed cases, non-zero failure summaries) rather than the full
+  pass/fail transcript, with the full transcript saved to a timestamped file
+  under `$TMPDIR` for cases the filter misses.
+- `swift test`/`swift build` are driven by `Package.swift`, which exists
+  only to run the Swift unit tests; it does not build or replace the
+  shipped app. The app is still built by the Makefile via direct `swiftc`
+  invocations, and `Package.swift`'s `LOPECore` target excludes the app
+  entry point and SwiftUI view files (the same split the Makefile used for
+  its old model-only test binaries); all C sources live outside the Swift
+  package target under `Sources/C`.
+- Building and testing use local tools supplied by Xcode and Homebrew; they do
+  not require network access once the tools are installed.
+
+## Formatting and quality
+
+- Swift formatting/linting uses Apple's `swift-format` (via `xcrun`), with
+  the ruleset pinned in `.swift-format` at the repo root. C formatting uses
+  `clang-format`, configured in `.clang-format`. Run `make format` to apply
+  both, or `make lint` (alias for `make format-check`) to check without
+  writing changes.
+- `.clang-format` keeps include sorting disabled so module headers and
+  platform headers remain in deliberate, readable groups.
+- `make install-hooks` copies `scripts/git-hooks/pre-commit` into
+  `.git/hooks/pre-commit`. Before every commit, that hook runs `make format`
+  for Swift and C, re-stages only paths that were already staged, runs
+  `make format-check`, and runs the staged-file `make test-modified` gate.
+  Each clone needs to run `make install-hooks` once; it is not automatic. The
+  hook is a fast, changed-files gate; run `make test` and `make coverage-check`
+  when a full repository check is appropriate.
+- Never bypass commit hooks.
+- Work TDD-first and keep solutions simple and non-duplicative: T.D.D. ·
+  K.I.S.S. · D.R.Y.
+
+## Testing conventions
+
+- Swift tests are XCTest cases under `Sources/Swift/Tests/`, run with `swift test` against
+  the `LOPECore` library target, mirroring `Sources/Swift/Model/` one file
+  at a time (e.g. `DPIModelTests.swift` for `DPIModel.swift`,
+  `AppModelWritesTests.swift` for `AppModel+Writes.swift`). Add new test
+  methods to the relevant `XCTestCase`, or a new `XCTestCase` file under
+  `Sources/Swift/Tests/` named after the production file it covers — any `.swift` file
+  there is picked up automatically by the `LOPECoreTests` target, no
+  Makefile changes needed. `AppModelTestFixtures.swift` holds
+  `configureFixtureDevice(_:)`, a fixture shared by the several
+  `AppModel*Tests.swift` files that need a configured device/profile; add
+  further cross-file fixtures there rather than duplicating setup code.
+- C self-tests mirror `Sources/C/` the same way, one `test_<module>.c` file
+  per production module (e.g. `test_report_rate.c` for `report_rate.c`),
+  each exposing a single `int test_<module>(void)` entry point declared in
+  `selftest_modules.h`. Each test function is a plain function that
+  `fprintf(stderr, ...)` and returns a nonzero status on the first failing
+  case, matching the existing C self-test convention; there is no
+  XCTest/GoogleTest equivalent wired up for the C side.
+  `Sources/C/Testing/selftest.c` is now just the `run_self_test()`
+  dispatcher that calls each module's test function in turn and is what
+  `./lope self-test` invokes. `Sources/C/Testing/test_doubles.c` holds the
+  shared mocking seams (`channel_request_test_double`,
+  `discover_devices_for_options_test_double`) and canned fixture builders
+  (`build_mock_onboard_sector`, `build_mock_control_sector`,
+  `k_mock_get_info_reply`) that more than one module's self-test needs;
+  add further cross-module fixtures there rather than duplicating them.
+  Add new cases to the relevant `test_<module>.c`, or a new
+  `test_<module>.c` file plus a matching declaration in
+  `selftest_modules.h` and a call from `run_self_test()`, for new C core
+  logic.
+- A type named identically to an Apple system type (e.g. `RGBColor`, which
+  collides with the legacy QuickDraw `RGBColor` in `ApplicationServices`)
+  can become ambiguous in test code once any file in the same target
+  imports AppKit/ApplicationServices, even in files that never import them
+  directly, because Swift's Clang importer shares one namespace for
+  Objective-C/C declarations across a compilation. Qualify the call with
+  the module name (`LOPECore.RGBColor(...)`) rather than adding an
+  unhelpful type annotation, which does not resolve it.
+
+## Coverage
+
+- Both languages use Clang/LLVM source-based coverage instrumentation
+  (`-fprofile-instr-generate -fcoverage-mapping`) so one tool, `llvm-cov`,
+  reads both reports. There is no gcov/lcov and no Istanbul/JaCoCo here.
+- `make coverage` builds and runs an instrumented C self-test binary and an
+  instrumented `swift test` run, then prints an `llvm-cov report` for each.
+  `make coverage-c` / `make coverage-swift` run them individually.
+- **Branch coverage is only available for the C core.** Clang emits branch
+  regions and `make coverage-c` reports them (`--show-branch-summary`). The
+  Swift frontend (Swift 6.3 toolchain, checked 2026-09) does not emit
+  branch-region coverage mapping at all, so `llvm-cov` always reports 0/0
+  branches for Swift files — this is a toolchain limitation, not a bug in
+  the test suite. Judge Swift coverage on line/region coverage only; do not
+  write or expect a Swift branch-coverage percentage.
+- `make coverage-check` enforces per-file minimums (`COVERAGE_MIN_LINE`,
+  `COVERAGE_MIN_BRANCH`; default 90 each) via `scripts/check-coverage.sh`,
+  which prints every file below the threshold in one run before failing,
+  matching per-file-and-aggregate gating intent. `coverage-check-c` checks
+  line and branch minimums for the C core. The hardware-facing
+  `Sources/C/Core/main.m` dispatcher is excluded because the self-test exercises
+  command logic through injected seams rather than invoking live-device
+  entrypoint paths; `coverage-check-swift` checks
+  the line minimum only for Swift (branch checking is skipped there since
+  the toolchain cannot report it). Override thresholds ad hoc with
+  `make coverage-check COVERAGE_MIN_LINE=80`.
+- `make coverage` colors each percentage cell when writing to a terminal:
+  red below 90%, yellow from 90% through 98.99%, and green from 99% through
+  100%. Use `COVERAGE_COLOR=always` or `COVERAGE_COLOR=never` to override
+  terminal detection.
+- `coverage-check-c` and `coverage-c` both exclude `Sources/C/Testing/`
+  (`--ignore-filename-regex`/a negative-lookahead source pattern) from the
+  report and the threshold check. They also exclude the declaration-only
+  headers `Sources/C/Backup/backup_codec.h`,
+  `Sources/C/Core/engine_boundary.h`, and
+  `Sources/C/Profiles/profile_codec.h`; these headers define no functions to
+  exercise or grade. The testing directory is test infrastructure — the
+  `test_<module>.c` files, `selftest.c`'s dispatcher, and
+  `test_doubles.c`'s mocking seams — not production code. Self-test
+  files built from `&&`-chained assertions (`ok = a() && b() && !c(); if
+  (!ok) { ...; return 1; }`) structurally cap their own branch coverage
+  well under 90%: once every chained condition passes, the early-bail
+  branch for each `&&` never executes, and that is a property of the
+  assertion style, not a gap in what is tested. Excluding the directory
+  avoids grading test code against a metric it can't meaningfully satisfy.
+  `coverage-check-swift` and `coverage-swift` exclude `Sources/Swift/Tests/`
+  the same way — a test file grading itself against the coverage gate is
+  circular, so it is excluded from both the report and the threshold check,
+  matching `Sources/C/Testing/` on the C side.
+- `coverage-check-swift` and `coverage-swift` also exclude
+  `Sources/Swift/Model/Shims/`, the same way the C side excludes
+  `Sources/C/Testing/`. `Shims/` holds small, single-purpose files whose
+  entire job is one real AppKit modal dialog (`NSOpenPanel`/`NSSavePanel`)
+  or `NSWorkspace` call (e.g. `AppModel+ProfileEditorShim.swift`,
+  `AppModel+RefreshShim.swift`). No XCTest can drive a live `.runModal()`
+  or observe whether Finder/System Settings actually opened, and unlike
+  the CLI process boundary — which has a real mocking seam,
+  `AppModel.engineRunnerOverride` — there is no way to inject a fake for
+  these AppKit calls. When a function mixes an unmockable OS-dialog call
+  with logic that *is* testable (e.g. encoding a value and writing it to
+  the URL the dialog returned), keep only the dialog call and the thinnest
+  possible glue in the `Shims/` file, and move the rest into a plain
+  function taking the resolved URL/value as an ordinary argument in the
+  original (non-`Shims/`) file, so it stays covered — see
+  `writeProfileEditorExport`/`applyImportedProfileEditorDraft` in
+  `AppModel+ProfileEditor.swift` versus their callers in
+  `AppModel+ProfileEditorShim.swift` for the pattern.
+- `make test-modified` is wired into the pre-commit hook after the automatic
+  `make format` and `make format-check` steps. Its coverage invocation uses
+  the same configured per-file thresholds, but limits the report to changed
+  production files.
+- Automated pull-request checks are four separate required gates: `PR Title`,
+  `Formatting` (`make lint`), `Tests` (`make test`), and `Coverage`
+  (`make coverage-check`). Run the same commands locally for broad changes or
+  before requesting review. Configure those four check names as required in
+  the repository's branch protection settings.
+- For each uncovered line or path you touch:
+  1. Write a test for reachable behavior and relevant edge cases.
+  2. There is no per-line exclusion comment (no `LCOV_EXCL_LINE` equivalent
+     recognized by `llvm-cov`'s source-based coverage); it only supports
+     whole-file exclusion via `--ignore-filename-regex`. If a path is
+     genuinely untestable, say so in the PR/commit description and in a
+     comment at the site rather than relying on a suppression convention
+     that does not exist for this tooling.
+  3. Add any newly discovered edge case to the relevant test file.
+- Prefer running `make test-modified` for ordinary branch work; run
+  `make coverage-check` for broad changes and before requesting review.
+
+## C header layering
+
+`Sources/C/Core/types.h` is the platform-neutral shared model and protocol
+layer. It may be included by profile, backup, command, and codec code without
+pulling in Apple HID or POSIX declarations. Concrete HID channels, interfaces,
+and manager contexts live in `Sources/C/HID/hid_types.h`; HID transport and
+discovery headers include that layer when they need the platform types. The
+aggregate `Sources/C/Core/internal.h` is reserved for the executable entrypoint
+that dispatches all commands; implementation and self-test modules should
+include their narrower module headers directly.
+
+## Style
+
+- Swift: SwiftUI/AppKit, following the file-splitting convention already in
+  use (e.g. `AppModel+Editing.swift`, `AppModel+Writes.swift` extensions on
+  a shared model type).
+- C: C11 with `-Wall -Wextra -Wpedantic`. Keep each module independently
+  compilable, put shared declarations in headers, and keep implementation-
+  private helpers `static`.

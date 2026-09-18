@@ -1,0 +1,131 @@
+{
+	"schemaVersion": 1,
+	"id": "g700s",
+	"name": "G700s",
+	"match": {
+		"nameContains": ["G700S"],
+		"productIDs": ["0xC07C"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · Side/top button",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Battery check",
+			"aliases": ["Battery Level button"],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · DPI down",
+			"aliases": ["DPI Down button"],
+			"notes": null
+		},
+		{
+			"number": 10,
+			"control": "G10 · DPI up",
+			"aliases": ["DPI Up button"],
+			"notes": null
+		},
+		{
+			"number": 11,
+			"control": "G11 · Profile switch",
+			"aliases": ["Switch Profile button"],
+			"notes": null
+		},
+		{
+			"number": 12,
+			"control": "G12 · Wheel tilt left",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 13,
+			"control": "G13 · Wheel tilt right",
+			"aliases": [],
+			"notes": null
+		}
+	],
+	"scrollWheelButtonLabels": {
+		"14": "Scroll down",
+		"15": "Scroll up"
+	},
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 8200
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G700s macro/profile records are not compatible with the standard sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"wheelMotion": "up/down are exposed as virtual profile records 14/15; keep them visible and editable",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"Keep this family cataloged so its physical controls are named correctly. Virtual wheel records 14/15 remain visible and editable; do not route this family through the modern writer until a legacy-safe implementation exists.",
+			"Corrected 2026-09-17: relabeled records 8-13, identical fix to G700. Notably this file's own already-cited LED-indicator support article directly confirms the mapping when re-read for button content (it had previously only been mined for LED-color information): 'press the Battery Level button (by default, G8)', 'Switch Profile button (G11 by default)', 'DPI Up button (by default, G10)', 'DPI Down button (by default, G9)'. That same article also names a software-assignable 'DPI Shift' function, available only in Automatic Game Detection mode and not tied to any fixed physical button here -- not added as a control since it isn't a dedicated hardware button."
+		]
+	},
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://support.logi.com/hc/en-150/articles/360023399193-LED-indicator-lights-on-the-G700s-gaming-mouse",
+		"https://www.manualslib.com/guide/2972190/logitech-g700s-rechargeable-gaming-mouse-setup-guide.html"
+	]
+}

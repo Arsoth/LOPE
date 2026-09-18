@@ -1,0 +1,103 @@
+{
+	"schemaVersion": 1,
+	"id": "g500",
+	"name": "G500",
+	"match": {
+		"nameContains": ["G500"],
+		"productIDs": ["0xC068"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · Scroll wheel mode shift",
+			"aliases": [],
+			"notes": "Shifts the wheel between hyper-fast free-spinning and precise click-to-click scrolling. Not a DPI control despite the button previously being labeled 'DPI Shift' here."
+		},
+		{
+			"number": 7,
+			"control": "G7 · DPI down",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · DPI up",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 9,
+			"control": "G9 · Programmable button",
+			"aliases": [],
+			"notes": "No fixed default function; user-programmable via SetPoint/LGS."
+		}
+	],
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 5700
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ 1.0/LGS onboard profile",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy HID++ 1.0",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G500 storage has not been validated by the modern sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The physical order is kept distinct from G502 because there is no profile-cycle control in this mapping.",
+			"DPI maximum corrected 8200 -> 5700: libratbag's logitech-g500.device declares DpiRange=0:5700@23.53 for 0xC068. 8200 is G500s's confirmed ceiling (logitech-g500s.device, 0xC24E, DpiRange=0:8200@50), not G500's -- the two figures appear to have been conflated between the sibling files.",
+			"Corrected 2026-09-17: reduced from 10 to 9 buttons, dropping the 'Wheel tilt left/right' pair entirely and renaming 'DPI Shift' to 'Scroll wheel mode shift'. The official 94-page G500 manual's numbered overview diagram has no wheel-tilt/horizontal-scroll callout at all, and the technical-specifications page has no 'supports horizontal' field either (unlike G500s, which explicitly has both) -- the tilt pair was very likely bled in from the G500s sibling file, same shape of error as the DPI-maximum conflation above. The button previously labeled 'DPI Shift' is really the wheel's free-spin/click-to-click mode-shift button, unrelated to DPI (same function already documented on G9/G9x as 'Mode Shift Button')."
+		]
+	},
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://www.manualslib.com/guide/2945219/logitech-g500-gaming-mouse-manual.html",
+		"https://support.logi.com/hc/en-us/articles/360023305634-G500-Technical-Specifications"
+	]
+}

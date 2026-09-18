@@ -1,0 +1,106 @@
+{
+	"schemaVersion": 1,
+	"id": "g403-hero",
+	"name": "G403 HERO",
+	"match": {
+		"nameContains": ["G403 HERO"],
+		"productIDs": ["0xC08F"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI button",
+			"aliases": ["Top DPI"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 25600
+	},
+	"profileIO": {
+		"supported": true,
+		"capability": "HID++ 2.0 ONBOARD_PROFILES",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "0; fallback 1 when empty",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "standard-hidpp20-sector-write",
+			"startWrite": "0x60",
+			"writeData": "0x70",
+			"endWrite": "0x80",
+			"chunkBytes": "16",
+			"backup": "exact binary sector before write",
+			"verify": "CRC and full-sector readback"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control",
+			"buttonOffsetByFormat": "format 4/5 -> 32; format 6/7 -> 48",
+			"crc": "CRC-16/CCITT-FALSE"
+		},
+		"notes": [
+			"G403 HERO shares the wired G403 shell and six-control mapping, upgraded to the HERO 25K sensor (100-25600 DPI). This is a separate hardware SKU (PID 0xC08F) from the original PMW3366 G403 (g403.json, PID 0xC082) and the wired-only Prodigy variant (g403-prodigy.json, PID 0xC083)."
+		]
+	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [4, 5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 0,
+				"name": "Scroll wheel"
+			},
+			{
+				"index": 1,
+				"name": "Logo"
+			}
+		],
+		"notes": [
+			"Validated legacy onboard RGB records: four 11-byte records begin at offset 208; this device exposes the scroll-wheel and logo zones. Only the three-byte solid-color field is edited."
+		]
+	},
+	"sources": [
+		"https://www.logitechg.com/en-us/shop/p/g403-hero-gaming-mouse",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g403-hero.device",
+		"https://github.com/pwr-Solaar/Solaar/blob/master/lib/logitech_receiver/descriptors.py"
+	]
+}

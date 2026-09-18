@@ -1,0 +1,100 @@
+{
+	"schemaVersion": 1,
+	"id": "g705",
+	"name": "G705",
+	"match": {
+		"nameContains": ["G705"],
+		"productIDs": ["0xC096", "0x409D", "0xB02E"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI Shift",
+			"aliases": ["Top-mounted DPI"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 8200
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "HID++ profile transport unverified",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "runtime-detected",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Confirm the Aurora firmware's profile format and sector layout before enabling writes",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "4 bytes per control if standard HID++",
+			"buttonOffsetByFormat": "runtime-validated",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The six-button physical mapping follows Logitech's documented two-thumb-button plus top DPI layout; transport remains conservative until hardware capture is available."
+		]
+	},
+	"rgbProfile": {
+		"supported": true,
+		"profileFormats": [5],
+		"baseOffset": 208,
+		"recordBytes": 11,
+		"colorOffset": 1,
+		"zones": [
+			{
+				"index": 1,
+				"name": "LIGHTSYNC RGB (8-LED array)"
+			}
+		],
+		"deviceNameContains": ["G705"],
+		"productIDs": ["0xC096", "0x409D", "0xB02E"],
+		"notes": [
+			"libratbag applies the same G502X_PLUS lighting quirk to G705, indicating it reuses the G502 X PLUS eight-LED LIGHTSYNC array implementation; transport writes remain read-only until confirmed by hardware capture (see profileIO)."
+		]
+	},
+	"sources": [
+		"https://www.logitechg.com/en-us/products/gaming-mice/g705-wireless-gaming-mouse.html",
+		"https://github.com/libratbag/libratbag/blob/master/data/devices/logitech-g705.device"
+	]
+}

@@ -1,0 +1,11 @@
+{
+	"[c]": {
+		"editor.defaultFormatter": "xaver.clang-format",
+		"editor.formatOnSave": true
+	},
+	"[objective-c]": {
+		"editor.defaultFormatter": "xaver.clang-format",
+		"editor.formatOnSave": true
+	},
+	"clang-format.style": "file"
+}

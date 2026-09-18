@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026
+//
+// lope: a deliberately small, read-first Logitech HID++ utility for
+// macOS. Protocol constants and layout knowledge are based on public Solaar,
+// libratbag, lowtech, and omm.py research; see docs/PROTOCOL.md.
+
+#ifndef LOPE_LOGITECH_ONBOARD_TYPES_H
+#define LOPE_LOGITECH_ONBOARD_TYPES_H
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#define LOGITECH_VID 0x046D
+#define HIDPP_USAGE_PAGE 0xFF00
+#define MOUSE_USAGE_PAGE 0x0001
+#define MOUSE_USAGE 0x0002
+
+#define REPORT_SHORT 0x10
+#define REPORT_LONG 0x11
+#define SHORT_REPORT_BYTES 7
+#define LONG_REPORT_BYTES 20
+#define MAX_REPORT_BYTES 64
+#define MAX_FEATURE_REPORT_BYTES 256
+#define MAX_SECTOR_BYTES 4096
+#define MAX_FEATURES 128
+#define MAX_DEVICES 64
+#define MAX_HEADERS 32
+#define MAX_DPI_VALUES 1024
+#define MAX_BATCH_BUTTON_CHANGES 64
+#define MAX_BATCH_RGB_CHANGES 4
+#define MAX_BATCH_PROFILE_CHANGES MAX_HEADERS
+#define SW_ID 0x0B
+
+#define FEATURE_ROOT 0x0000
+#define FEATURE_SET 0x0001
+#define FEATURE_DEVICE_NAME 0x0005
+#define FEATURE_ADJUSTABLE_DPI 0x2201
+#define FEATURE_ADJUSTABLE_REPORT_RATE 0x8060
+#define FEATURE_EXTENDED_REPORT_RATE 0x8061
+#define FEATURE_ONBOARD_PROFILES 0x8100
+
+// HID++ 1.0 receiver registers used to enumerate paired devices.
+#define REGISTER_RECEIVER_CONNECTION 0x0002
+#define REGISTER_RECEIVER_INFO 0x02B5
+#define RECEIVER_INFO_INFORMATION 0x03
+#define RECEIVER_INFO_PAIRING 0x20
+#define RECEIVER_INFO_DEVICE_NAME 0x40
+
+#define ONBOARD_GET_INFO 0x00
+#define ONBOARD_SET_MODE 0x10
+#define ONBOARD_GET_MODE 0x20
+#define ONBOARD_SET_CURRENT_PROFILE 0x30
+#define ONBOARD_GET_CURRENT_PROFILE 0x40
+#define ONBOARD_READ_SECTOR 0x50
+#define ONBOARD_START_WRITE 0x60
+#define ONBOARD_WRITE_DATA 0x70
+#define ONBOARD_END_WRITE 0x80
+#define ONBOARD_GET_CURRENT_DPI_INDEX 0xB0
+#define ONBOARD_SET_CURRENT_DPI_INDEX 0xC0
+
+#define ONBOARD_MODE_ONBOARD 0x01
+#define ONBOARD_MODE_HOST 0x02
+
+#define BACKUP_HEADER_BYTES 20
+#define BACKUP_MAGIC "LOGIOB02"
+#define MAX_BACKUP_SECTORS 32
+
+// Format-4/5 profile sectors reserve four 11-byte lighting records after the
+// profile name. The first byte is the effect mode and bytes 1..3 are RGB.
+#define RGB_PROFILE_BASE_OFFSET 208
+#define RGB_PROFILE_RECORD_BYTES 11
+#define RGB_PROFILE_COLOR_OFFSET 1
+#define RGB_PROFILE_RECORD_COUNT 4
+
+// HID objects are defined in hid_types.h. Keeping this pointer opaque lets
+// protocol, profile, backup, and command declarations use Device without
+// importing CoreFoundation or IOKit.
+typedef struct HidChannel HidChannel;
+typedef struct HidContext HidContext;
+typedef struct HidInterface HidInterface;
+
+typedef struct {
+    uint16_t id;
+    uint8_t index;
+    uint8_t version;
+} Feature;
+
+#define MAX_REPORT_RATES 8
+
+typedef struct {
+    uint32_t hertz;
+    uint8_t wire_value;
+} ReportRateEntry;
+
+typedef struct {
+    uint16_t feature_id;
+    uint16_t supported_mask;
+    ReportRateEntry rates[MAX_REPORT_RATES];
+    size_t rate_count;
+    uint32_t current_hertz;
+    bool current_valid;
+} ReportRateCapabilities;
+
+typedef struct {
+    HidInterface *iface;
+    // Stable product identity for the paired mouse. Direct devices use their
+    // HID product ID; receiver-backed slots use the mouse WPID from the
+    // receiver pairing record. This is deliberately separate from
+    // iface->product_id, which identifies the transport interface (often the
+    // receiver) and is still required for HID++ routing.
+    uint32_t mouse_product_id;
+    // device_number is the address returned by discovery and is useful for
+    // identifying receiver slots. request_device_number is the address that
+    // must be used for subsequent HID++ calls; a direct wireless endpoint can
+    // report a slot alias while still requiring 0xFF for commands.
+    uint8_t device_number;
+    uint8_t request_device_number;
+    double protocol;
+    bool prefer_long_reports;
+    Feature features[MAX_FEATURES];
+    size_t feature_count;
+    char name[256];
+} Device;
+
+typedef enum {
+    REPLY_OK = 0,
+    REPLY_TIMEOUT = 1,
+    REPLY_HIDPP10_ERROR = 2,
+    REPLY_HIDPP20_ERROR = 3,
+    REPLY_IO_ERROR = 4,
+    REPLY_PROTOCOL_ERROR = 5,
+} ReplyStatus;
+
+typedef struct {
+    ReplyStatus status;
+    uint8_t error_code;
+    uint8_t device_number;
+    uint8_t bytes[MAX_REPORT_BYTES];
+    size_t length;
+} Reply;
+
+typedef struct {
+    uint8_t memory;
+    uint8_t profile_format;
+    uint8_t macro_format;
+    uint8_t profile_count;
+    uint8_t out_of_band;
+    uint8_t button_count;
+    uint8_t sector_count;
+    uint16_t sector_size;
+    uint8_t shift_flags;
+} ProfileInfo;
+
+typedef struct {
+    uint16_t sector;
+    uint8_t enabled;
+} ProfileHeader;
+
+typedef struct {
+    ProfileInfo info;
+    ProfileHeader headers[MAX_HEADERS];
+    size_t header_count;
+    size_t selected_header;
+    uint8_t *data;
+    size_t data_length;
+    bool crc_ok;
+    bool crc_checked;
+    size_t button_offset;
+    size_t valid_specs;
+    size_t known_specs;
+    bool layout_supported;
+    size_t gshift_button_offset;
+    size_t gshift_valid_specs;
+    size_t gshift_known_specs;
+    bool gshift_layout_supported;
+    size_t dpi_offset;
+    size_t dpi_count;
+    uint8_t dpi_default_index;
+    uint8_t dpi_shift_index;
+    // Value used to terminate the on-device DPI table. This is firmware
+    // family-specific: some mice use 0 while others use 0xFFFF.
+    uint16_t dpi_unused_value;
+    bool dpi_layout_supported;
+    size_t rgb_offset;
+    size_t rgb_zone_count;
+    bool rgb_zone_present[RGB_PROFILE_RECORD_COUNT];
+    bool rgb_layout_supported;
+} Profile;
+
+typedef struct {
+    const char *command;
+    const char *path;
+    const char *target;
+    const char *backup_path;
+    int device_index;
+    const char *device_key;
+    int slot;
+    int profile;
+    bool headers_only;
+    bool summary_only;
+    bool sensor_only;
+    bool include_dpi;
+    bool include_report_rate;
+    // `--format json` selects the versioned process boundary. It is kept in
+    // the command options so the CLI can choose presentation without changing
+    // the typed engine operation inputs.
+    bool structured_output;
+    int button;
+    int dpi_default;
+    int dpi_shift;
+    const char *dpi_values;
+    const char *report_rate;
+    const char *backup_directory;
+    const char *operation_id;
+    const char *button_changes[MAX_BATCH_BUTTON_CHANGES];
+    size_t button_change_count;
+    const char *rgb_changes[MAX_BATCH_RGB_CHANGES];
+    size_t rgb_change_count;
+    const char *rgb_mode_changes[MAX_BATCH_RGB_CHANGES];
+    size_t rgb_mode_change_count;
+    const char *profile_state_changes[MAX_BATCH_PROFILE_CHANGES];
+    size_t profile_state_change_count;
+    bool yes;
+    const char *positionals[8];
+    size_t positional_count;
+} Options;
+
+typedef struct {
+    uint16_t sector;
+    uint16_t size;
+    const uint8_t *data;
+} BackupSectorSource;
+
+typedef struct {
+    uint16_t sector;
+    uint16_t size;
+    uint8_t *data;
+} BackupSector;
+
+typedef struct {
+    uint16_t vendor_id;
+    uint16_t product_id;
+    uint8_t device_number;
+    uint8_t profile_format;
+    size_t sector_count;
+    BackupSector sectors[MAX_BACKUP_SECTORS];
+} BackupPackage;
+
+#endif // LOPE_LOGITECH_ONBOARD_TYPES_H

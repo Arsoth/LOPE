@@ -1,0 +1,103 @@
+{
+	"schemaVersion": 1,
+	"id": "g400s",
+	"name": "G400s",
+	"match": {
+		"nameContains": ["G400S"],
+		"productIDs": ["0xC24C"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		},
+		{
+			"number": 6,
+			"control": "G6 · DPI increase",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 7,
+			"control": "G7 · DPI decrease",
+			"aliases": [],
+			"notes": null
+		},
+		{
+			"number": 8,
+			"control": "G8 · Generic button",
+			"aliases": [],
+			"notes": "Freely reprogrammable via Logitech Gaming Software; has no fixed default function of its own."
+		},
+		{
+			"number": 9,
+			"control": "G9 · Default DPI reset",
+			"aliases": [],
+			"notes": "Immediately switches the mouse back to its default tracking sensitivity (800 dpi)."
+		}
+	],
+	"dpiRange": {
+		"minimum": 200,
+		"maximum": 4000
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "legacy HID++ profile transport",
+		"feature": "legacy",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --profile <number>",
+			"getInfo": "legacy/runtime",
+			"readSector": "legacy/runtime",
+			"controlSector": "legacy/runtime",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "Legacy G400s storage has not been validated by the modern sector writer",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "legacy/runtime",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"The eight-control layout follows the G402-style DPI control arrangement; keep legacy writes disabled until captured from hardware.",
+			"Corrected 2026-09-17: expanded from 8 to 9 buttons, confirmed by G400s's own dedicated official Getting Started PDF (identical numbered diagram to G400: DPI increase, DPI decrease, reprogrammable 'Generic Button 3', default-DPI-reset, Forward, Back, plus L/R/Middle = 9). The short-form technical-specifications page's 'DPI toggle' item is most likely a loose paraphrase covering both Generic Button 3 and the default-DPI-reset button as one bucket."
+		]
+	},
+	"sources": [
+		"https://github.com/libratbag/libratbag/wiki/Devices",
+		"https://the-sz.com/products/usbid/index.php?v=0x046D",
+		"http://www.logitech.com/assets/47975/2/g400s-optical-gaming-mouse-quick-start-guide.pdf",
+		"https://support.logi.com/hc/en-us/articles/360023465473-Logitech-G400s-Optical-Gaming-Mouse-Technical-Specifications"
+	]
+}

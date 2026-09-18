@@ -1,0 +1,8 @@
+#ifndef LOPE_LOGITECH_ONBOARD_COMMANDS_SET_PROFILE_STATE_H
+#define LOPE_LOGITECH_ONBOARD_COMMANDS_SET_PROFILE_STATE_H
+
+#include "types.h"
+
+int run_set_profile_state(const Options *options);
+
+#endif // LOPE_LOGITECH_ONBOARD_COMMANDS_SET_PROFILE_STATE_H

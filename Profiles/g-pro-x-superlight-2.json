@@ -1,0 +1,76 @@
+{
+	"schemaVersion": 1,
+	"id": "g-pro-x-superlight-2",
+	"name": "PRO X SUPERLIGHT 2",
+	"match": {
+		"nameContains": ["PRO X SUPERLIGHT 2"],
+		"productIDs": ["0xC09B"]
+	},
+	"buttons": [
+		{
+			"number": 1,
+			"control": "G1 · Primary click",
+			"aliases": ["Left"],
+			"notes": null
+		},
+		{
+			"number": 2,
+			"control": "G2 · Secondary click",
+			"aliases": ["Right"],
+			"notes": null
+		},
+		{
+			"number": 3,
+			"control": "G3 · Middle click",
+			"aliases": ["Wheel click"],
+			"notes": null
+		},
+		{
+			"number": 4,
+			"control": "G4 · Back",
+			"aliases": ["Rear thumb"],
+			"notes": null
+		},
+		{
+			"number": 5,
+			"control": "G5 · Forward",
+			"aliases": ["Front thumb"],
+			"notes": null
+		}
+	],
+	"dpiRange": {
+		"minimum": 100,
+		"maximum": 44000
+	},
+	"profileIO": {
+		"supported": false,
+		"capability": "HID++ profile transport unverified",
+		"feature": "0x8100",
+		"load": {
+			"command": "profiles",
+			"engineArguments": "--summary-only --with-dpi --profile <number>",
+			"getInfo": "0x00",
+			"readSector": "0x50",
+			"controlSector": "runtime-detected",
+			"explicitProfile": "required when multiple slots"
+		},
+		"save": {
+			"strategy": "read-only",
+			"reason": "HERO 2/LIGHTFORCE firmware variants need a captured profile descriptor before standard writes are enabled",
+			"backup": "required",
+			"verify": "required"
+		},
+		"layout": {
+			"buttonRecord": "runtime-reported",
+			"buttonOffsetByFormat": "runtime-validated",
+			"crc": "runtime-validated"
+		},
+		"notes": [
+			"This is the plain PRO X SUPERLIGHT 2; the 2C, 2 SE, and DEX variants expose the same five-button logical mapping in product specifications, but each model's profile transport must be verified per firmware family, so they are cataloged in their own files."
+		]
+	},
+	"sources": [
+		"https://www.logitechg.com/en-us/shop/c/gaming-mice",
+		"https://github.com/libratbag/libratbag/issues/1519"
+	]
+}
