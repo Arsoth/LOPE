@@ -33,6 +33,40 @@ private final class LOPEAppDelegate: NSObject, NSApplicationDelegate {
     mainWindow = window
 
     window.makeKeyAndOrderFront(nil)
+    addCenteredTitlebarTitle(to: window)
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  private func addCenteredTitlebarTitle(to window: NSWindow) {
+    guard let closeButton = window.standardWindowButton(.closeButton) else { return }
+    let title = window.title
+    window.title = ""
+
+    var titlebarView = closeButton.superview
+    while let currentView = titlebarView,
+      let superview = currentView.superview
+    {
+      titlebarView = superview
+      if superview.bounds.width >= window.frame.width - 1 {
+        break
+      }
+    }
+
+    guard let titlebarView else { return }
+
+    let titleLabel = NSTextField(labelWithString: title)
+    titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+    titleLabel.alignment = .center
+    titleLabel.setAccessibilityLabel(title)
+    titleLabel.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
+    titlebarView.addSubview(titleLabel, positioned: .above, relativeTo: nil)
+
+    let titleSize = NSSize(width: 160, height: 22)
+    titleLabel.frame = NSRect(
+      x: (titlebarView.bounds.width - titleSize.width) / 2,
+      y: (titlebarView.bounds.height - titleSize.height) / 2,
+      width: titleSize.width,
+      height: titleSize.height
+    )
   }
 }
