@@ -162,6 +162,22 @@ struct ContentView: View {
           ?? L10n.text("Choose “Left click” for the primary-click button, then save again.")
       )
     }
+    .alert(
+      Text(L10n.text("Update available")),
+      isPresented: Binding(
+        get: { model.updateAvailable != nil },
+        set: { if !$0 { model.dismissAvailableUpdate() } }
+      )
+    ) {
+      Button(L10n.text("Install update")) {
+        model.installAvailableUpdate()
+      }
+      Button(L10n.text("Later"), role: .cancel) {
+        model.dismissAvailableUpdate()
+      }
+    } message: {
+      Text(model.updateAvailableMessage)
+    }
   }
 
   private var tabBar: some View {

@@ -242,6 +242,41 @@ struct SettingsPane: View {
           .padding(4)
           .frame(width: contentWidth, alignment: .leading)
         }
+        GroupBox(L10n.text("Updates")) {
+          VStack(alignment: .leading, spacing: 6) {
+            Toggle(
+              L10n.text("Check for updates on launch"),
+              isOn: Binding(
+                get: { model.automaticUpdateChecksEnabled },
+                set: { model.setAutomaticUpdateChecksEnabled($0) }
+              )
+            )
+            .toggleStyle(.checkbox)
+            .tint(theme.checkboxActive)
+            Text(
+              L10n.text(
+                "When enabled, LOPE checks GitHub for a newer release each time it launches."
+              )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+              Button(L10n.text("Check now"), action: model.checkForUpdates)
+                .disabled(model.updateCheckInProgress)
+              if model.updateCheckInProgress {
+                ProgressView()
+                  .controlSize(.small)
+              }
+              if let message = model.updateCheckMessage {
+                Text(message)
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+              }
+            }
+          }
+          .padding(4)
+          .frame(width: contentWidth, alignment: .leading)
+        }
         Spacer()
       }
       .padding(.top, 4)
@@ -250,6 +285,17 @@ struct SettingsPane: View {
     }
     .onAppear {
       model.updateInputMonitoringAuthorization()
+    }
+    .alert(
+      Text(L10n.text("Update could not be installed")),
+      isPresented: Binding(
+        get: { model.updateErrorMessage != nil },
+        set: { if !$0 { model.updateErrorMessage = nil } }
+      )
+    ) {
+      Button(L10n.text("OK")) { model.updateErrorMessage = nil }
+    } message: {
+      Text(model.updateErrorMessage ?? "")
     }
   }
 

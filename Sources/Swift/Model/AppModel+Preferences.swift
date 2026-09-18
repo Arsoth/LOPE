@@ -8,6 +8,7 @@ enum AppModelPreferenceKeys {
   static let lightThemeID = "\(AppConstants.defaultsPrefix).lightThemeID"
   static let darkThemeID = "\(AppConstants.defaultsPrefix).darkThemeID"
   static let keyboardKeyGroups = "\(AppConstants.defaultsPrefix).keyboardKeyGroups"
+  static let automaticUpdateChecks = "\(AppConstants.defaultsPrefix).automaticUpdateChecks"
 }
 
 @MainActor
@@ -102,6 +103,24 @@ extension AppModel {
       .filter { enabledKeyboardKeyGroups.contains($0) }
       .map(\.rawValue)
     UserDefaults.standard.set(stored, forKey: AppModelPreferenceKeys.keyboardKeyGroups)
+  }
+
+  func loadUpdatePreferences() {
+    if let stored = UserDefaults.standard.object(
+      forKey: AppModelPreferenceKeys.automaticUpdateChecks) as? Bool
+    {
+      automaticUpdateChecksEnabled = stored
+    } else {
+      automaticUpdateChecksEnabled = true
+    }
+  }
+
+  func setAutomaticUpdateChecksEnabled(_ enabled: Bool) {
+    automaticUpdateChecksEnabled = enabled
+    UserDefaults.standard.set(enabled, forKey: AppModelPreferenceKeys.automaticUpdateChecks)
+    if !enabled {
+      cancelUpdateCheck()
+    }
   }
 
   var filteredExtendedKeyboardKeyGroups: [KeyboardKeyGroupChoice] {

@@ -12,11 +12,19 @@ final class AppModelPreferencesTests: XCTestCase {
   private let lightThemeKey = "\(AppConstants.defaultsPrefix).lightThemeID"
   private let darkThemeKey = "\(AppConstants.defaultsPrefix).darkThemeID"
   private let keyboardGroupsKey = "\(AppConstants.defaultsPrefix).keyboardKeyGroups"
+  private let automaticUpdateChecksKey =
+    "\(AppConstants.defaultsPrefix).automaticUpdateChecks"
+
+  override func setUp() {
+    super.setUp()
+    UserDefaults.standard.removeObject(forKey: automaticUpdateChecksKey)
+  }
 
   override func tearDown() {
     UserDefaults.standard.removeObject(forKey: lightThemeKey)
     UserDefaults.standard.removeObject(forKey: darkThemeKey)
     UserDefaults.standard.removeObject(forKey: keyboardGroupsKey)
+    UserDefaults.standard.removeObject(forKey: automaticUpdateChecksKey)
     ThemeCatalog.reload(customThemesDirectory: nil)
     super.tearDown()
   }
@@ -119,6 +127,18 @@ final class AppModelPreferencesTests: XCTestCase {
     XCTAssertEqual(model.selectedLightThemeID, "light")
     XCTAssertEqual(model.selectedDarkThemeID, "dark")
     XCTAssertEqual(model.enabledKeyboardKeyGroups, [.media, .other])
+  }
+
+  func testAutomaticUpdateChecksDefaultToEnabledAndPersist() {
+    let model = AppModel(startInitialRefresh: false)
+    XCTAssertTrue(model.automaticUpdateChecksEnabled)
+
+    model.setAutomaticUpdateChecksEnabled(false)
+    XCTAssertFalse(model.automaticUpdateChecksEnabled)
+    XCTAssertFalse(UserDefaults.standard.bool(forKey: automaticUpdateChecksKey))
+
+    let reloaded = AppModel(startInitialRefresh: false)
+    XCTAssertFalse(reloaded.automaticUpdateChecksEnabled)
   }
 
   func testKeyboardKeyGroupsDefaultToStandardAndPersistIndependently() {

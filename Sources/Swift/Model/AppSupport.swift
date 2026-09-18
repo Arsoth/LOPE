@@ -23,6 +23,7 @@ enum AppConstants {
   static let engineName = "lope"
   static let appSupportDirectory = "LOPE"
   static let defaultsPrefix = "LOPE"
+  static let updateRepository = "Arsoth/LOPE"
   static let lastSelectedDeviceKey = "lastSelectedDevice"
   static let backupExtension = "logiob"
   static let appearancePreferenceKey = "appearancePreference"

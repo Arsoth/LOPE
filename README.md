@@ -49,6 +49,8 @@ non-standard keyboard keys, and the color mode. Color mode defaults to
 **System**; Light is a soft off-white theme and Dark keeps the colorblind-safe
 DPI palette. Settings also shows how many mice are built in and can open the
 custom profiles folder, which starts with an example file showing the format.
+The **Updates** section can check GitHub for a newer release at launch and
+download and install it when one is available.
 
 MX mice are detected but do not show the generic button-editor fallback, and
 catalog entries whose onboard format is not validated remain read-only. Their

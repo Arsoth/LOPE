@@ -60,6 +60,11 @@ final class AppModel: ObservableObject {
   @Published var selectedLightThemeID = "light"
   @Published var selectedDarkThemeID = "dark"
   @Published var enabledKeyboardKeyGroups: Set<KeyboardKeyGroup> = [.standard]
+  @Published var automaticUpdateChecksEnabled = true
+  @Published var updateCheckInProgress = false
+  @Published var updateAvailable: AppUpdateRelease?
+  @Published var updateCheckMessage: String?
+  @Published var updateErrorMessage: String?
 
   /// The editor can remain visible while discovery/profile reads are in
   /// flight. Its controls are then catalog-derived or preserved from the
@@ -82,6 +87,8 @@ final class AppModel: ObservableObject {
   var rgbEditingAllZones = false
   var currentDeviceName = ""
   var refreshTask: Task<Void, Never>?
+  var updateCheckTask: Task<Void, Never>?
+  var updateInstallTask: Task<Void, Never>?
   var refreshGeneration = 0
   var recoveryDeviceKey: String?
   var discoveredBackups: [BackupEntry] = []
@@ -255,6 +262,7 @@ final class AppModel: ObservableObject {
 
   var configurationDirectory: URL
   let defaultConfigurationDirectory: URL
+  let updateClient: AppUpdateClient
 
   var backupDirectory: URL {
     configurationDirectory.appendingPathComponent("Backups", isDirectory: true)
@@ -264,7 +272,8 @@ final class AppModel: ObservableObject {
     configurationDirectory.appendingPathComponent("Custom Profiles", isDirectory: true)
   }
 
-  init(startInitialRefresh: Bool = true) {
+  init(startInitialRefresh: Bool = true, updateClient: AppUpdateClient = .live) {
+    self.updateClient = updateClient
     let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
       .appendingPathComponent(AppConstants.appSupportDirectory, isDirectory: true)
     defaultConfigurationDirectory = base
@@ -293,6 +302,7 @@ final class AppModel: ObservableObject {
     reloadThemes()
     loadThemePreferences()
     loadKeyboardKeyPreferences()
+    loadUpdatePreferences()
     MouseProfileCatalog.reload(customProfilesDirectory: customProfilesDirectory)
     refreshBackups()
     if startInitialRefresh {
@@ -301,6 +311,7 @@ final class AppModel: ObservableObject {
       Task { @MainActor in
         initialRefresh()
         startReconnectMonitor()
+        startAutomaticUpdateCheck()
       }
     }
   }
